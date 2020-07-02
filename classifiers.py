@@ -1,37 +1,80 @@
-from abc import ABC
+import abc
 from commons import Patch
-from typing import Dict
+from typing import Dict, List, Tuple, Callable
 from commons import Slide
 import numpy as np
+from tifffile import imwrite
 
 
-class FeatureSet(object):
-    def __init__(self, patch: Patch, features=Dict):
+class PatchFeature:
+    def __init__(self, patch: Patch, data: Dict):
         self.patch = patch
-        self.features = features
+        self.data = data
 
     def __str__(self):
-        return f'{self.patch}, features: {self.features}'
+        return f'{self.patch}, data: {self.data}'
 
 
-class Classifier(ABC):
-    def classify_patch(patch: Patch) -> FeatureSet:
+class FeatureTIFFRenderer(abc.ABC):
+    @abc.abstractmethod
+    def render(self, filename: str, features: List[PatchFeature]):
+        pass
+
+
+def karolinska_rgb_convert(features: List[PatchFeature]):
+    for feature in features:
+        yield np.full((feature.patch.size + (3, )), (int(
+            round(feature.data[KarolinskaDummyClassifier.Feature.
+                               CANCER_PERCENTAGE] * 255)), 0, 0), 'uint8')
+
+
+class BasicFeatureTIFFRenderer:
+    def __init__(
+        self,
+        rgb_convert: Callable,
+        shape: Tuple[int, int],
+    ):
+        self._shape = shape
+        self._rgb_convert = rgb_convert
+
+    def render(self, filename: str, features: List[PatchFeature]):
+        imwrite(filename,
+                self._rgb_convert(features),
+                dtype='uint8',
+                shape=self._shape + (3, ),
+                photometric='rgb',
+                tile=features[0].patch.size)
+
+
+class Classifier(abc.ABC):
+    @abc.abstractmethod
+    def classify_patch(patch: Patch) -> PatchFeature:
         pass
 
 
 class KarolinskaDummyClassifier(Classifier):
+    class Feature:
+        CANCER_PERCENTAGE = 'cancer_percentage'
+
     def __init__(self, mask: Slide):
         self.mask = mask
 
-    def classify_patch(self, patch: Patch) -> FeatureSet:
+    def classify_patch(self, patch: Patch) -> PatchFeature:
         image = self.mask.read_region(location=(patch.x, patch.y),
                                       level=0,
-                                      size=(patch.size.x, patch.size.y))
+                                      size=patch.size)
 
         data = np.array(image.getchannel(0).getdata())
-        feature_set = FeatureSet(
+        features = PatchFeature(
             patch, {
-                "cancer_percentage":
+                KarolinskaDummyClassifier.Feature.CANCER_PERCENTAGE:
                 sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
             })
-        return feature_set
+        return features
+
+    def classify(self,
+                 patch_size: Tuple[int, int] = None) -> List[PatchFeature]:
+        features = []
+        for patch in self.mask.iterate_by_patch(patch_size):
+            features.append(self.classify_patch(patch))
+        return features
