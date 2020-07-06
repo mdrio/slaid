@@ -23,9 +23,11 @@ class FeatureTIFFRenderer(abc.ABC):
 
 def karolinska_rgb_convert(features: List[PatchFeature]):
     for feature in features:
-        yield np.full((feature.patch.size + (3, )), (int(
-            round(feature.data[KarolinskaDummyClassifier.Feature.
-                               CANCER_PERCENTAGE] * 255)), 0, 0), 'uint8')
+        cancer_percentage = feature.data[
+            KarolinskaDummyClassifier.Feature.CANCER_PERCENTAGE]
+        data = (int(round(cancer_percentage * 255)), 0, 0,
+                255) if cancer_percentage > 0 else (0, 0, 0, 0)
+        yield np.full(feature.patch.size + (4, ), data, 'uint8')
 
 
 class BasicFeatureTIFFRenderer:
@@ -41,9 +43,10 @@ class BasicFeatureTIFFRenderer:
         imwrite(filename,
                 self._rgb_convert(features),
                 dtype='uint8',
-                shape=(self._shape[1], self._shape[0], 3),
+                shape=(self._shape[1], self._shape[0], 4),
                 photometric='rgb',
-                tile=features[0].patch.size)
+                tile=features[0].patch.size,
+                extrasamples=('ASSOCALPHA', ))
 
 
 class Classifier(abc.ABC):
