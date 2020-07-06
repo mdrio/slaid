@@ -41,7 +41,7 @@ class BasicFeatureTIFFRenderer:
         imwrite(filename,
                 self._rgb_convert(features),
                 dtype='uint8',
-                shape=self._shape + (3, ),
+                shape=(self._shape[1], self._shape[0], 3),
                 photometric='rgb',
                 tile=features[0].patch.size)
 

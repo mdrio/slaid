@@ -5,8 +5,8 @@ from typing import Tuple
 class Slide(OpenSlide):
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         patch_size = patch_size if patch_size else (256, 256)
-        for x in range(0, self.dimensions[0], patch_size[0]):
-            for y in range(0, self.dimensions[1], patch_size[1]):
+        for y in range(0, self.dimensions[1], patch_size[1]):
+            for x in range(0, self.dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
 
 
