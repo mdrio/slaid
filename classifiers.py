@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Callable
 from commons import Slide
 import numpy as np
 from tifffile import imwrite
+from PIL import Image, ImageDraw, ImageFont
 
 
 class PatchFeature:
@@ -21,13 +22,26 @@ class FeatureTIFFRenderer(abc.ABC):
         pass
 
 
-def karolinska_rgb_convert(features: List[PatchFeature]):
+def karolinska_rgb_convert(features: List[PatchFeature]) -> np.array:
     for feature in features:
         cancer_percentage = feature.data[
             KarolinskaDummyClassifier.Feature.CANCER_PERCENTAGE]
-        data = (int(round(cancer_percentage * 255)), 0, 0,
+        mask_value = int(round(cancer_percentage * 255))
+        data = (mask_value, mask_value, mask_value,
                 255) if cancer_percentage > 0 else (0, 0, 0, 0)
         yield np.full(feature.patch.size + (4, ), data, 'uint8')
+
+
+def karolinska_text_convert(features: List[PatchFeature]) -> np.array:
+    for feature in features:
+        cancer_percentage = feature.data[
+            KarolinskaDummyClassifier.Feature.CANCER_PERCENTAGE]
+        red = int(round(cancer_percentage * 255))
+        txt = Image.new("RGBA", feature.patch.size, (0, 0, 0, 0))
+        fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 30)
+        d = ImageDraw.Draw(txt)
+        d.text((10, 10), f'{red}', font=fnt, fill=(255, 0, 0, 255))
+        yield np.asarray(txt)
 
 
 class BasicFeatureTIFFRenderer:
