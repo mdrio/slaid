@@ -5,5 +5,5 @@ COPY src/* opt/slide_classifier/
 RUN apt update && apt install -y openslide-tools && \
     pip install -r /opt/slide_classifier/requirements.txt
 
-ENTRYPOINT /opt/slide_classifier/runner.py
+ENTRYPOINT ["/opt/slide_classifier/runner.py"]
 
