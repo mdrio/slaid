@@ -27,8 +27,8 @@ def karolinska_rgb_convert(features: List[PatchFeature]) -> np.array:
         cancer_percentage = feature.data[
             KarolinskaDummyClassifier.Feature.CANCER_PERCENTAGE]
         mask_value = int(round(cancer_percentage * 255))
-        data = (mask_value, mask_value, mask_value,
-                255) if cancer_percentage > 0 else (0, 0, 0, 0)
+        data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
+                                                                      0)
         yield np.full(feature.patch.size + (4, ), data, 'uint8')
 
 
