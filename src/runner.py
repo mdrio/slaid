@@ -3,6 +3,8 @@
 
 from commons import Slide
 import classifiers
+import pickle
+import os
 
 
 def classify_mask(in_filename, out_filename, classifier_name, *args):
@@ -10,7 +12,11 @@ def classify_mask(in_filename, out_filename, classifier_name, *args):
 
     cl = getattr(classifiers, classifier_name).create(*args)
 
+    feature_pkl_name = os.path.splitext(out_filename)[0] + '.pkl'
+    print(feature_pkl_name)
     features = cl.classify(slide)
+    pickle.dump(features, open(feature_pkl_name, 'wb'))
+
     renderer = classifiers.BasicFeatureTIFFRenderer(
         classifiers.karolinska_rgb_convert, slide.dimensions)
     print('rendering...')
