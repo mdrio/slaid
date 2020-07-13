@@ -1,11 +1,13 @@
 import abc
-from commons import Patch
+from commons import Patch, SlideIterator
 from typing import Dict, List, Tuple, Callable
 from commons import Slide
 import numpy as np
 from tifffile import imwrite
 from PIL import Image, ImageDraw, ImageFont
 import random
+import os
+from multiprocessing import Pool
 
 
 class PatchFeature:
@@ -115,3 +117,19 @@ class KarolinskaTrueValueClassifier(Classifier):
                 sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
             })
         return features
+
+
+class KarolinskaParallelTrueValueClassifier(KarolinskaTrueValueClassifier):
+    def __init__(self, mask: Slide):
+        self.mask = mask
+
+    @staticmethod
+    def create(mask_filename):
+        return KarolinskaParallelTrueValueClassifier(Slide(mask_filename))
+
+    def classify(self,
+                 slide: Slide,
+                 patch_size: Tuple[int, int] = None) -> List[PatchFeature]:
+        with Pool(os.cpu_count()) as pool:
+            return pool.map(self.classify_patch,
+                            SlideIterator(self.mask, patch_size))

@@ -13,7 +13,7 @@ class Slide:
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]):
-        return self._slide(location, level, size)
+        return self._slide.read_region(location, level, size)
 
     def __getstate__(self):
         return self._filename
@@ -26,6 +26,15 @@ class Slide:
         for y in range(0, self.dimensions[1], patch_size[1]):
             for x in range(0, self.dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
+
+
+class SlideIterator:
+    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
+        self._slide = slide
+        self._patch_size = patch_size
+
+    def __iter__(self):
+        return self._slide.iterate_by_patch(self._patch_size)
 
 
 class Patch:
