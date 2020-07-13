@@ -86,7 +86,7 @@ class KarolinskaFeature:
 
 class KarolinskaRandomClassifier(Classifier):
     @staticmethod
-    def create():
+    def create(*args):
         return KarolinskaRandomClassifier()
 
     def classify_patch(self, patch: Patch) -> PatchFeature:
