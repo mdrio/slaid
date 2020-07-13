@@ -11,6 +11,7 @@ def classify_mask(in_filename, out_filename, classifier_name, *args):
     slide = Slide(in_filename)
 
     cl = getattr(classifiers, classifier_name).create(*args)
+    print(cl)
 
     feature_pkl_name = os.path.splitext(out_filename)[0] + '.pkl'
     print(feature_pkl_name)
