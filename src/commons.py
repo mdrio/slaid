@@ -2,7 +2,25 @@ from openslide import OpenSlide
 from typing import Tuple
 
 
-class Slide(OpenSlide):
+class Slide:
+    def __init__(self, filename: str):
+        self._filename = filename
+        self._slide = OpenSlide(filename)
+
+    @property
+    def dimensions(self):
+        return self._slide.dimensions
+
+    def read_region(self, location: Tuple[int, int], level: int,
+                    size: Tuple[int, int]):
+        return self._slide(location, level, size)
+
+    def __getstate__(self):
+        return self._filename
+
+    def __setstate__(self, filename):
+        self.__init__(filename)
+
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         patch_size = patch_size if patch_size else (256, 256)
         for y in range(0, self.dimensions[1], patch_size[1]):
