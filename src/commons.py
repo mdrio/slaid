@@ -1,6 +1,12 @@
 from openslide import OpenSlide
 from typing import Tuple
 import os
+import sys
+import inspect
+
+
+def get_class(name, module):
+    return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
 class Slide:

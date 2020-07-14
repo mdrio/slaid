@@ -1,5 +1,5 @@
 import abc
-from commons import Patch, SlideIterator
+from commons import Patch, SlideIterator, get_class
 from typing import Dict, List, Tuple, Callable
 from commons import Slide
 import numpy as np
@@ -20,16 +20,31 @@ class PatchFeature:
         return f'{self.patch}, data: {self.data}'
 
 
-class PatchFeatureJsonEncoder(json.JSONEncoder):
+class PatchFeatureCollection:
+    def __init__(self, slide: Slide, features: List[PatchFeature]):
+        self.slide = slide
+        self.features = features
+
+    def __getitem__(self, key):
+        return self.features.__getitem__(key)
+
+
+class JSONEncoder(json.JSONEncoder):
+    def _encode_patch_feature(self, feature: PatchFeature):
+
+        return {
+            'slide': feature.patch.slide.ID,
+            'x': feature.patch.x,
+            'y': feature.patch.y,
+            'size': feature.patch.size,
+            'data': feature.data
+        }
+
     def default(self, obj):
         if isinstance(obj, PatchFeature):
-            return {
-                'slide': obj.patch.slide.ID,
-                'x': obj.patch.x,
-                'y': obj.patch.y,
-                'size': obj.patch.size,
-                'data': obj.data
-            }
+            return self._encode_patch_feature(obj)
+        elif isinstance(obj, PatchFeatureCollection):
+            return [self._encode_patch_feature(f) for f in obj.features]
         return super().default(obj)
 
 
@@ -84,16 +99,16 @@ class Classifier(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def classify_patch(patch: Patch) -> PatchFeature:
+    def classify_patch(self, patch: Patch) -> PatchFeature:
         pass
 
     def classify(self,
                  slide: Slide,
-                 patch_size: Tuple[int, int] = None) -> List[PatchFeature]:
+                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
         features = []
         for patch in slide.iterate_by_patch(patch_size):
             features.append(self.classify_patch(patch))
-        return features
+        return PatchFeatureCollection(slide, features)
 
 
 class KarolinskaFeature:
@@ -106,9 +121,9 @@ class KarolinskaRandomClassifier(Classifier):
         return KarolinskaRandomClassifier()
 
     def classify_patch(self, patch: Patch) -> PatchFeature:
-        features = PatchFeature(
+        feature = PatchFeature(
             patch, {KarolinskaFeature.CANCER_PERCENTAGE: random.random()})
-        return features
+        return feature
 
 
 class KarolinskaTrueValueClassifier(Classifier):
@@ -125,25 +140,31 @@ class KarolinskaTrueValueClassifier(Classifier):
                                       size=patch.size)
 
         data = np.array(image.getchannel(0).getdata())
-        features = PatchFeature(
+        feature = PatchFeature(
             patch, {
                 KarolinskaFeature.CANCER_PERCENTAGE:
                 sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
             })
-        return features
+        return feature
 
 
-class KarolinskaParallelTrueValueClassifier(KarolinskaTrueValueClassifier):
-    def __init__(self, mask: Slide):
-        self.mask = mask
+class ParallelClassifier(Classifier):
+    def __init__(self, classifier: Classifier):
+        self._classifier = classifier
 
     @staticmethod
-    def create(mask_filename):
-        return KarolinskaParallelTrueValueClassifier(Slide(mask_filename))
+    def create(classifier_cls_name: str, *args):
+        return ParallelClassifier(
+            get_class(classifier_cls_name, 'classifiers').create(*args))
+
+    def classify_patch(self, patch: Patch) -> PatchFeature:
+        return self._classifier(patch)
 
     def classify(self,
                  slide: Slide,
-                 patch_size: Tuple[int, int] = None) -> List[PatchFeature]:
+                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
         with Pool(os.cpu_count()) as pool:
-            return pool.map(self.classify_patch,
-                            SlideIterator(self.mask, patch_size))
+            return PatchFeatureCollection(
+                slide,
+                pool.map(self._classifier.classify_patch,
+                         SlideIterator(slide, patch_size)))

@@ -13,7 +13,7 @@ def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
 
     features = cl.classify(slide)
     with open(json_filename, 'w') as json_file:
-        json.dump(features, json_file, cls=classifiers.PatchFeatureJsonEncoder)
+        json.dump(features, json_file, cls=classifiers.JSONEncoder)
 
     renderer = classifiers.BasicFeatureTIFFRenderer(
         classifiers.karolinska_rgb_convert, slide.dimensions)
