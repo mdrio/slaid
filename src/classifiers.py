@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 import random
 import os
 from multiprocessing import Pool
+import json
 
 
 class PatchFeature:
@@ -17,6 +18,19 @@ class PatchFeature:
 
     def __str__(self):
         return f'{self.patch}, data: {self.data}'
+
+
+class PatchFeatureJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, PatchFeature):
+            return {
+                'slide': obj.patch.slide.ID,
+                'x': obj.patch.x,
+                'y': obj.patch.y,
+                'size': obj.patch.size,
+                'data': obj.data
+            }
+        return super().default(obj)
 
 
 class FeatureTIFFRenderer(abc.ABC):

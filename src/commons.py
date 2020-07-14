@@ -1,5 +1,6 @@
 from openslide import OpenSlide
 from typing import Tuple
+import os
 
 
 class Slide:
@@ -10,6 +11,10 @@ class Slide:
     @property
     def dimensions(self):
         return self._slide.dimensions
+
+    @property
+    def ID(self):
+        return os.path.basename(self._filename)
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]):

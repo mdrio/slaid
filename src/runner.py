@@ -3,24 +3,22 @@
 
 from commons import Slide
 import classifiers
-import pickle
-import os
+import json
 
 
-def classify_mask(in_filename, out_filename, classifier_name, *args):
+def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
     slide = Slide(in_filename)
 
     cl = getattr(classifiers, classifier_name).create(*args)
 
-    feature_pkl_name = os.path.splitext(out_filename)[0] + '.pkl'
-    print(feature_pkl_name)
     features = cl.classify(slide)
-    pickle.dump(features, open(feature_pkl_name, 'wb'))
+    with open(json_filename, 'w') as json_file:
+        json.dump(features, json_file, cls=classifiers.PatchFeatureJsonEncoder)
 
     renderer = classifiers.BasicFeatureTIFFRenderer(
         classifiers.karolinska_rgb_convert, slide.dimensions)
     print('rendering...')
-    renderer.render(out_filename, features)
+    renderer.render(tiff_filename, features)
 
 
 if __name__ == '__main__':
@@ -28,13 +26,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('input')
-    parser.add_argument('output')
+    parser.add_argument('-t', dest='tiff_filename')
     parser.add_argument('-c',
                         dest='classifier',
                         default='KarolinskaTrueValueClassifier')
     parser.add_argument('classifier_args', nargs='*')
+    parser.add_argument('-j', dest='json_filename')
 
     args = parser.parse_args()
 
-    classify_mask(args.input, args.output, args.classifier,
-                  *args.classifier_args)
+    main(args.classifier, args.input, args.tiff_filename, args.json_filename,
+         *args.classifier_args)
