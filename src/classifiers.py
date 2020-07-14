@@ -16,17 +16,42 @@ class PatchFeature:
         self.patch = patch
         self.data = data
 
+    @property
+    def size(self):
+        return self.patch.size
+
+    @property
+    def x(self):
+        return self.patch.x
+
+    @property
+    def y(self):
+        return self.patch.y
+
     def __str__(self):
         return f'{self.patch}, data: {self.data}'
 
 
 class PatchFeatureCollection:
-    def __init__(self, slide: Slide, features: List[PatchFeature]):
+    def __init__(self, slide: Slide, patch_size, features: List[PatchFeature]):
         self.slide = slide
+        self.patch_size = patch_size
         self.features = features
 
     def __getitem__(self, key):
         return self.features.__getitem__(key)
+
+    def __iter__(self):
+        return self.features
+
+    def order_features(self):
+        features_ordered = [None] * len(self.features)
+        patch_per_row = self.slide.size[1] / self.patch_size[1]
+        for f in self.features:
+            index = f.y // self.patch_size[1] * patch_per_row\
+                + f.x // self.patch_size[0]
+            features_ordered[int(index)] = f
+        self.features = features_ordered
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -108,7 +133,7 @@ class Classifier(abc.ABC):
         features = []
         for patch in slide.iterate_by_patch(patch_size):
             features.append(self.classify_patch(patch))
-        return PatchFeatureCollection(slide, features)
+        return PatchFeatureCollection(slide, patch_size, features)
 
 
 class KarolinskaFeature:
@@ -165,6 +190,18 @@ class ParallelClassifier(Classifier):
                  patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
         with Pool(os.cpu_count()) as pool:
             return PatchFeatureCollection(
-                slide,
+                slide, patch_size,
                 pool.map(self._classifier.classify_patch,
                          SlideIterator(slide, patch_size)))
+
+
+class ClusterGenerator(abc.ABC):
+    @abc.abstractmethod
+    def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
+        pass
+
+
+class BasicClusterGenerator(ClusterGenerator):
+    def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
+        n_patch_x = features.slide.size[0] / features.patch_size[0]
+        n_patch_y = features.slide.size[1] / features.patch_size[1]
