@@ -28,8 +28,12 @@ class PatchFeature:
     def y(self):
         return self.patch.y
 
-    def __str__(self):
-        return f'{self.patch}, data: {self.data}'
+    def __eq__(self, other):
+        return self.x == other.x and self.y == self.y and\
+            self.size == other.size and self.data == other.data
+
+    def __repr__(self):
+        return f'{self.x}, {self.y}, {self.size}, {self.data}'
 
 
 class PatchFeatureCollection:
@@ -44,14 +48,8 @@ class PatchFeatureCollection:
     def __iter__(self):
         return self.features
 
-    def order_features(self):
-        features_ordered = [None] * len(self.features)
-        patch_per_row = self.slide.size[1] / self.patch_size[1]
-        for f in self.features:
-            index = f.y // self.patch_size[1] * patch_per_row\
-                + f.x // self.patch_size[0]
-            features_ordered[int(index)] = f
-        self.features = features_ordered
+    def sort(self):
+        self.features.sort(key=lambda e: e.patch.index)
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -201,7 +199,7 @@ class ClusterGenerator(abc.ABC):
         pass
 
 
-class BasicClusterGenerator(ClusterGenerator):
-    def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
-        n_patch_x = features.slide.size[0] / features.patch_size[0]
-        n_patch_y = features.slide.size[1] / features.patch_size[1]
+#  class BasicClusterGenerator(ClusterGenerator):
+#      def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
+#          n_patch_x = features.slide.size[0] / features.patch_size[0]
+#          n_patch_y = features.slide.size[1] / features.patch_size[1]
