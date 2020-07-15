@@ -191,15 +191,3 @@ class ParallelClassifier(Classifier):
                 slide, patch_size,
                 pool.map(self._classifier.classify_patch,
                          SlideIterator(slide, patch_size)))
-
-
-class ClusterGenerator(abc.ABC):
-    @abc.abstractmethod
-    def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
-        pass
-
-
-#  class BasicClusterGenerator(ClusterGenerator):
-#      def clusterize(features: PatchFeatureCollection) -> PatchFeatureCollection:
-#          n_patch_x = features.slide.size[0] / features.patch_size[0]
-#          n_patch_y = features.slide.size[1] / features.patch_size[1]
