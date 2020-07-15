@@ -191,3 +191,129 @@ class ParallelClassifier(Classifier):
                 slide, patch_size,
                 pool.map(self._classifier.classify_patch,
                          SlideIterator(slide, patch_size)))
+
+
+class PatchExtractor(abc.ABC):
+    @abc.abstractmethod
+    def extract_patches(self, slide: Slide,
+                        patch_size: Tuple[int, int]) -> List[Patch]:
+        pass
+
+
+class TissueMaskPredictor(abc.ABC):
+    @abc.abstractmethod
+    def get_tissue_mask(image: Image, threshold: float) -> np.array:
+        pass
+
+
+class BasicTissueMaskPredictor(TissueMaskPredictor):
+    def __init__(self, model):
+        self._model = model
+
+    def get_tissue_mask(self, image: Image, threshold: float) -> np.array:
+        np_img = np.array(image)
+        n_px = np_img.shape[0] * np_img.shape[1]
+        x = np_img[:, :, :3].reshape(n_px, 3)
+
+        #  if self.ann_model:
+        #      pred = self.model.predict(x, batch_size=self.bs)
+        #  else:
+        #      pred = self.model.predict(x)
+        #
+        pred = self.model.predict(x)
+        msk_pred = pred.reshape(np_img.shape[0], np_img.shape[1])
+        msk_pred[msk_pred < threshold] = 0
+        msk_pred[msk_pred > threshold] = 1
+
+        return msk_pred
+
+
+class TissueDetector(PatchExtractor):
+    def __init__(self,
+                 predictor: TissueMaskPredictor,
+                 mask_threshold: float = 0.5,
+                 patch_threshold: float = 0.8,
+                 level: int = 2):
+        self._predictor = predictor
+        self._mask_threshold = mask_threshold
+        self._patch_threshold = patch_threshold
+        self._level = level
+
+    def _get_mask_tissue_from_slide(self, slide, threshold, level=2):
+
+        dims = slide.level_dimensions
+        ds = [int(i) for i in slide.level_downsamples]
+
+        x0 = 0
+        y0 = 0
+        x1 = dims[0][0]
+        y1 = dims[0][1]
+
+        delta_x = x1 - x0
+        delta_y = y1 - y0
+
+        pil_img = slide.read_region(location=(x0, y0),
+                                    level=level,
+                                    size=(delta_x // ds[level],
+                                          delta_y // ds[level]))
+        return self._predictor.get_tissue_mask(pil_img, threshold)
+
+    def _get_tissue_patches_coordinates(self,
+                                        slide,
+                                        tissue_mask,
+                                        patch_size,
+                                        extraction_lev=0):
+
+        tissue_mask *= 255
+        # resize and use to extract patches
+        lev = slide.get_best_level_for_downsample(16)
+        lev_dim = slide.level_dimensions[lev]
+
+        big_x = slide.level_dimensions[extraction_lev][0]
+        big_y = slide.level_dimensions[extraction_lev][1]
+
+        # downsampling factor of level0 with respect  patch size
+        dim_x, dim_y = patch_size
+        xx = round(big_x / dim_x)
+        yy = round(big_y / dim_y)
+
+        mask = Image.new('L', lev_dim)
+        mask.putdata(tissue_mask.flatten())
+        mask = mask.resize((xx, yy), resample=Image.BILINEAR)
+        tissue = [(x, y) for x in range(xx) for y in range(yy)
+                  if mask.getpixel((x, y)) > 0]
+        random.shuffle(tissue)  # randomly permute the elements
+
+        ext_lev_ds = slide.level_downsamples[extraction_lev]
+        return [(round(x * big_x / xx * ext_lev_ds),
+                 round(y * big_y / yy * ext_lev_ds)) for (x, y) in tissue]
+
+    def extract_patches(self, slide: Slide,
+                        patch_size: Tuple[int, int]) -> List[Patch]:
+        tissue_patches = []
+
+        lev = slide.get_best_level_for_downsample(16)
+        lev_dim = slide.level_dimensions[lev]
+        thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
+        tissue_mask = self._predictor.get_tissue_mask(thumb,
+                                                      self._mask_threshold)
+
+        dim_x, dim_y = patch_size
+        patch_area = dim_x * dim_y
+        patch_area_th = patch_area * self._patch_threshold
+        extraction_lev = 0  # TODO check it is correct
+
+        patch_coordinates = self._get_tissue_patches_coordinates(
+            slide, tissue_mask, patch_size)
+        for (coor_x, coor_y) in patch_coordinates:
+            patch = slide.read_region(location=(coor_x, coor_y),
+                                      level=extraction_lev,
+                                      size=(dim_x, dim_y))
+
+            tissue_area = np.sum(
+                self._predictor.get_tissue_mask(patch, self._patch_threshold))
+
+            if tissue_area > patch_area_th:
+                tissue_patches.append(
+                    Patch(slide, (coor_x, coor_y), (dim_x, dim_y)))
+        return tissue_patches

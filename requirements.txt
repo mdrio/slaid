@@ -2,3 +2,4 @@ setuptools==45
 numpy
 tiffile
 openslide-python
+sklearn
