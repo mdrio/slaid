@@ -11,7 +11,7 @@ class DummyModel:
     def __init__(self, res):
         self.res = res
 
-    def get_predict(self, *args):
+    def predict(self, *args):
         return self.res
 
 
@@ -58,6 +58,17 @@ class TestTissueDetector(unittest.TestCase):
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueDetector(predictor)
         patches = tissue_detector.extract_patches(slide, (10, 10))
+        self.assertEqual(len(patches), 0)
+
+    def test_detector_all_tissue(self):
+        size = (100, 100)
+        image = Image.new('RGB', size)
+        slide = DummySlide('slide', size, image)
+        model = DummyModel(np.ones(size[0] * size[1]))
+        predictor = BasicTissueMaskPredictor(model)
+        tissue_detector = TissueDetector(predictor)
+        patches = tissue_detector.extract_patches(slide, (10, 10))
+        self.assertEqual(len(patches), 100)
 
 
 if __name__ == '__main__':

@@ -38,6 +38,17 @@ class Slide:
             for x in range(0, self.dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
 
+    def get_best_level_for_downsample(self, downsample: int):
+        return self._slide.get_best_level_for_downsample(downsample)
+
+    @property
+    def level_dimensions(self):
+        return self._slide.level_dimensions
+
+    @property
+    def level_downsamples(self):
+        return self._slide.level_downsamples
+
 
 class SlideIterator:
     def __init__(self, slide: Slide, patch_size: Tuple[int, int]):

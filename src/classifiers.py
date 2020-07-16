@@ -220,7 +220,7 @@ class BasicTissueMaskPredictor(TissueMaskPredictor):
         #  else:
         #      pred = self.model.predict(x)
         #
-        pred = self.model.predict(x)
+        pred = self._model.predict(x)
         msk_pred = pred.reshape(np_img.shape[0], np_img.shape[1])
         msk_pred[msk_pred < threshold] = 0
         msk_pred[msk_pred > threshold] = 1
