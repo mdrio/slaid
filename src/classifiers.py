@@ -37,19 +37,34 @@ class PatchFeature:
 
 
 class PatchFeatureCollection:
+    @staticmethod
+    def create(slide, patch_size, default_data):
+        features = []
+        for patch in slide.iterate_by_patch(patch_size):
+            features.append(PatchFeature(patch, default_data))
+        return PatchFeatureCollection(slide, patch_size, features)
+
     def __init__(self, slide: Slide, patch_size, features: List[PatchFeature]):
         self.slide = slide
         self.patch_size = patch_size
-        self.features = features
+        self._features = features
+        self._coordinates_index = {}
+
+    def get_by_coordinates(self, coordinates):
+        if not self._coordinates_index:
+            for feature in self._features:
+                self._coordinates_index[(feature.patch.x,
+                                         feature.patch.y)] = feature
+        return self._coordinates_index[coordinates]
 
     def __getitem__(self, key):
-        return self.features.__getitem__(key)
+        return self._features.__getitem__(key)
 
     def __iter__(self):
-        return self.features
+        return iter(self._features)
 
     def sort(self):
-        self.features.sort(key=lambda e: e.patch.index)
+        self._features.sort(key=lambda e: e.patch.index)
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -193,13 +208,6 @@ class ParallelClassifier(Classifier):
                          SlideIterator(slide, patch_size)))
 
 
-class PatchExtractor(abc.ABC):
-    @abc.abstractmethod
-    def extract_patches(self, slide: Slide,
-                        patch_size: Tuple[int, int]) -> List[Patch]:
-        pass
-
-
 class TissueMaskPredictor(abc.ABC):
     @abc.abstractmethod
     def get_tissue_mask(image: Image, threshold: float) -> np.array:
@@ -228,7 +236,11 @@ class BasicTissueMaskPredictor(TissueMaskPredictor):
         return msk_pred
 
 
-class TissueDetector(PatchExtractor):
+class TissueFeature:
+    TISSUE_PERCENTAGE = 'tissue_percentage'
+
+
+class TissueClassifier(Classifier):
     def __init__(self,
                  predictor: TissueMaskPredictor,
                  mask_threshold: float = 0.5,
@@ -238,6 +250,12 @@ class TissueDetector(PatchExtractor):
         self._mask_threshold = mask_threshold
         self._patch_threshold = patch_threshold
         self._level = level
+
+    @staticmethod
+    def create(predictor_cls_name: str, *args):
+        #  return TissueClassifier(
+        #      get_class(predictor_cls_name, 'classifiers').create(*args))
+        raise NotImplementedError()
 
     def _get_mask_tissue_from_slide(self, slide, threshold, level=2):
 
@@ -288,9 +306,12 @@ class TissueDetector(PatchExtractor):
         return [(round(x * big_x / xx * ext_lev_ds),
                  round(y * big_y / yy * ext_lev_ds)) for (x, y) in tissue]
 
-    def extract_patches(self, slide: Slide,
-                        patch_size: Tuple[int, int]) -> List[Patch]:
-        tissue_patches = []
+    def classify_patch(self, patch: Patch) -> PatchFeature:
+        raise NotImplementedError
+
+    def classify(self,
+                 slide: Slide,
+                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
 
         lev = slide.get_best_level_for_downsample(16)
         lev_dim = slide.level_dimensions[lev]
@@ -300,11 +321,15 @@ class TissueDetector(PatchExtractor):
 
         dim_x, dim_y = patch_size
         patch_area = dim_x * dim_y
-        patch_area_th = patch_area * self._patch_threshold
+        #  patch_area_th = patch_area * self._patch_threshold
         extraction_lev = 0  # TODO check it is correct
 
         patch_coordinates = self._get_tissue_patches_coordinates(
             slide, tissue_mask, patch_size)
+
+        feature_collection = PatchFeatureCollection.create(
+            slide, patch_size, {TissueFeature.TISSUE_PERCENTAGE: 0.0})
+
         for (coor_x, coor_y) in patch_coordinates:
             patch = slide.read_region(location=(coor_x, coor_y),
                                       level=extraction_lev,
@@ -313,7 +338,7 @@ class TissueDetector(PatchExtractor):
             tissue_area = np.sum(
                 self._predictor.get_tissue_mask(patch, self._patch_threshold))
 
-            if tissue_area > patch_area_th:
-                tissue_patches.append(
-                    Patch(slide, (coor_x, coor_y), (dim_x, dim_y)))
-        return tissue_patches
+            feature_collection.get_by_coordinates((coor_x, coor_y)).data[
+                TissueFeature.TISSUE_PERCENTAGE] = tissue_area / patch_area
+
+        return feature_collection

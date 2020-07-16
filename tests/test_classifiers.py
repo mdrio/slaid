@@ -1,6 +1,6 @@
 import unittest
 from classifiers import PatchFeature, PatchFeatureCollection,\
-    BasicTissueMaskPredictor, TissueDetector
+    BasicTissueMaskPredictor, TissueClassifier, TissueFeature
 from PIL import Image
 import numpy as np
 from commons import Patch
@@ -46,29 +46,38 @@ class TestPatchFeatureCollection(unittest.TestCase):
         collection = PatchFeatureCollection(slide, patch_size,
                                             reversed_features)
         collection.sort()
-        self.assertEqual(features, collection.features)
+        self.assertEqual(features, collection._features)
 
 
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
-        size = (100, 100)
-        image = Image.new('RGB', size)
-        slide = DummySlide('slide', size, image)
-        model = DummyModel(np.zeros(size[0] * size[1]))
+        slide_size = (100, 100)
+        patch_size = (10, 10)
+        image = Image.new('RGB', patch_size)
+        slide = DummySlide('slide', slide_size, image)
+        model = DummyModel(np.zeros(patch_size[0] * patch_size[1]))
         predictor = BasicTissueMaskPredictor(model)
-        tissue_detector = TissueDetector(predictor)
-        patches = tissue_detector.extract_patches(slide, (10, 10))
-        self.assertEqual(len(patches), 0)
+        tissue_detector = TissueClassifier(predictor)
+        patch_collection = tissue_detector.classify(slide, (10, 10))
+        self.assertEqual(len(patch_collection._features), 100)
+        for patch_feature in patch_collection:
+            self.assertEqual(
+                patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 0)
 
     def test_detector_all_tissue(self):
-        size = (100, 100)
-        image = Image.new('RGB', size)
-        slide = DummySlide('slide', size, image)
-        model = DummyModel(np.ones(size[0] * size[1]))
+
+        slide_size = (100, 100)
+        patch_size = (10, 10)
+        image = Image.new('RGB', patch_size)
+        slide = DummySlide('slide', slide_size, image)
+        model = DummyModel(np.ones(patch_size[0] * patch_size[1]))
         predictor = BasicTissueMaskPredictor(model)
-        tissue_detector = TissueDetector(predictor)
-        patches = tissue_detector.extract_patches(slide, (10, 10))
-        self.assertEqual(len(patches), 100)
+        tissue_detector = TissueClassifier(predictor)
+        patch_collection = tissue_detector.classify(slide, (10, 10))
+        self.assertEqual(len(patch_collection._features), 100)
+        for patch_feature in patch_collection:
+            self.assertEqual(
+                patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 1)
 
 
 if __name__ == '__main__':
