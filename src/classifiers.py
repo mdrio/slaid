@@ -66,6 +66,12 @@ class PatchFeatureCollection:
     def sort(self):
         self._features.sort(key=lambda e: e.patch.index)
 
+    def filter(
+            self, condition: Callable[[PatchFeature],
+                                      bool]) -> "PatchFeatureCollection":
+        features = [f for f in self._features if condition(f)]
+        return PatchFeatureCollection(self._slide, self.patch_size, features)
+
 
 class JSONEncoder(json.JSONEncoder):
     def _encode_patch_feature(self, feature: PatchFeature):
