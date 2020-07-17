@@ -30,9 +30,7 @@ class TestTissueDetector(unittest.TestCase):
     def test_detector_all_tissue(self):
 
         slide_size = (100, 100)
-        patch_size = (10, 10)
-        image = Image.new('RGB', patch_size)
-        slide = DummySlide('slide', slide_size, image)
+        slide = DummySlide('slide', slide_size)
         model = DummyModel(np.ones)
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueClassifier(predictor)
