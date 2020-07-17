@@ -8,20 +8,19 @@ from test_commons import DummySlide
 
 
 class DummyModel:
-    def __init__(self, res):
-        self.res = res
+    def __init__(self, func):
+        self.func = func
 
-    def predict(self, *args):
-        return self.res
+    def predict(self, array):
+        return self.func(array.shape[0])
 
 
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
         slide_size = (100, 100)
         patch_size = (10, 10)
-        image = Image.new('RGB', patch_size)
-        slide = DummySlide('slide', slide_size, image)
-        model = DummyModel(np.zeros(patch_size[0] * patch_size[1]))
+        slide = DummySlide('slide', slide_size)
+        model = DummyModel(np.zeros)
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueClassifier(predictor)
         patch_collection = tissue_detector.classify(slide, (10, 10))
@@ -36,7 +35,7 @@ class TestTissueDetector(unittest.TestCase):
         patch_size = (10, 10)
         image = Image.new('RGB', patch_size)
         slide = DummySlide('slide', slide_size, image)
-        model = DummyModel(np.ones(patch_size[0] * patch_size[1]))
+        model = DummyModel(np.ones)
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueClassifier(predictor)
         patch_collection = tissue_detector.classify(slide, (10, 10))

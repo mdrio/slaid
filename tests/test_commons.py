@@ -15,12 +15,10 @@ class DummySlide(Slide):
     def __init__(self,
                  ID: str,
                  size: Tuple[int, int],
-                 image: Image = None,
-                 best_level_for_downsample: int = 2,
+                 best_level_for_downsample: int = 1,
                  level_downsample: int = 1):
         self._id = ID
         self.size = size
-        self.image = image
         self.best_level_for_downsample = best_level_for_downsample
         self._level_dimensions = DummySlide.DummyIndexable(size)
         self._level_downsample = DummySlide.DummyIndexable(level_downsample)
@@ -31,7 +29,7 @@ class DummySlide(Slide):
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]):
-        return self.image
+        return Image.new('RGB', size)
 
     @property
     def ID(self):
