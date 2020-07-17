@@ -16,26 +16,25 @@ class DummyModel:
 
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
-        slide_size = (100, 100)
-        slide = DummySlide('slide', slide_size)
+        slide = DummySlide('slide', (100, 100))
         model = DummyModel(np.zeros)
-        predictor = BasicTissueMaskPredictor(model)
-        tissue_detector = TissueClassifier(predictor)
-        patch_collection = tissue_detector.classify(slide, (10, 10))
-        self.assertEqual(len(patch_collection), 100)
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+
+        patch_size = (10, 10)
+        patch_collection = tissue_detector.classify(slide, patch_size)
+        self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
         for patch_feature in patch_collection:
             self.assertEqual(
                 patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 0)
 
     def test_detector_all_tissue(self):
-
-        slide_size = (100, 100)
-        slide = DummySlide('slide', slide_size)
+        slide = DummySlide('slide', (100, 100))
         model = DummyModel(np.ones)
-        predictor = BasicTissueMaskPredictor(model)
-        tissue_detector = TissueClassifier(predictor)
-        patch_collection = tissue_detector.classify(slide, (10, 10))
-        self.assertEqual(len(patch_collection), 100)
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+
+        patch_size = (10, 10)
+        patch_collection = tissue_detector.classify(slide, patch_size)
+        self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
         for patch_feature in patch_collection:
             self.assertEqual(
                 patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 1)
