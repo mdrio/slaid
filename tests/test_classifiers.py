@@ -1,9 +1,8 @@
 import unittest
-from classifiers import PatchFeature, PatchFeatureCollection,\
-    BasicTissueMaskPredictor, TissueClassifier, TissueFeature
+from classifiers import BasicTissueMaskPredictor,\
+    TissueClassifier, TissueFeature
 from PIL import Image
 import numpy as np
-from commons import Patch
 from test_commons import DummySlide
 
 
@@ -18,7 +17,6 @@ class DummyModel:
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
         slide_size = (100, 100)
-        patch_size = (10, 10)
         slide = DummySlide('slide', slide_size)
         model = DummyModel(np.zeros)
         predictor = BasicTissueMaskPredictor(model)
