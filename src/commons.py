@@ -73,20 +73,7 @@ class Patch:
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.size = size
-        self._index = self.slide.convert_coordinates_to_index(
-            coordinates, size)
-
-    @property
-    def index(self):
-        return self._index
 
     def __str__(self):
         return (f'slide: {self.slide}, x: {self.x}, '
                 f'y: {self.y}, size: {self.size}')
-
-    def __lt__(self, other):
-        return self._index < other._index
-
-    def __eq__(self, other):
-        return self.slide == other.slide and\
-            self.size == other.size and self._index == other._index

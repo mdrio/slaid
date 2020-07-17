@@ -15,40 +15,6 @@ class DummyModel:
         return self.res
 
 
-class TestPatchFeatureCollection(unittest.TestCase):
-    def test_sort(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        features = [
-            PatchFeature(Patch(slide, (0, 0), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 100), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 200), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 300), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                0,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                100,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                200,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                300,
-            ), patch_size), {}),
-        ]
-
-        reversed_features = list(reversed(features))
-        collection = PatchFeatureCollection(slide, patch_size,
-                                            reversed_features)
-        collection.sort()
-        self.assertEqual(features, collection._features)
-
-
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
         slide_size = (100, 100)
@@ -59,7 +25,7 @@ class TestTissueDetector(unittest.TestCase):
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueClassifier(predictor)
         patch_collection = tissue_detector.classify(slide, (10, 10))
-        self.assertEqual(len(patch_collection._features), 100)
+        self.assertEqual(len(patch_collection), 100)
         for patch_feature in patch_collection:
             self.assertEqual(
                 patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 0)
@@ -74,7 +40,7 @@ class TestTissueDetector(unittest.TestCase):
         predictor = BasicTissueMaskPredictor(model)
         tissue_detector = TissueClassifier(predictor)
         patch_collection = tissue_detector.classify(slide, (10, 10))
-        self.assertEqual(len(patch_collection._features), 100)
+        self.assertEqual(len(patch_collection), 100)
         for patch_feature in patch_collection:
             self.assertEqual(
                 patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 1)

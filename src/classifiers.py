@@ -9,6 +9,8 @@ import random
 import os
 from multiprocessing import Pool
 import json
+import pandas
+from collections import defaultdict
 
 
 class PatchFeature:
@@ -47,30 +49,41 @@ class PatchFeatureCollection:
     def __init__(self, slide: Slide, patch_size, features: List[PatchFeature]):
         self.slide = slide
         self.patch_size = patch_size
-        self._features = features
-        self._coordinates_index = {}
 
-    def get_by_coordinates(self, coordinates):
-        if not self._coordinates_index:
-            for feature in self._features:
-                self._coordinates_index[(feature.patch.x,
-                                         feature.patch.y)] = feature
-        return self._coordinates_index[coordinates]
+        data = defaultdict(lambda: [])
+        for f in features:
+            data['x'].append(f.x)
+            data['y'].append(f.y)
+            for k, v in f.data.items():
+                data[k].append(v)
+        self._dataframe = pandas.DataFrame(data, index=[data['x'], data['y']])
 
-    def __getitem__(self, key):
-        return self._features.__getitem__(key)
+    #  def get_by_coordinates(self, coordinates):
+    #      return self._create_patch_feature(self._dataframe.loc[coordinates[0],
+    #                                                            coordinates[1]])
+
+    def _create_patch_feature(self, data: Tuple) -> PatchFeature:
+        x, y = data[:2]
+        features = dict(data[2:])
+        return PatchFeature(Patch(self.slide, (x, y), self.patch_size),
+                            features)
 
     def __iter__(self):
-        return iter(self._features)
+        for data in self._dataframe.iterrows():
+            yield self._create_patch_feature(data[1])
 
-    def sort(self):
-        self._features.sort(key=lambda e: e.patch.index)
+    def __len__(self):
+        return len(self._dataframe)
 
-    def filter(
-            self, condition: Callable[[PatchFeature],
-                                      bool]) -> "PatchFeatureCollection":
-        features = [f for f in self._features if condition(f)]
-        return PatchFeatureCollection(self._slide, self.patch_size, features)
+    @property
+    def dataframe(self):
+        return self._dataframe
+
+    def __getitem__(self, key):
+        return self._dataframe.loc[key]
+
+    def update_feature(self, coordinates, feature, value):
+        self._dataframe.loc[coordinates, feature] = value
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -344,7 +357,8 @@ class TissueClassifier(Classifier):
             tissue_area = np.sum(
                 self._predictor.get_tissue_mask(patch, self._patch_threshold))
 
-            feature_collection.get_by_coordinates((coor_x, coor_y)).data[
-                TissueFeature.TISSUE_PERCENTAGE] = tissue_area / patch_area
+            feature_collection.update_feature((coor_x, coor_y),
+                                              TissueFeature.TISSUE_PERCENTAGE,
+                                              tissue_area / patch_area)
 
         return feature_collection
