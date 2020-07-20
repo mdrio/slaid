@@ -1,7 +1,7 @@
 import unittest
 from typing import Tuple
 from PIL import Image
-from commons import Patch, Slide
+from commons import Slide
 
 
 class DummySlide(Slide):
@@ -16,12 +16,14 @@ class DummySlide(Slide):
                  ID: str,
                  size: Tuple[int, int],
                  best_level_for_downsample: int = 1,
-                 level_downsample: int = 1):
+                 level_downsample: int = 1,
+                 data=None):
         self._id = ID
         self.size = size
         self.best_level_for_downsample = best_level_for_downsample
         self._level_dimensions = DummySlide.DummyIndexable(size)
         self._level_downsample = DummySlide.DummyIndexable(level_downsample)
+        self.data = data
 
     @property
     def dimensions(self):
@@ -29,7 +31,13 @@ class DummySlide(Slide):
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]):
-        return Image.new('RGB', size)
+        if self.data is None:
+            return Image.new('RGB', size)
+        else:
+            data = self.data[location[0]:location[0] + size[0],
+                             location[1]:location[1] + size[1]]
+            mask = Image.fromarray(data, 'RGB')
+            return mask
 
     @property
     def ID(self):

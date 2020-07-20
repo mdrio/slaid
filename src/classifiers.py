@@ -201,7 +201,8 @@ class Classifier(abc.ABC):
 
     def classify(self, patch_collection: PatchCollection) -> PatchCollection:
         for patch in patch_collection:
-            patch_collection.update_patch(self.classify_patch(patch))
+            patch_collection.update_patch(patch=patch,
+                                          features=self.classify_patch(patch))
         return patch_collection
 
 
