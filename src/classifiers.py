@@ -1,7 +1,6 @@
 import abc
-from commons import Patch, SlideIterator, get_class
-from typing import Dict, List, Tuple, Callable
-from commons import Slide
+from commons import Patch, Slide, get_class
+from typing import List, Tuple, Callable, Any, Dict
 import numpy as np
 from tifffile import imwrite
 from PIL import Image, ImageDraw, ImageFont
@@ -9,68 +8,87 @@ import random
 import os
 from multiprocessing import Pool
 import json
-import pandas
-from collections import defaultdict
+import pandas as pd
+from collections import defaultdict, OrderedDict
 
 
-class PatchFeature:
-    def __init__(self, patch: Patch, data: Dict):
-        self.patch = patch
-        self.data = data
+class PatchCollection(abc.ABC):
+    @abc.abstractclassmethod
+    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
+                    dataframe: pd.DataFrame):
+        pass
 
-    @property
-    def size(self):
-        return self.patch.size
-
-    @property
-    def x(self):
-        return self.patch.x
+    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
+        self._slide = slide
+        self._patch_size = patch_size
 
     @property
-    def y(self):
-        return self.patch.y
+    def slide(self) -> Slide:
+        return self._slide
 
-    def __eq__(self, other):
-        return self.x == other.x and self.y == self.y and\
-            self.size == other.size and self.data == other.data
+    @property
+    def patch_size(self) -> Tuple[int, int]:
+        return self._patch_size
 
-    def __repr__(self):
-        return f'{self.x}, {self.y}, {self.size}, {self.data}'
+    @abc.abstractproperty
+    def dataframe(self) -> pd.DataFrame:
+        pass
+
+    @abc.abstractmethod
+    def __getitem__(self, coordinates: Tuple[int, int]) -> Patch:
+        pass
+
+    @abc.abstractmethod
+    def __iter__(self):
+        pass
+
+    @abc.abstractmethod
+    def __len__(self):
+        pass
+
+    @abc.abstractmethod
+    def update_patch(self,
+                     coordinates: Tuple[int, int] = None,
+                     patch: Patch = None,
+                     features: Dict = None):
+        pass
+
+    @abc.abstractproperty
+    def features(self) -> List[str]:
+        pass
+
+    @abc.abstractmethod
+    def add_feature(self, feature: str, default_value: Any = None):
+        pass
 
 
-class PatchFeatureCollection:
-    @staticmethod
-    def create(slide, patch_size, default_data):
-        features = []
-        for patch in slide.iterate_by_patch(patch_size):
-            features.append(PatchFeature(patch, default_data))
-        return PatchFeatureCollection(slide, patch_size, features)
+class PandasPatchCollection(PatchCollection):
+    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
+                    dataframe: pd.DataFrame):
+        patch_collection = cls(slide, patch_size, [])
+        # TODO add some assert to verify dataframe is compatible
+        patch_collection._dataframe = dataframe
+        return patch_collection
 
-    def __init__(self, slide: Slide, patch_size, features: List[PatchFeature]):
-        self.slide = slide
-        self.patch_size = patch_size
+    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
+        super().__init__(slide, patch_size)
+        self._dataframe = self._init_dataframe()
 
+    def _init_dataframe(self):
         data = defaultdict(lambda: [])
-        for f in features:
-            data['x'].append(f.x)
-            data['y'].append(f.y)
-            for k, v in f.data.items():
-                data[k].append(v)
-        self._dataframe = pandas.DataFrame(data, index=[data['x'], data['y']])
+        for p in self._slide.iterate_by_patch(self._patch_size):
+            data['x'].append(p.x)
+            data['y'].append(p.y)
+        return pd.DataFrame(data, index=[data['x'], data['y']])
 
-    #  def get_by_coordinates(self, coordinates):
-    #      return self._create_patch_feature(self._dataframe.loc[coordinates[0],
-    #                                                            coordinates[1]])
-
-    def _create_patch_feature(self, data: Tuple) -> PatchFeature:
+    def _create_patch(self, data: Tuple) -> Patch:
         x, y = data[:2]
         features = dict(data[2:])
-        return PatchFeature(Patch(self.slide, (x, y), self.patch_size),
-                            features)
+        return Patch(self.slide, (x, y), self.patch_size, features)
 
     def __iter__(self):
         for data in self._dataframe.iterrows():
-            yield self._create_patch_feature(data[1])
+            yield self._create_patch(data[1])
 
     def __len__(self):
         return len(self._dataframe)
@@ -82,49 +100,71 @@ class PatchFeatureCollection:
     def __getitem__(self, key):
         return self._dataframe.loc[key]
 
-    def update_feature(self, coordinates, feature, value):
-        self._dataframe.loc[coordinates, feature] = value
+    @property
+    def features(self) -> List[str]:
+        return [c for c in self._dataframe.columns[2:]]
+
+    def add_feature(self, feature: str, default_value: Any = None):
+        if feature not in self.features:
+            self.dataframe.insert(len(self._dataframe.columns), feature,
+                                  default_value)
+
+    def update_patch(self,
+                     coordinates: Tuple[int, int] = None,
+                     patch: Patch = None,
+                     features: Dict = None):
+        if patch:
+            coordinates = (patch.x, patch.y)
+
+        features = OrderedDict(features)
+        if coordinates is None:
+            raise RuntimeError('coordinates and patch cannot be None')
+
+        missing_features = features.keys() - set(self._dataframe.columns)
+        for f in missing_features:
+            self.add_feature(f)
+        self._dataframe.loc[coordinates, features.keys()] = features.values()
 
 
 class JSONEncoder(json.JSONEncoder):
-    def _encode_patch_feature(self, feature: PatchFeature):
+    def _encode_patch(self, patch: Patch):
 
         return {
-            'slide': feature.patch.slide.ID,
-            'x': feature.patch.x,
-            'y': feature.patch.y,
-            'size': feature.patch.size,
-            'data': feature.data
+            'slide': patch.slide.ID,
+            'x': patch.x,
+            'y': patch.y,
+            'size': patch.size,
+            'features': patch.features
         }
 
     def default(self, obj):
-        if isinstance(obj, PatchFeature):
-            return self._encode_patch_feature(obj)
-        elif isinstance(obj, PatchFeatureCollection):
-            return [self._encode_patch_feature(f) for f in obj.features]
+        if isinstance(obj, Patch):
+            return self._encode_patch(obj)
+        elif isinstance(obj, PatchCollection):
+            return [self._encode_patch(p) for p in obj]
         return super().default(obj)
 
 
 class FeatureTIFFRenderer(abc.ABC):
     @abc.abstractmethod
-    def render(self, filename: str, features: List[PatchFeature]):
+    def render(self, filename: str, patches: List[Patch]):
         pass
 
 
-def karolinska_rgb_convert(features: List[PatchFeature]) -> np.array:
-    for feature in features:
-        cancer_percentage = feature.data[KarolinskaFeature.CANCER_PERCENTAGE]
+def karolinska_rgb_convert(patches: List[Patch]) -> np.array:
+    for patch in patches:
+        cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
         mask_value = int(round(cancer_percentage * 255))
         data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
                                                                       0)
-        yield np.full(feature.patch.size + (4, ), data, 'uint8')
+        yield np.full(patch.size + (4, ), data, 'uint8')
 
 
-def karolinska_text_convert(features: List[PatchFeature]) -> np.array:
-    for feature in features:
-        cancer_percentage = feature.data[KarolinskaFeature.CANCER_PERCENTAGE]
+def karolinska_text_convert(patches: List[Patch]) -> np.array:
+    for patch in patches:
+        cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
         red = int(round(cancer_percentage * 255))
-        txt = Image.new("RGBA", feature.patch.size, (0, 0, 0, 0))
+        txt = Image.new("RGBA", patch.size, (0, 0, 0, 0))
         fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 30)
         d = ImageDraw.Draw(txt)
         d.text((10, 10), f'{red}', font=fnt, fill=(255, 0, 0, 255))
@@ -140,13 +180,13 @@ class BasicFeatureTIFFRenderer:
         self._shape = shape
         self._rgb_convert = rgb_convert
 
-    def render(self, filename: str, features: List[PatchFeature]):
+    def render(self, filename: str, patches: List[Patch]):
         imwrite(filename,
-                self._rgb_convert(features),
+                self._rgb_convert(patches),
                 dtype='uint8',
                 shape=(self._shape[1], self._shape[0], 4),
                 photometric='rgb',
-                tile=features[0].patch.size,
+                tile=patches[0].size,
                 extrasamples=('ASSOCALPHA', ))
 
 
@@ -156,16 +196,13 @@ class Classifier(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def classify_patch(self, patch: Patch) -> PatchFeature:
+    def classify_patch(self, patch: Patch) -> Dict:
         pass
 
-    def classify(self,
-                 slide: Slide,
-                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
-        features = []
-        for patch in slide.iterate_by_patch(patch_size):
-            features.append(self.classify_patch(patch))
-        return PatchFeatureCollection(slide, patch_size, features)
+    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
+        for patch in patch_collection:
+            patch_collection.update_patch(self.classify_patch(patch))
+        return patch_collection
 
 
 class KarolinskaFeature:
@@ -177,10 +214,8 @@ class KarolinskaRandomClassifier(Classifier):
     def create(*args):
         return KarolinskaRandomClassifier()
 
-    def classify_patch(self, patch: Patch) -> PatchFeature:
-        feature = PatchFeature(
-            patch, {KarolinskaFeature.CANCER_PERCENTAGE: random.random()})
-        return feature
+    def classify_patch(self, patch: Patch) -> Dict:
+        return {KarolinskaFeature.CANCER_PERCENTAGE: random.random()}
 
 
 class KarolinskaTrueValueClassifier(Classifier):
@@ -191,18 +226,16 @@ class KarolinskaTrueValueClassifier(Classifier):
     def create(mask_filename):
         return KarolinskaTrueValueClassifier(Slide(mask_filename))
 
-    def classify_patch(self, patch: Patch) -> PatchFeature:
+    def classify_patch(self, patch: Patch) -> Dict:
         image = self.mask.read_region(location=(patch.x, patch.y),
                                       level=0,
                                       size=patch.size)
 
         data = np.array(image.getchannel(0).getdata())
-        feature = PatchFeature(
-            patch, {
-                KarolinskaFeature.CANCER_PERCENTAGE:
-                sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
-            })
-        return feature
+        return {
+            KarolinskaFeature.CANCER_PERCENTAGE:
+            sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
+        }
 
 
 class ParallelClassifier(Classifier):
@@ -214,17 +247,15 @@ class ParallelClassifier(Classifier):
         return ParallelClassifier(
             get_class(classifier_cls_name, 'classifiers').create(*args))
 
-    def classify_patch(self, patch: Patch) -> PatchFeature:
-        return self._classifier(patch)
+    def classify_patch(self, patch: Patch) -> Dict:
+        return self._classifier.classify_patch(patch)
 
-    def classify(self,
-                 slide: Slide,
-                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
+    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
         with Pool(os.cpu_count()) as pool:
-            return PatchFeatureCollection(
-                slide, patch_size,
+            return PatchCollection(
+                patch_collection.slide, patch_collection.patch_size,
                 pool.map(self._classifier.classify_patch,
-                         SlideIterator(slide, patch_size)))
+                         list(patch_collection)))
 
 
 class TissueMaskPredictor(abc.ABC):
@@ -325,40 +356,42 @@ class TissueClassifier(Classifier):
         return [(round(x * big_x / xx * ext_lev_ds),
                  round(y * big_y / yy * ext_lev_ds)) for (x, y) in tissue]
 
-    def classify_patch(self, patch: Patch) -> PatchFeature:
+    def classify_patch(self, patch: Patch) -> Patch:
         raise NotImplementedError
 
-    def classify(self,
-                 slide: Slide,
-                 patch_size: Tuple[int, int] = None) -> PatchFeatureCollection:
+    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
 
-        lev = slide.get_best_level_for_downsample(16)
-        lev_dim = slide.level_dimensions[lev]
-        thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
+        lev = patch_collection.slide.get_best_level_for_downsample(16)
+        lev_dim = patch_collection.slide.level_dimensions[lev]
+        thumb = patch_collection.slide.read_region(location=(0, 0),
+                                                   level=lev,
+                                                   size=lev_dim)
         tissue_mask = self._predictor.get_tissue_mask(thumb,
                                                       self._mask_threshold)
 
-        dim_x, dim_y = patch_size
+        dim_x, dim_y = patch_collection.patch_size
         patch_area = dim_x * dim_y
         #  patch_area_th = patch_area * self._patch_threshold
         extraction_lev = 0  # TODO check it is correct
 
         patch_coordinates = self._get_tissue_patches_coordinates(
-            slide, tissue_mask, patch_size)
+            patch_collection.slide, tissue_mask, patch_collection.patch_size)
 
-        feature_collection = PatchFeatureCollection.create(
-            slide, patch_size, {TissueFeature.TISSUE_PERCENTAGE: 0.0})
+        patch_collection.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
 
         for (coor_x, coor_y) in patch_coordinates:
-            patch = slide.read_region(location=(coor_x, coor_y),
-                                      level=extraction_lev,
-                                      size=(dim_x, dim_y))
+            patch = patch_collection.slide.read_region(location=(coor_x,
+                                                                 coor_y),
+                                                       level=extraction_lev,
+                                                       size=(dim_x, dim_y))
 
             tissue_area = np.sum(
                 self._predictor.get_tissue_mask(patch, self._patch_threshold))
 
-            feature_collection.update_feature((coor_x, coor_y),
-                                              TissueFeature.TISSUE_PERCENTAGE,
-                                              tissue_area / patch_area)
+            patch_collection.update_patch((coor_x, coor_y),
+                                          features={
+                                              TissueFeature.TISSUE_PERCENTAGE:
+                                              tissue_area / patch_area
+                                          })
 
-        return feature_collection
+        return patch_collection

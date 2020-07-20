@@ -1,5 +1,5 @@
 from openslide import OpenSlide
-from typing import Tuple
+from typing import Tuple, Dict
 import os
 import sys
 import inspect
@@ -67,12 +67,16 @@ class SlideIterator:
 
 
 class Patch:
-    def __init__(self, slide: Slide, coordinates: Tuple[int, int],
-                 size: Tuple[int, int]):
+    def __init__(self,
+                 slide: Slide,
+                 coordinates: Tuple[int, int],
+                 size: Tuple[int, int],
+                 features: Dict = None):
         self.slide = slide
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.size = size
+        self.features = features or {}
 
     def __str__(self):
         return (f'slide: {self.slide}, x: {self.x}, '

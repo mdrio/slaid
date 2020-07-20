@@ -1,7 +1,6 @@
 import unittest
 from classifiers import BasicTissueMaskPredictor,\
-    TissueClassifier, TissueFeature
-from PIL import Image
+    TissueClassifier, TissueFeature, PandasPatchCollection
 import numpy as np
 from test_commons import DummySlide
 
@@ -21,11 +20,12 @@ class TestTissueDetector(unittest.TestCase):
         tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
 
         patch_size = (10, 10)
-        patch_collection = tissue_detector.classify(slide, patch_size)
+        patch_collection = tissue_detector.classify(
+            PandasPatchCollection(slide, patch_size))
         self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
-        for patch_feature in patch_collection:
-            self.assertEqual(
-                patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 0)
+        for patch in patch_collection:
+            self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
+                             0)
 
     def test_detector_all_tissue(self):
         slide = DummySlide('slide', (100, 100))
@@ -33,11 +33,12 @@ class TestTissueDetector(unittest.TestCase):
         tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
 
         patch_size = (10, 10)
-        patch_collection = tissue_detector.classify(slide, patch_size)
+        patch_collection = tissue_detector.classify(
+            PandasPatchCollection(slide, patch_size))
         self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
         for patch_feature in patch_collection:
             self.assertEqual(
-                patch_feature.data[TissueFeature.TISSUE_PERCENTAGE], 1)
+                patch_feature.features[TissueFeature.TISSUE_PERCENTAGE], 1)
 
 
 if __name__ == '__main__':

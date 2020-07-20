@@ -47,37 +47,5 @@ class DummySlide(Slide):
         return self._level_downsample
 
 
-class TestPatch(unittest.TestCase):
-    def test_ordering_0(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        patch_0 = Patch(slide, (0, 0), patch_size)
-        patch_1 = Patch(slide, (0, 0), patch_size)
-        self.assertTrue(patch_0 == patch_1)
-
-    def test_ordering_1(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        patch_0 = Patch(slide, (0, 0), patch_size)
-        patch_1 = Patch(slide, (0, 100), patch_size)
-        self.assertTrue(patch_0 < patch_1)
-        self.assertFalse(patch_0 > patch_1)
-        self.assertFalse(patch_0 == patch_1)
-
-    def test_ordering_2(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        patch_0 = Patch(slide, (0, 0), patch_size)
-        patch_1 = Patch(slide, (100, 0), patch_size)
-        self.assertTrue(patch_0 < patch_1)
-
-    def test_ordering_3(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        patch_0 = Patch(slide, (0, 0), patch_size)
-        patch_1 = Patch(slide, (100, 100), patch_size)
-        self.assertTrue(patch_0 < patch_1)
-
-
 if __name__ == '__main__':
     unittest.main()
