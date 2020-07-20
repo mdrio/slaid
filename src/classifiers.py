@@ -3,7 +3,7 @@ from commons import Patch, Slide, get_class
 from typing import List, Tuple, Callable, Any, Dict
 import numpy as np
 from tifffile import imwrite
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import random
 import os
 from multiprocessing import Pool
@@ -151,24 +151,13 @@ class FeatureTIFFRenderer(abc.ABC):
         pass
 
 
-def karolinska_rgb_convert(patches: List[Patch]) -> np.array:
+def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
     for patch in patches:
         cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
         mask_value = int(round(cancer_percentage * 255))
         data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
                                                                       0)
         yield np.full(patch.size + (4, ), data, 'uint8')
-
-
-def karolinska_text_convert(patches: List[Patch]) -> np.array:
-    for patch in patches:
-        cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
-        red = int(round(cancer_percentage * 255))
-        txt = Image.new("RGBA", patch.size, (0, 0, 0, 0))
-        fnt = ImageFont.truetype("Pillow/Tests/fonts/FreeMono.ttf", 30)
-        d = ImageDraw.Draw(txt)
-        d.text((10, 10), f'{red}', font=fnt, fill=(255, 0, 0, 255))
-        yield np.asarray(txt)
 
 
 class BasicFeatureTIFFRenderer:
@@ -180,13 +169,13 @@ class BasicFeatureTIFFRenderer:
         self._shape = shape
         self._rgb_convert = rgb_convert
 
-    def render(self, filename: str, patches: List[Patch]):
+    def render(self, filename: str, patches: PatchCollection):
         imwrite(filename,
                 self._rgb_convert(patches),
                 dtype='uint8',
                 shape=(self._shape[1], self._shape[0], 4),
                 photometric='rgb',
-                tile=patches[0].size,
+                tile=patches.patch_size,
                 extrasamples=('ASSOCALPHA', ))
 
 
@@ -251,12 +240,18 @@ class ParallelClassifier(Classifier):
     def classify_patch(self, patch: Patch) -> Dict:
         return self._classifier.classify_patch(patch)
 
+    def _classify_patch(self, patch) -> Tuple[Patch, Dict]:
+        return (patch, self.classify_patch(patch))
+
     def classify(self, patch_collection: PatchCollection) -> PatchCollection:
         with Pool(os.cpu_count()) as pool:
-            return PatchCollection(
-                patch_collection.slide, patch_collection.patch_size,
-                pool.map(self._classifier.classify_patch,
-                         list(patch_collection)))
+            patch_features = pool.map(self._classify_patch,
+                                      iter(patch_collection))
+
+        for patch, features in patch_features:
+            patch_collection.update_patch(patch=patch, features=features)
+
+        return patch_collection
 
 
 class TissueMaskPredictor(abc.ABC):

@@ -11,7 +11,8 @@ def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
 
     cl = getattr(classifiers, classifier_name).create(*args)
 
-    features = cl.classify(slide)
+    features = cl.classify(classifiers.PandasPatchCollection(
+        slide, (256, 256)))
     with open(json_filename, 'w') as json_file:
         json.dump(features, json_file, cls=classifiers.JSONEncoder)
 
