@@ -55,5 +55,21 @@ class DummySlide(Slide):
         return self._level_downsample
 
 
+class TestSlide(unittest.TestCase):
+    def test_iterate(self):
+        patch_size = (256, 256)
+        slide_size = (1024, 512)
+        slide = DummySlide('slide', slide_size)
+        patches = list(slide.iterate_by_patch(patch_size))
+        self.assertEqual(
+            len(patches),
+            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+
+        expected_coordinates = [(0, 0), (256, 0), (512, 0), (768, 0), (0, 256),
+                                (256, 256), (512, 256), (768, 256)]
+        real_coordinates = [(p.x, p.y) for p in patches]
+        self.assertEqual(real_coordinates, expected_coordinates)
+
+
 if __name__ == '__main__':
     unittest.main()
