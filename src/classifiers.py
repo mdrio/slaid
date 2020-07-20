@@ -77,12 +77,12 @@ class PandasPatchCollection(PatchCollection):
     def _init_dataframe(self):
         data = defaultdict(lambda: [])
         for p in self._slide.iterate_by_patch(self._patch_size):
-            data['x'].append(p.x)
             data['y'].append(p.y)
-        return pd.DataFrame(data, index=[data['x'], data['y']])
+            data['x'].append(p.x)
+        return pd.DataFrame(data, index=[data['y'], data['x']])
 
     def _create_patch(self, data: Tuple) -> Patch:
-        x, y = data[:2]
+        y, x = data[:2]
         features = dict(data[2:])
         return Patch(self.slide, (x, y), self.patch_size, features)
 
@@ -98,7 +98,7 @@ class PandasPatchCollection(PatchCollection):
         return self._dataframe
 
     def __getitem__(self, key):
-        return self._dataframe.loc[key]
+        return self._create_patch(self._dataframe.loc[key[::-1]])
 
     @property
     def features(self) -> List[str]:
