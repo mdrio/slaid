@@ -123,7 +123,8 @@ class PandasPatchCollection(PatchCollection):
         missing_features = features.keys() - set(self._dataframe.columns)
         for f in missing_features:
             self.add_feature(f)
-        self._dataframe.loc[coordinates, features.keys()] = features.values()
+        self._dataframe.loc[coordinates[::-1],
+                            features.keys()] = features.values()
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -190,8 +191,8 @@ class Classifier(abc.ABC):
 
     def classify(self, patch_collection: PatchCollection) -> PatchCollection:
         for patch in patch_collection:
-            patch_collection.update_patch(patch=patch,
-                                          features=self.classify_patch(patch))
+            features = self.classify_patch(patch)
+            patch_collection.update_patch(patch=patch, features=features)
         return patch_collection
 
 

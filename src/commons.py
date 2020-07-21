@@ -32,13 +32,6 @@ class Slide:
     def __setstate__(self, filename):
         self.__init__(filename)
 
-    def convert_coordinates_to_index(self, coordinates: Tuple[int, int],
-                                     patch_size: Tuple[int, int]):
-
-        patch_per_row = self.dimensions[0] // patch_size[0]
-        x, y = coordinates
-        return (y // patch_size[1]) * patch_per_row + (x // patch_size[0])
-
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         patch_size = patch_size if patch_size else (256, 256)
         for y in range(0, self.dimensions[1], patch_size[1]):

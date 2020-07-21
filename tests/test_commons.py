@@ -34,8 +34,8 @@ class DummySlide(Slide):
         if self.data is None:
             return Image.new('RGB', size)
         else:
-            data = self.data[location[0]:location[0] + size[0],
-                             location[1]:location[1] + size[1]]
+            data = self.data[location[1]:location[1] + size[1],
+                             location[0]:location[0] + size[0]]
             mask = Image.fromarray(data, 'RGB')
             return mask
 

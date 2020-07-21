@@ -44,8 +44,19 @@ class TestTissueDetector(unittest.TestCase):
 
 
 class TestPandasPatchCollection(unittest.TestCase):
-    def test_iteration_order(self):
+    def test_init(self):
         slide_size = (100, 100)
+        patch_size = (10, 10)
+        #  slide_size = (23904, 28664)
+        #  patch_size = (256, 256)
+        slide = DummySlide('slide', slide_size)
+        collection = PandasPatchCollection(slide, patch_size)
+        self.assertEqual(
+            len(collection),
+            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+
+    def test_iteration(self):
+        slide_size = (200, 100)
         slide = DummySlide('slide', slide_size)
         patch_size = (10, 10)
         collection = PandasPatchCollection(slide, patch_size)
@@ -58,39 +69,56 @@ class TestPandasPatchCollection(unittest.TestCase):
                 y += patch_size[1]
             counter += 1
 
-        self.assertEqual(counter, 100)
+        self.assertEqual(
+            counter,
+            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
 
     def test_get_item(self):
-        slide = DummySlide('slide', (100, 100))
+        slide = DummySlide('slide', (200, 100))
+        patch_size = (10, 10)
+        coordinates = (190, 90)
+        collection = PandasPatchCollection(slide, patch_size)
+        patch = collection[coordinates]
+        self.assertTrue(isinstance(patch, Patch))
+        self.assertEqual(patch.x, coordinates[0])
+        self.assertEqual(patch.y, coordinates[1])
+
+    def test_update_patch(self):
+        slide_size = (200, 100)
+        slide = DummySlide('slide', slide_size)
         patch_size = (10, 10)
         collection = PandasPatchCollection(slide, patch_size)
-        patch = collection[(10, 20)]
-        self.assertTrue(isinstance(patch, Patch))
-        self.assertEqual(patch.x, 10)
-        self.assertEqual(patch.y, 20)
+        coordinates = (190, 90)
+        collection.update_patch(coordinates=coordinates, features={'test': 1})
+        self.assertEqual(len(collection), 200)
+        patch = collection[coordinates]
+        self.assertEqual(patch.x, coordinates[0])
+        self.assertEqual(patch.y, coordinates[1])
+        self.assertEqual(patch.features['test'], 1)
 
 
 class KarolinskaTest(unittest.TestCase):
     def test_true_value(self):
-        size = (100, 100)
-        data = np.zeros((size[0], size[1], 3), dtype=np.uint8)
+        size = (200, 100)
+        patch_size = (10, 10)
+        #  size = (23904, 28664)
+        #  patch_size = (256, 256)
+        data = np.zeros((size[1], size[0], 3), dtype=np.uint8)
         data[0:10, 0:50] = [2, 0, 0]
 
-        size = (100, 100)
         mask_slide = DummySlide('mask', size, data=data)
         slide = DummySlide('slide', size)
         cl = KarolinskaTrueValueClassifier(mask_slide)
-        collection = PandasPatchCollection(slide, (10, 10))
-        collection = cl.classify(collection)
-        for i, patch in enumerate(collection):
+        collection = PandasPatchCollection(slide, patch_size)
+        collection_classified = cl.classify(collection)
+        self.assertEqual(len(collection), len(collection_classified))
+        for i, patch in enumerate(collection_classified):
             feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
             if i <= 4:
                 self.assertEqual(feature, 1)
             else:
                 self.assertEqual(feature, 0)
 
-
-#
 
 if __name__ == '__main__':
     unittest.main()
