@@ -12,17 +12,14 @@ def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
     cl = getattr(classifiers, classifier_name).create(*args)
 
     patches = classifiers.PandasPatchCollection(slide, (256, 256))
-    print(slide.dimensions)
-    print(len(patches))
     features = cl.classify(patches)
-    print(len(features))
-    #  with open(json_filename, 'w') as json_file:
-    #      json.dump(features, json_file, cls=classifiers.JSONEncoder)
-    #
-    #  renderer = classifiers.BasicFeatureTIFFRenderer(
-    #      classifiers.karolinska_rgb_convert, slide.dimensions)
-    #  print('rendering...')
-    #  renderer.render(tiff_filename, features)
+    with open(json_filename, 'w') as json_file:
+        json.dump(features, json_file, cls=classifiers.JSONEncoder)
+
+    renderer = classifiers.BasicFeatureTIFFRenderer(
+        classifiers.karolinska_rgb_convert, slide.dimensions)
+    print('rendering...')
+    renderer.render(tiff_filename, features)
 
 
 if __name__ == '__main__':
