@@ -1,9 +1,65 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from commons import Slide
+from commons import Slide, get_class
 import classifiers
 import json
+from typing import Any, List, Dict
+import abc
+
+
+class Step(abc.ABC):
+    @classmethod
+    def from_json(cls, json: Dict):
+        return cls(json['name'])
+
+    def __init__(self, name: str = ''):
+        self._executed = False
+        self.name = name
+
+    @property
+    def executed(self):
+        return self._executed
+
+    @abc.abstractmethod
+    def run(self, *args):
+        pass
+
+    @abc.abstractproperty
+    def input(self) -> Any:
+        pass
+
+
+class Runner(Step):
+    @classmethod
+    def from_json(cls, json: Dict):
+        steps = []
+        for step in json['steps']:
+            cls_name = step.pop('class')
+            module = step.pop('module')
+            steps.append(get_class(cls_name, module).from_json(step))
+        return cls(steps, json['name'])
+
+    def __init__(self, steps: List[Step], name: str = ''):
+        super().__init__(name)
+        self._steps = steps
+
+    @property
+    def steps(self):
+        return self._steps
+
+    @property
+    def input(self):
+        return self._steps
+
+    def run(self):
+        for i, step in enumerate(self.steps):
+            if i == 0:
+                output = step.run()
+            else:
+                output = step.run(output)
+
+        self._executed = True
 
 
 def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
