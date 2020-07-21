@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import abc
+import json
+from typing import List, Dict, Any
 from commons import Slide, get_class
 import classifiers
-import json
-from typing import Any, List, Dict
-import abc
 
 
 class Step(abc.ABC):
@@ -13,9 +13,14 @@ class Step(abc.ABC):
     def from_json(cls, json: Dict):
         return cls(json['name'])
 
-    def __init__(self, name: str = ''):
-        self._executed = False
+    def __init__(self, name: str = '', _input: Any = None):
+        self._input = _input
         self.name = name
+        self._executed = False
+
+    @property
+    def input(self):
+        return self._input
 
     @property
     def executed(self):
@@ -25,9 +30,13 @@ class Step(abc.ABC):
     def run(self, *args):
         pass
 
-    @abc.abstractproperty
-    def input(self) -> Any:
-        pass
+
+class ClassifierStep(Step):
+    def __init__(self, classifier: classifiers.Classifier):
+        self.classifier = classifier
+
+    def run(self, patch_collection: classifiers.PatchCollection):
+        return self.classifier.classify(patch_collection)
 
 
 class Runner(Step):
@@ -40,9 +49,10 @@ class Runner(Step):
             steps.append(get_class(cls_name, module).from_json(step))
         return cls(steps, json['name'])
 
-    def __init__(self, steps: List[Step], name: str = ''):
-        super().__init__(name)
+    def __init__(self, steps: List[Step], name: str = '', _input: Any = None):
+        super().__init__(name, _input)
         self._steps = steps
+        self._input = _input
 
     @property
     def steps(self):
@@ -50,16 +60,13 @@ class Runner(Step):
 
     @property
     def input(self):
-        return self._steps
+        return self._input
 
     def run(self):
+        _input = self.input
         for i, step in enumerate(self.steps):
-            if i == 0:
-                output = step.run()
-            else:
-                output = step.run(output)
-
-        self._executed = True
+            _input = step.run(_input)
+        return _input
 
 
 def main(classifier_name, in_filename, tiff_filename, json_filename, *args):
