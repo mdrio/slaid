@@ -3,3 +3,4 @@ numpy
 tiffile
 openslide-python
 sklearn
+pandas
