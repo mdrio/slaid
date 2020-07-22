@@ -197,6 +197,8 @@ class FeatureTIFFRenderer(abc.ABC):
 def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
     for patch in patches:
         cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
+        cancer_percentage = 0 if np.isnan(
+            cancer_percentage) else cancer_percentage
         mask_value = int(round(cancer_percentage * 255))
         data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
                                                                       0)
