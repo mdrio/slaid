@@ -44,54 +44,44 @@ class TestTissueDetector(unittest.TestCase):
 
 
 class TestPandasPatchCollection(unittest.TestCase):
+    def setUp(self):
+        self.slide_size = (200, 100)
+        self.slide = DummySlide('slide', self.slide_size)
+        self.patch_size = (10, 10)
+        self.collection = PandasPatchCollection(self.slide, self.patch_size)
+
     def test_init(self):
-        slide_size = (100, 100)
-        patch_size = (10, 10)
-        #  slide_size = (23904, 28664)
-        #  patch_size = (256, 256)
-        slide = DummySlide('slide', slide_size)
-        collection = PandasPatchCollection(slide, patch_size)
         self.assertEqual(
-            len(collection),
-            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+            len(self.collection), self.slide_size[0] * self.slide_size[1] /
+            (self.patch_size[0] * self.patch_size[1]))
 
     def test_iteration(self):
-        slide_size = (200, 100)
-        slide = DummySlide('slide', slide_size)
-        patch_size = (10, 10)
-        collection = PandasPatchCollection(slide, patch_size)
         x = y = counter = 0
-        for patch in collection:
+        for patch in self.collection:
             self.assertEqual(patch.x, x)
             self.assertEqual(patch.y, y)
-            x = (x + patch_size[0]) % slide_size[0]
+            x = (x + self.patch_size[0]) % self.slide_size[0]
             if x == 0:
-                y += patch_size[1]
+                y += self.patch_size[1]
             counter += 1
 
         self.assertEqual(
-            counter,
-            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+            counter, self.slide_size[0] * self.slide_size[1] /
+            (self.patch_size[0] * self.patch_size[1]))
 
     def test_get_item(self):
-        slide = DummySlide('slide', (200, 100))
-        patch_size = (10, 10)
         coordinates = (190, 90)
-        collection = PandasPatchCollection(slide, patch_size)
-        patch = collection[coordinates]
+        patch = self.collection.get_patch(coordinates)
         self.assertTrue(isinstance(patch, Patch))
         self.assertEqual(patch.x, coordinates[0])
         self.assertEqual(patch.y, coordinates[1])
 
     def test_update_patch(self):
-        slide_size = (200, 100)
-        slide = DummySlide('slide', slide_size)
-        patch_size = (10, 10)
-        collection = PandasPatchCollection(slide, patch_size)
         coordinates = (190, 90)
-        collection.update_patch(coordinates=coordinates, features={'test': 1})
-        self.assertEqual(len(collection), 200)
-        patch = collection[coordinates]
+        self.collection.update_patch(coordinates=coordinates,
+                                     features={'test': 1})
+        self.assertEqual(len(self.collection), 200)
+        patch = self.collection.get_patch(coordinates)
         self.assertEqual(patch.x, coordinates[0])
         self.assertEqual(patch.y, coordinates[1])
         self.assertEqual(patch.features['test'], 1)
