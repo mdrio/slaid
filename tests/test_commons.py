@@ -1,7 +1,7 @@
 import unittest
 from typing import Tuple
 from PIL import Image
-from commons import Slide
+from commons import Slide, round_to_patch
 
 
 class DummySlide(Slide):
@@ -69,6 +69,32 @@ class TestSlide(unittest.TestCase):
                                 (256, 256), (512, 256), (768, 256)]
         real_coordinates = [(p.x, p.y) for p in patches]
         self.assertEqual(real_coordinates, expected_coordinates)
+
+
+class TestRoundToPatch(unittest.TestCase):
+    def test_round_0(self):
+        coordinates = (0, 0)
+        patch_size = (256, 256)
+        res = round_to_patch(coordinates, patch_size)
+        self.assertEqual(res, (0, 0))
+
+    def test_round_1(self):
+        coordinates = (256, 256)
+        patch_size = (256, 256)
+        res = round_to_patch(coordinates, patch_size)
+        self.assertEqual(res, (256, 256))
+
+    def test_round_down(self):
+        coordinates = (513, 256)
+        patch_size = (256, 256)
+        res = round_to_patch(coordinates, patch_size)
+        self.assertEqual(res, (512, 256))
+
+    def test_round_up(self):
+        coordinates = (511, 256)
+        patch_size = (256, 256)
+        res = round_to_patch(coordinates, patch_size)
+        self.assertEqual(res, (512, 256))
 
 
 if __name__ == '__main__':

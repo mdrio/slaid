@@ -1,4 +1,4 @@
-from openslide import OpenSlide
+from openslide import OpenSlide, open_slide, OpenSlideUnsupportedFormatError
 from typing import Tuple, Dict
 import os
 import sys
@@ -12,7 +12,10 @@ def get_class(name, module):
 class Slide:
     def __init__(self, filename: str):
         self._filename = filename
-        self._slide = OpenSlide(filename)
+        try:
+            self._slide = OpenSlide(filename)
+        except OpenSlideUnsupportedFormatError:
+            self._slide = open_slide(filename)
 
     @property
     def dimensions(self):
@@ -74,3 +77,12 @@ class Patch:
     def __str__(self):
         return (f'slide: {self.slide}, x: {self.x}, '
                 f'y: {self.y}, size: {self.size}')
+
+
+def round_to_patch(coordinates, patch_size):
+    res = []
+    for i, c in enumerate(coordinates):
+        size = patch_size[i]
+        q, r = divmod(c, size)
+        res.append(size * (q + round(r / size)))
+    return tuple(res)

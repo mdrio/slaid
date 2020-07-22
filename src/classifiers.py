@@ -1,5 +1,5 @@
 import abc
-from commons import Patch, Slide, get_class
+from commons import Patch, Slide, get_class, round_to_patch
 from typing import List, Tuple, Callable, Any, Dict
 import numpy as np
 from tifffile import imwrite
@@ -79,10 +79,12 @@ class PandasPatchCollection(PatchCollection):
         for p in self._slide.iterate_by_patch(self._patch_size):
             data['y'].append(p.y)
             data['x'].append(p.x)
-        return pd.DataFrame(data, index=[data['y'], data['x']])
+        df = pd.DataFrame(data, dtype=int)
+        df.set_index(['y', 'x'], inplace=True, drop=False)
+        return df
 
     def _create_patch(self, data: Tuple) -> Patch:
-        y, x = data[:2]
+        y, x = [int(i) for i in data[:2]]
         features = dict(data[2:])
         return Patch(self.slide, (x, y), self.patch_size, features)
 
@@ -350,8 +352,11 @@ class TissueClassifier(Classifier):
         random.shuffle(tissue)  # randomly permute the elements
 
         ext_lev_ds = slide.level_downsamples[extraction_lev]
-        return [(round(x * big_x / xx * ext_lev_ds),
-                 round(y * big_y / yy * ext_lev_ds)) for (x, y) in tissue]
+        return [
+            round_to_patch((round(x * big_x / xx * ext_lev_ds),
+                            round(y * big_y / yy * ext_lev_ds)), patch_size)
+            for (x, y) in tissue
+        ]
 
     def classify_patch(self, patch: Patch) -> Patch:
         raise NotImplementedError
