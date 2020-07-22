@@ -34,8 +34,12 @@ class PatchCollection(abc.ABC):
     def dataframe(self) -> pd.DataFrame:
         pass
 
+    @abc.abstractproperty
+    def loc(self) -> "PatchCollection":
+        pass
+
     @abc.abstractmethod
-    def __getitem__(self, coordinates: Tuple[int, int]) -> Patch:
+    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
         pass
 
     @abc.abstractmethod
@@ -61,11 +65,29 @@ class PatchCollection(abc.ABC):
     def add_feature(self, feature: str, default_value: Any = None):
         pass
 
+    @abc.abstractmethod
+    def update(self, other_collection: 'PatchCollection'):
+        pass
+
+    @abc.abstractmethod
+    def merge(self, other_collection: 'PatchCollection'):
+        pass
+
 
 class PandasPatchCollection(PatchCollection):
+    class LocIndexer:
+        def __init__(self, collection: "PandasPatchCollection"):
+            self.collection = collection
+
+        def __getitem__(self, key):
+            return PandasPatchCollection.from_pandas(
+                self.collection.slide, self.collection.patch_size,
+                self.collection.dataframe.loc[key])
+
+    @classmethod
     def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
                     dataframe: pd.DataFrame):
-        patch_collection = cls(slide, patch_size, [])
+        patch_collection = cls(slide, patch_size)
         # TODO add some assert to verify dataframe is compatible
         patch_collection._dataframe = dataframe
         return patch_collection
@@ -73,6 +95,7 @@ class PandasPatchCollection(PatchCollection):
     def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
         super().__init__(slide, patch_size)
         self._dataframe = self._init_dataframe()
+        self._loc = PandasPatchCollection.LocIndexer(self)
 
     def _init_dataframe(self):
         data = defaultdict(lambda: [])
@@ -80,17 +103,21 @@ class PandasPatchCollection(PatchCollection):
             data['y'].append(p.y)
             data['x'].append(p.x)
         df = pd.DataFrame(data, dtype=int)
-        df.set_index(['y', 'x'], inplace=True, drop=False)
+        df.set_index(['y', 'x'], inplace=True)
         return df
 
-    def _create_patch(self, data: Tuple) -> Patch:
-        y, x = [int(i) for i in data[:2]]
-        features = dict(data[2:])
+    def __getitem__(self, key):
+        return self._dataframe[key]
+
+    def _create_patch(self, coordinates: Tuple[int, int],
+                      data: Tuple) -> Patch:
+        y, x = coordinates
+        features = dict(data)
         return Patch(self.slide, (x, y), self.patch_size, features)
 
     def __iter__(self):
         for data in self._dataframe.iterrows():
-            yield self._create_patch(data[1])
+            yield self._create_patch(data[0], data[1])
 
     def __len__(self):
         return len(self._dataframe)
@@ -99,8 +126,9 @@ class PandasPatchCollection(PatchCollection):
     def dataframe(self):
         return self._dataframe
 
-    def __getitem__(self, key):
-        return self._create_patch(self._dataframe.loc[key[::-1]])
+    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
+        return self._create_patch(coordinates[::-1],
+                                  self._dataframe.loc[coordinates[::-1]])
 
     @property
     def features(self) -> List[str]:
@@ -126,7 +154,19 @@ class PandasPatchCollection(PatchCollection):
         for f in missing_features:
             self.add_feature(f)
         self._dataframe.loc[coordinates[::-1],
-                            features.keys()] = features.values()
+                            list(features.keys())] = list(features.values())
+
+    @property
+    def loc(self) -> "PatchCollection":
+        return self._loc
+
+    def update(self, other: "PandasPatchCollection"):
+        self.dataframe.update(other.dataframe)
+
+    def merge(self, other_collection: 'PandasPatchCollection'):
+        self._dataframe = self.dataframe.merge(other_collection.dataframe,
+                                               'left').set_index(
+                                                   self._dataframe.index)
 
 
 class JSONEncoder(json.JSONEncoder):

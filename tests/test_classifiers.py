@@ -79,12 +79,35 @@ class TestPandasPatchCollection(unittest.TestCase):
     def test_update_patch(self):
         coordinates = (190, 90)
         self.collection.update_patch(coordinates=coordinates,
-                                     features={'test': 1})
+                                     features={
+                                         'test': 1,
+                                         'test2': 2
+                                     })
         self.assertEqual(len(self.collection), 200)
         patch = self.collection.get_patch(coordinates)
         self.assertEqual(patch.x, coordinates[0])
         self.assertEqual(patch.y, coordinates[1])
         self.assertEqual(patch.features['test'], 1)
+        self.assertEqual(patch.features['test2'], 2)
+
+    def test_filter(self):
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p, features={'feature': i})
+        filtered_collection = self.collection.loc[
+            self.collection['feature'] > 0]
+        self.assertEqual(len(filtered_collection), len(self.collection) - 1)
+
+        filtered_collection.update_patch(coordinates=(10, 10),
+                                         features={
+                                             'feature2': -1,
+                                         })
+        #  self.collection.update(filtered_collection)
+        #  self.assertEqual(
+        #      self.collection.get_patch((10, 10)).features['feature'], -1)
+
+        self.collection.merge(filtered_collection)
+        self.assertEqual(
+            self.collection.get_patch((10, 10)).features['feature2'], -1)
 
 
 class KarolinskaTest(unittest.TestCase):
