@@ -1,7 +1,7 @@
 import unittest
-from commons import Patch
+from commons import Patch, PandasPatchCollection
 from classifiers import BasicTissueMaskPredictor,\
-    TissueClassifier, TissueFeature, PandasPatchCollection,\
+    TissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature
 import numpy as np
 from test_commons import DummySlide
@@ -93,8 +93,8 @@ class TestPandasPatchCollection(unittest.TestCase):
     def test_filter(self):
         for i, p in enumerate(self.collection):
             self.collection.update_patch(patch=p, features={'feature': i})
-        filtered_collection = self.collection.loc[
-            self.collection['feature'] > 0]
+        filtered_collection = self.collection.filter(
+            self.collection['feature'] > 0)
         self.assertEqual(len(filtered_collection), len(self.collection) - 1)
 
         filtered_collection.update_patch(coordinates=(10, 10),
@@ -120,12 +120,11 @@ class KarolinskaTest(unittest.TestCase):
         data[0:10, 0:50] = [2, 0, 0]
 
         mask_slide = DummySlide('mask', size, data=data)
-        slide = DummySlide('slide', size)
+        slide = DummySlide('slide', size, patch_size=patch_size)
         cl = KarolinskaTrueValueClassifier(mask_slide)
-        collection = PandasPatchCollection(slide, patch_size)
-        collection_classified = cl.classify(collection)
-        self.assertEqual(len(collection), len(collection_classified))
-        for i, patch in enumerate(collection_classified):
+        slide_classified = cl.classify(slide)
+        self.assertEqual(len(slide.patches), len(slide_classified.patches))
+        for i, patch in enumerate(slide_classified.patches):
             feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
             if i <= 4:
                 self.assertEqual(feature, 1)

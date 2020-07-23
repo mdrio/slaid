@@ -1,7 +1,8 @@
 import unittest
 from typing import Tuple
 from PIL import Image
-from commons import Slide, round_to_patch
+from commons import Slide, round_to_patch,\
+    PatchCollection, PandasPatchCollection
 
 
 class DummySlide(Slide):
@@ -17,13 +18,18 @@ class DummySlide(Slide):
                  size: Tuple[int, int],
                  best_level_for_downsample: int = 1,
                  level_downsample: int = 1,
-                 data=None):
+                 data=None,
+                 patches: PatchCollection = None,
+                 patch_size: Tuple[int, int] = (256, 256)):
+
         self._id = ID
         self.size = size
         self.best_level_for_downsample = best_level_for_downsample
         self._level_dimensions = DummySlide.DummyIndexable(size)
         self._level_downsample = DummySlide.DummyIndexable(level_downsample)
         self.data = data
+        self.features = {}
+        self._patches = patches or PandasPatchCollection(self, patch_size)
 
     @property
     def dimensions(self):

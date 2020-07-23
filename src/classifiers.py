@@ -1,192 +1,13 @@
 import abc
 from commons import Patch, Slide, get_class, round_to_patch
-from typing import List, Tuple, Callable, Any, Dict
+from typing import List, Tuple, Callable, Dict
 import numpy as np
 from tifffile import imwrite
 from PIL import Image
 import random
 import os
 from multiprocessing import Pool
-import json
-import pandas as pd
-from collections import defaultdict, OrderedDict
-
-
-class PatchCollection(abc.ABC):
-    @abc.abstractclassmethod
-    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
-                    dataframe: pd.DataFrame):
-        pass
-
-    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
-        self._slide = slide
-        self._patch_size = patch_size
-
-    @property
-    def slide(self) -> Slide:
-        return self._slide
-
-    @property
-    def patch_size(self) -> Tuple[int, int]:
-        return self._patch_size
-
-    @abc.abstractproperty
-    def dataframe(self) -> pd.DataFrame:
-        pass
-
-    @abc.abstractproperty
-    def loc(self) -> "PatchCollection":
-        pass
-
-    @abc.abstractmethod
-    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
-        pass
-
-    @abc.abstractmethod
-    def __iter__(self):
-        pass
-
-    @abc.abstractmethod
-    def __len__(self):
-        pass
-
-    @abc.abstractmethod
-    def update_patch(self,
-                     coordinates: Tuple[int, int] = None,
-                     patch: Patch = None,
-                     features: Dict = None):
-        pass
-
-    @abc.abstractproperty
-    def features(self) -> List[str]:
-        pass
-
-    @abc.abstractmethod
-    def add_feature(self, feature: str, default_value: Any = None):
-        pass
-
-    @abc.abstractmethod
-    def update(self, other_collection: 'PatchCollection'):
-        pass
-
-    @abc.abstractmethod
-    def merge(self, other_collection: 'PatchCollection'):
-        pass
-
-
-class PandasPatchCollection(PatchCollection):
-    class LocIndexer:
-        def __init__(self, collection: "PandasPatchCollection"):
-            self.collection = collection
-
-        def __getitem__(self, key):
-            return PandasPatchCollection.from_pandas(
-                self.collection.slide, self.collection.patch_size,
-                self.collection.dataframe.loc[key])
-
-    @classmethod
-    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
-                    dataframe: pd.DataFrame):
-        patch_collection = cls(slide, patch_size)
-        # TODO add some assert to verify dataframe is compatible
-        patch_collection._dataframe = dataframe
-        return patch_collection
-
-    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
-        super().__init__(slide, patch_size)
-        self._dataframe = self._init_dataframe()
-        self._loc = PandasPatchCollection.LocIndexer(self)
-
-    def _init_dataframe(self):
-        data = defaultdict(lambda: [])
-        for p in self._slide.iterate_by_patch(self._patch_size):
-            data['y'].append(p.y)
-            data['x'].append(p.x)
-        df = pd.DataFrame(data, dtype=int)
-        df.set_index(['y', 'x'], inplace=True)
-        return df
-
-    def __getitem__(self, key):
-        return self._dataframe[key]
-
-    def _create_patch(self, coordinates: Tuple[int, int],
-                      data: Tuple) -> Patch:
-        y, x = coordinates
-        features = dict(data)
-        return Patch(self.slide, (x, y), self.patch_size, features)
-
-    def __iter__(self):
-        for data in self._dataframe.iterrows():
-            yield self._create_patch(data[0], data[1])
-
-    def __len__(self):
-        return len(self._dataframe)
-
-    @property
-    def dataframe(self):
-        return self._dataframe
-
-    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
-        return self._create_patch(coordinates[::-1],
-                                  self._dataframe.loc[coordinates[::-1]])
-
-    @property
-    def features(self) -> List[str]:
-        return [c for c in self._dataframe.columns[2:]]
-
-    def add_feature(self, feature: str, default_value: Any = None):
-        if feature not in self.features:
-            self.dataframe.insert(len(self._dataframe.columns), feature,
-                                  default_value)
-
-    def update_patch(self,
-                     coordinates: Tuple[int, int] = None,
-                     patch: Patch = None,
-                     features: Dict = None):
-        if patch:
-            coordinates = (patch.x, patch.y)
-
-        features = OrderedDict(features)
-        if coordinates is None:
-            raise RuntimeError('coordinates and patch cannot be None')
-
-        missing_features = features.keys() - set(self._dataframe.columns)
-        for f in missing_features:
-            self.add_feature(f)
-        self._dataframe.loc[coordinates[::-1],
-                            list(features.keys())] = list(features.values())
-
-    @property
-    def loc(self) -> "PatchCollection":
-        return self._loc
-
-    def update(self, other: "PandasPatchCollection"):
-        self.dataframe.update(other.dataframe)
-
-    def merge(self, other_collection: 'PandasPatchCollection'):
-        self._dataframe = self.dataframe.merge(other_collection.dataframe,
-                                               'left',
-                                               on=['y', 'x']).set_index(
-                                                   self._dataframe.index)
-
-
-class JSONEncoder(json.JSONEncoder):
-    def _encode_patch(self, patch: Patch):
-
-        return {
-            'slide': patch.slide.ID,
-            'x': patch.x,
-            'y': patch.y,
-            'size': patch.size,
-            'features': patch.features
-        }
-
-    def default(self, obj):
-        if isinstance(obj, Patch):
-            return self._encode_patch(obj)
-        elif isinstance(obj, PatchCollection):
-            return [self._encode_patch(p) for p in obj]
-        return super().default(obj)
+from commons import PatchCollection
 
 
 class FeatureTIFFRenderer(abc.ABC):
@@ -198,8 +19,8 @@ class FeatureTIFFRenderer(abc.ABC):
 def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
     for patch in patches:
         cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
-        cancer_percentage = 0 if np.isnan(
-            cancer_percentage) else cancer_percentage
+        cancer_percentage = 0 if cancer_percentage is None\
+             else cancer_percentage
         mask_value = int(round(cancer_percentage * 255))
         data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
                                                                       0)
@@ -234,11 +55,14 @@ class Classifier(abc.ABC):
     def classify_patch(self, patch: Patch) -> Dict:
         pass
 
-    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
-        for patch in patch_collection:
+    def classify(self, slide: Slide, patch_filter=None) -> Slide:
+        patches = slide.patches if patch_filter is None else\
+            slide.patches.filter(patch_filter)
+
+        for patch in patches:
             features = self.classify_patch(patch)
-            patch_collection.update_patch(patch=patch, features=features)
-        return patch_collection
+            slide.patches.update_patch(patch=patch, features=features)
+        return slide
 
 
 class KarolinskaFeature:
@@ -410,39 +234,36 @@ class TissueClassifier(Classifier):
     def classify_patch(self, patch: Patch) -> Patch:
         raise NotImplementedError
 
-    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
+    def classify(self, slide: Slide) -> Slide:
 
-        lev = patch_collection.slide.get_best_level_for_downsample(16)
-        lev_dim = patch_collection.slide.level_dimensions[lev]
-        thumb = patch_collection.slide.read_region(location=(0, 0),
-                                                   level=lev,
-                                                   size=lev_dim)
+        lev = slide.get_best_level_for_downsample(16)
+        lev_dim = slide.level_dimensions[lev]
+        thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
         tissue_mask = self._predictor.get_tissue_mask(thumb,
                                                       self._mask_threshold)
 
-        dim_x, dim_y = patch_collection.patch_size
+        dim_x, dim_y = slide.patches.patch_size
         patch_area = dim_x * dim_y
         #  patch_area_th = patch_area * self._patch_threshold
         extraction_lev = 0  # TODO check it is correct
 
         patch_coordinates = self._get_tissue_patches_coordinates(
-            patch_collection.slide, tissue_mask, patch_collection.patch_size)
+            slide, tissue_mask, slide.patches.patch_size)
 
-        patch_collection.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
+        slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
 
         for (coor_x, coor_y) in patch_coordinates:
-            patch = patch_collection.slide.read_region(location=(coor_x,
-                                                                 coor_y),
-                                                       level=extraction_lev,
-                                                       size=(dim_x, dim_y))
+            patch = slide.read_region(location=(coor_x, coor_y),
+                                      level=extraction_lev,
+                                      size=(dim_x, dim_y))
 
             tissue_area = np.sum(
                 self._predictor.get_tissue_mask(patch, self._patch_threshold))
 
-            patch_collection.update_patch((coor_x, coor_y),
-                                          features={
-                                              TissueFeature.TISSUE_PERCENTAGE:
-                                              tissue_area / patch_area
-                                          })
+            slide.patches.update_patch((coor_x, coor_y),
+                                       features={
+                                           TissueFeature.TISSUE_PERCENTAGE:
+                                           tissue_area / patch_area
+                                       })
 
-        return patch_collection
+        return slide

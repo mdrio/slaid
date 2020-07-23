@@ -3,7 +3,7 @@ import numpy as np
 import os
 from PIL import Image
 import classifiers as cl
-from commons import Slide
+from commons import Slide, PandasPatchCollection, JSONEncoder
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -30,7 +30,7 @@ def main():
     json_filename = os.path.join(DIR, 'test.json')
     tiff_filename = os.path.join(DIR, 'test.tiff')
 
-    mask = slide = Slide(slide_filename)
+    mask = slide = Slide(slide_filename, patch_size=patch_size)
 
     tissue_classifier = cl.TissueClassifier(
         cl.BasicTissueMaskPredictor(GreenIsTissueModel()))
@@ -39,21 +39,18 @@ def main():
 
     print('tissue classification')
 
-    patches = cl.PandasPatchCollection(slide, patch_size)
-    patches = tissue_classifier.classify(patches)
+    tissue_classifier.classify(slide)
     print('cancer classification')
-    cancer_features = cancer_classifier.classify(
-        patches.loc[patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5])
-
-    patches.merge(cancer_features)
+    cancer_classifier.classify(
+        slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
 
     with open(json_filename, 'w') as json_file:
-        json.dump(patches, json_file, cls=cl.JSONEncoder)
+        json.dump(slide.patches, json_file, cls=JSONEncoder)
 
     renderer = cl.BasicFeatureTIFFRenderer(cl.karolinska_rgb_convert,
                                            slide.dimensions)
     print('rendering...')
-    renderer.render(tiff_filename, patches)
+    renderer.render(tiff_filename, slide.patches)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)
