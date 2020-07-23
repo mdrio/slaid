@@ -165,7 +165,8 @@ class PandasPatchCollection(PatchCollection):
 
     def merge(self, other_collection: 'PandasPatchCollection'):
         self._dataframe = self.dataframe.merge(other_collection.dataframe,
-                                               'left').set_index(
+                                               'left',
+                                               on=['y', 'x']).set_index(
                                                    self._dataframe.index)
 
 
