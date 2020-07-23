@@ -306,6 +306,12 @@ class TissueMaskPredictor(abc.ABC):
         pass
 
 
+class Model(abc.ABC):
+    @abc.abstractmethod
+    def predict(self, array: np.array) -> np.array:
+        pass
+
+
 class BasicTissueMaskPredictor(TissueMaskPredictor):
     def __init__(self, model):
         self._model = model
