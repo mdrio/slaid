@@ -107,6 +107,31 @@ def round_to_patch(coordinates, patch_size):
 
 
 class PatchCollection(abc.ABC):
+    class Projection(abc.ABC):
+        @abc.abstractmethod
+        def __eq__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def __lt__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def __le__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def __ne__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def __ge__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def __gt__(self, other):
+            pass
+
     @abc.abstractclassmethod
     def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
                     dataframe: pd.DataFrame):
@@ -130,7 +155,7 @@ class PatchCollection(abc.ABC):
 
     @abc.abstractmethod
     def filter(self,
-               condition: "PatchCollection.Condition") -> "PatchCollection":
+               condition: "PatchCollection.Projection") -> "PatchCollection":
         pass
 
     @abc.abstractmethod
@@ -170,6 +195,36 @@ class PatchCollection(abc.ABC):
 
 
 class PandasPatchCollection(PatchCollection):
+    class Projection(PatchCollection.Projection):
+        def __init__(self, series: pd.core.series.Series):
+            self._series = series
+
+        def __eq__(self, other):
+            return PandasPatchCollection.Projection(self._series == other)
+
+        def __lt__(self, other):
+            return PandasPatchCollection.Projection(self._series < other)
+
+        def __le__(self, other):
+            return PandasPatchCollection.Projection(self._series < other)
+
+        def __ne__(self, other):
+            return PandasPatchCollection.Projection(self._series != other)
+
+        def __ge__(self, other):
+            return PandasPatchCollection.Projection(self._series >= other)
+
+        def __gt__(self, other):
+            return PandasPatchCollection.Projection(self._series > other)
+
+        def __and__(self, other):
+            return PandasPatchCollection.Projection(self._series
+                                                    & other._series)
+
+        def __or__(self, other):
+            return PandasPatchCollection.Projection(self._series
+                                                    | other._series)
+
     class LocIndexer:
         def __init__(self, collection: "PandasPatchCollection"):
             self.collection = collection
@@ -202,7 +257,7 @@ class PandasPatchCollection(PatchCollection):
         return df
 
     def __getitem__(self, key):
-        return self._dataframe[key]
+        return PandasPatchCollection.Projection(self._dataframe[key])
 
     def _create_patch(self, coordinates: Tuple[int, int],
                       data: Tuple) -> Patch:
@@ -227,7 +282,7 @@ class PandasPatchCollection(PatchCollection):
 
     @property
     def features(self) -> List[str]:
-        return [c for c in self._dataframe.columns[2:]]
+        return [c for c in self._dataframe.columns]
 
     def add_feature(self, feature: str, default_value: Any = None):
         if feature not in self.features:
@@ -252,8 +307,8 @@ class PandasPatchCollection(PatchCollection):
                             list(features.keys())] = list(features.values())
 
     def filter(self,
-               condition: "PatchCollection.Condition") -> "PatchCollection":
-        return self._loc[condition]
+               condition: "PatchCollection.Projection") -> "PatchCollection":
+        return self._loc[condition._series]
 
     def update(self, other: "PandasPatchCollection"):
         self.dataframe.update(other.dataframe)

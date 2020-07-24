@@ -155,7 +155,7 @@ class TestPandasPatchCollection(unittest.TestCase):
         self.assertEqual(patch.features['test'], 1)
         self.assertEqual(patch.features['test2'], 2)
 
-    def test_filter(self):
+    def test_merge(self):
         for i, p in enumerate(self.collection):
             self.collection.update_patch(patch=p, features={'feature': i})
         filtered_collection = self.collection.filter(
@@ -173,6 +173,45 @@ class TestPandasPatchCollection(unittest.TestCase):
         self.collection.merge(filtered_collection)
         self.assertEqual(
             self.collection.get_patch((10, 10)).features['feature2'], -1)
+
+    def test_filter(self):
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p, features={
+                'feature': i,
+            })
+        filtered_collection = self.collection.filter(
+            self.collection['feature'] > 0)
+
+        for p in filtered_collection:
+            self.assertTrue(p.features['feature'] > 0)
+
+    def test_filter_and_condition(self):
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p,
+                                         features={
+                                             'feature': i,
+                                             'feature2': i
+                                         })
+        filtered_collection = self.collection.filter(
+            (self.collection['feature'] > 0)
+            & (self.collection['feature2'] > 1))
+
+        for p in filtered_collection:
+            self.assertTrue(p.features['feature'] > 0)
+            self.assertTrue(p.features['feature2'] > 1)
+
+    def test_features(self):
+        self.assertEqual(self.slide.patches.features, [])
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p,
+                                         features={
+                                             'feature': i,
+                                             'feature2': i
+                                         })
+
+        features = list(self.collection.features)
+        features.sort()
+        self.assertEqual(features, ['feature', 'feature2'])
 
 
 if __name__ == '__main__':
