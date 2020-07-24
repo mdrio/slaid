@@ -1,41 +1,63 @@
 import unittest
-from classifiers import PatchFeature, PatchFeatureCollection
-from commons import Patch
+from commons import Patch, PandasPatchCollection
+from classifiers import BasicTissueMaskPredictor,\
+    TissueClassifier, TissueFeature, \
+    KarolinskaTrueValueClassifier, KarolinskaFeature
+import numpy as np
 from test_commons import DummySlide
 
 
-class TestPatchFeatureCollection(unittest.TestCase):
-    def test_sort(self):
-        slide = DummySlide('slide', (400, 200))
-        patch_size = (100, 100)
-        features = [
-            PatchFeature(Patch(slide, (0, 0), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 100), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 200), patch_size), {}),
-            PatchFeature(Patch(slide, (0, 300), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                0,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                100,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                200,
-            ), patch_size), {}),
-            PatchFeature(Patch(slide, (
-                0,
-                300,
-            ), patch_size), {}),
-        ]
+class DummyModel:
+    def __init__(self, func):
+        self.func = func
 
-        reversed_features = list(reversed(features))
-        collection = PatchFeatureCollection(slide, patch_size,
-                                            reversed_features)
-        collection.sort()
-        self.assertEqual(features, collection.features)
+    def predict(self, array):
+        return self.func(array.shape[0])
+
+
+class TestTissueDetector(unittest.TestCase):
+    def test_detector_no_tissue(self):
+        patch_size = (10, 10)
+        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
+        model = DummyModel(np.zeros)
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+
+        tissue_detector.classify(slide)
+        for patch in slide.patches:
+            self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
+                             0)
+
+    def test_detector_all_tissue(self):
+        patch_size = (10, 10)
+        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
+        model = DummyModel(np.ones)
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+        tissue_detector.classify(slide)
+        for patch in slide.patches:
+            self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
+                             1)
+
+
+class KarolinskaTest(unittest.TestCase):
+    def test_true_value(self):
+        size = (200, 100)
+        patch_size = (10, 10)
+        #  size = (23904, 28664)
+        #  patch_size = (256, 256)
+        data = np.zeros((size[1], size[0], 3), dtype=np.uint8)
+        data[0:10, 0:50] = [2, 0, 0]
+
+        mask_slide = DummySlide('mask', size, data=data)
+        slide = DummySlide('slide', size, patch_size=patch_size)
+        cl = KarolinskaTrueValueClassifier(mask_slide)
+        slide_classified = cl.classify(slide)
+        self.assertEqual(len(slide.patches), len(slide_classified.patches))
+        for i, patch in enumerate(slide_classified.patches):
+            feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
+            if i <= 4:
+                self.assertEqual(feature, 1)
+            else:
+                self.assertEqual(feature, 0)
 
 
 if __name__ == '__main__':
