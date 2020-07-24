@@ -1,7 +1,7 @@
 import unittest
 from typing import Tuple
 from PIL import Image
-from commons import Slide, round_to_patch,\
+from commons import Patch, Slide, round_to_patch,\
     PatchCollection, PandasPatchCollection
 
 
@@ -30,6 +30,7 @@ class DummySlide(Slide):
         self.data = data
         self.features = {}
         self._patches = patches or PandasPatchCollection(self, patch_size)
+        self.patch_size = patch_size
 
     @property
     def dimensions(self):
@@ -59,6 +60,10 @@ class DummySlide(Slide):
     @property
     def level_downsamples(self):
         return self._level_downsample
+
+    def __len__(self):
+        return self.size[0] * self.size[1] // (self.patch_size[0] *
+                                               self.patch_size[1])
 
 
 class TestSlide(unittest.TestCase):
@@ -101,6 +106,73 @@ class TestRoundToPatch(unittest.TestCase):
         patch_size = (256, 256)
         res = round_to_patch(coordinates, patch_size)
         self.assertEqual(res, (512, 256))
+
+
+class TestPandasPatchCollection(unittest.TestCase):
+    def setUp(self):
+        self.slide_size = (200, 100)
+        self.slide = DummySlide('slide', self.slide_size)
+        self.patch_size = (10, 10)
+        self.collection = PandasPatchCollection(self.slide, self.patch_size)
+
+    def test_init(self):
+        self.assertEqual(
+            len(self.collection), self.slide_size[0] * self.slide_size[1] /
+            (self.patch_size[0] * self.patch_size[1]))
+
+    def test_iteration(self):
+        x = y = counter = 0
+        for patch in self.collection:
+            self.assertEqual(patch.x, x)
+            self.assertEqual(patch.y, y)
+            x = (x + self.patch_size[0]) % self.slide_size[0]
+            if x == 0:
+                y += self.patch_size[1]
+            counter += 1
+
+        self.assertEqual(
+            counter, self.slide_size[0] * self.slide_size[1] /
+            (self.patch_size[0] * self.patch_size[1]))
+
+    def test_get_item(self):
+        coordinates = (190, 90)
+        patch = self.collection.get_patch(coordinates)
+        self.assertTrue(isinstance(patch, Patch))
+        self.assertEqual(patch.x, coordinates[0])
+        self.assertEqual(patch.y, coordinates[1])
+
+    def test_update_patch(self):
+        coordinates = (190, 90)
+        self.collection.update_patch(coordinates=coordinates,
+                                     features={
+                                         'test': 1,
+                                         'test2': 2
+                                     })
+        self.assertEqual(len(self.collection), 200)
+        patch = self.collection.get_patch(coordinates)
+        self.assertEqual(patch.x, coordinates[0])
+        self.assertEqual(patch.y, coordinates[1])
+        self.assertEqual(patch.features['test'], 1)
+        self.assertEqual(patch.features['test2'], 2)
+
+    def test_filter(self):
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p, features={'feature': i})
+        filtered_collection = self.collection.filter(
+            self.collection['feature'] > 0)
+        self.assertEqual(len(filtered_collection), len(self.collection) - 1)
+
+        filtered_collection.update_patch(coordinates=(10, 10),
+                                         features={
+                                             'feature2': -1,
+                                         })
+        #  self.collection.update(filtered_collection)
+        #  self.assertEqual(
+        #      self.collection.get_patch((10, 10)).features['feature'], -1)
+
+        self.collection.merge(filtered_collection)
+        self.assertEqual(
+            self.collection.get_patch((10, 10)).features['feature2'], -1)
 
 
 if __name__ == '__main__':
