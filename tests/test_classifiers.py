@@ -1,7 +1,7 @@
 import unittest
-from commons import Patch
+from commons import Patch, PandasPatchCollection
 from classifiers import BasicTissueMaskPredictor,\
-    TissueClassifier, TissueFeature, PandasPatchCollection,\
+    TissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature
 import numpy as np
 from test_commons import DummySlide
@@ -17,97 +17,25 @@ class DummyModel:
 
 class TestTissueDetector(unittest.TestCase):
     def test_detector_no_tissue(self):
-        slide = DummySlide('slide', (100, 100))
+        patch_size = (10, 10)
+        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.zeros)
         tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
 
-        patch_size = (10, 10)
-        patch_collection = tissue_detector.classify(
-            PandasPatchCollection(slide, patch_size))
-        self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
-        for patch in patch_collection:
+        tissue_detector.classify(slide)
+        for patch in slide.patches:
             self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
                              0)
 
     def test_detector_all_tissue(self):
-        slide = DummySlide('slide', (100, 100))
+        patch_size = (10, 10)
+        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.ones)
         tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
-
-        patch_size = (10, 10)
-        patch_collection = tissue_detector.classify(
-            PandasPatchCollection(slide, patch_size))
-        self.assertEqual(len(patch_collection), patch_size[0] * patch_size[1])
-        for patch_feature in patch_collection:
-            self.assertEqual(
-                patch_feature.features[TissueFeature.TISSUE_PERCENTAGE], 1)
-
-
-class TestPandasPatchCollection(unittest.TestCase):
-    def setUp(self):
-        self.slide_size = (200, 100)
-        self.slide = DummySlide('slide', self.slide_size)
-        self.patch_size = (10, 10)
-        self.collection = PandasPatchCollection(self.slide, self.patch_size)
-
-    def test_init(self):
-        self.assertEqual(
-            len(self.collection), self.slide_size[0] * self.slide_size[1] /
-            (self.patch_size[0] * self.patch_size[1]))
-
-    def test_iteration(self):
-        x = y = counter = 0
-        for patch in self.collection:
-            self.assertEqual(patch.x, x)
-            self.assertEqual(patch.y, y)
-            x = (x + self.patch_size[0]) % self.slide_size[0]
-            if x == 0:
-                y += self.patch_size[1]
-            counter += 1
-
-        self.assertEqual(
-            counter, self.slide_size[0] * self.slide_size[1] /
-            (self.patch_size[0] * self.patch_size[1]))
-
-    def test_get_item(self):
-        coordinates = (190, 90)
-        patch = self.collection.get_patch(coordinates)
-        self.assertTrue(isinstance(patch, Patch))
-        self.assertEqual(patch.x, coordinates[0])
-        self.assertEqual(patch.y, coordinates[1])
-
-    def test_update_patch(self):
-        coordinates = (190, 90)
-        self.collection.update_patch(coordinates=coordinates,
-                                     features={
-                                         'test': 1,
-                                         'test2': 2
-                                     })
-        self.assertEqual(len(self.collection), 200)
-        patch = self.collection.get_patch(coordinates)
-        self.assertEqual(patch.x, coordinates[0])
-        self.assertEqual(patch.y, coordinates[1])
-        self.assertEqual(patch.features['test'], 1)
-        self.assertEqual(patch.features['test2'], 2)
-
-    def test_filter(self):
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p, features={'feature': i})
-        filtered_collection = self.collection.loc[
-            self.collection['feature'] > 0]
-        self.assertEqual(len(filtered_collection), len(self.collection) - 1)
-
-        filtered_collection.update_patch(coordinates=(10, 10),
-                                         features={
-                                             'feature2': -1,
-                                         })
-        #  self.collection.update(filtered_collection)
-        #  self.assertEqual(
-        #      self.collection.get_patch((10, 10)).features['feature'], -1)
-
-        self.collection.merge(filtered_collection)
-        self.assertEqual(
-            self.collection.get_patch((10, 10)).features['feature2'], -1)
+        tissue_detector.classify(slide)
+        for patch in slide.patches:
+            self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
+                             1)
 
 
 class KarolinskaTest(unittest.TestCase):
@@ -120,12 +48,11 @@ class KarolinskaTest(unittest.TestCase):
         data[0:10, 0:50] = [2, 0, 0]
 
         mask_slide = DummySlide('mask', size, data=data)
-        slide = DummySlide('slide', size)
+        slide = DummySlide('slide', size, patch_size=patch_size)
         cl = KarolinskaTrueValueClassifier(mask_slide)
-        collection = PandasPatchCollection(slide, patch_size)
-        collection_classified = cl.classify(collection)
-        self.assertEqual(len(collection), len(collection_classified))
-        for i, patch in enumerate(collection_classified):
+        slide_classified = cl.classify(slide)
+        self.assertEqual(len(slide.patches), len(slide_classified.patches))
+        for i, patch in enumerate(slide_classified.patches):
             feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
             if i <= 4:
                 self.assertEqual(feature, 1)
