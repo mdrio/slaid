@@ -3,10 +3,11 @@ from openslide import OpenSlide, open_slide, OpenSlideUnsupportedFormatError
 from typing import Tuple, Dict, Any, List
 import os
 import sys
-import json
 import pandas as pd
 from collections import defaultdict, OrderedDict
 import inspect
+
+PATCH_SIZE = (256, 256)
 
 
 def get_class(name, module):
@@ -18,7 +19,7 @@ class Slide:
                  filename: str,
                  features: Dict = None,
                  patches: 'PatchCollection' = None,
-                 patch_size: Tuple[int, int] = (256, 256)):
+                 patch_size: Tuple[int, int] = PATCH_SIZE):
         self._filename = filename
 
         try:
@@ -54,7 +55,7 @@ class Slide:
         self.__init__(filename)
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
-        patch_size = patch_size if patch_size else (256, 256)
+        patch_size = patch_size if patch_size else PATCH_SIZE
         for y in range(0, self.dimensions[1], patch_size[1]):
             for x in range(0, self.dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
@@ -318,22 +319,3 @@ class PandasPatchCollection(PatchCollection):
                                                'left',
                                                on=['y', 'x']).set_index(
                                                    self._dataframe.index)
-
-
-class JSONEncoder(json.JSONEncoder):
-    def _encode_patch(self, patch: Patch):
-
-        return {
-            'slide': patch.slide.ID,
-            'x': patch.x,
-            'y': patch.y,
-            'size': patch.size,
-            'features': patch.features
-        }
-
-    def default(self, obj):
-        if isinstance(obj, Patch):
-            return self._encode_patch(obj)
-        elif isinstance(obj, PatchCollection):
-            return [self._encode_patch(p) for p in obj]
-        return super().default(obj)

@@ -1,7 +1,9 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import List, Callable, Any
+from enum import Enum
 from commons import Slide
 import classifiers
+from renderers import VectorialRenderer, BasicFeatureTIFFRenderer
 
 
 class Stream(ABC):
@@ -29,10 +31,15 @@ class SlideStream(Stream):
 class Step(ABC):
     def __init__(self):
         self._next = None
+        self._root = None
 
     @property
     def next(self):
         return self._next
+
+    @property
+    def root(self):
+        return self._root
 
     @abstractmethod
     def run(self, data_in: Stream):
@@ -43,7 +50,8 @@ class Step(ABC):
 
     def __or__(self, other):
         self._next = other
-        return self
+        other._root = self.root
+        return other
 
     def __add__(self, other):
         return MultiStep([self, other])
@@ -51,10 +59,12 @@ class Step(ABC):
 
 class Input(Step):
     def __init__(self, stream: Stream):
+        super().__init__()
         self.stream = stream
+        self._root = self
 
     def run(self):
-        return self.next.run(self.stream)
+        return self.next.run(self.stream) if self.next else None
 
 
 class BasicStep(Step):
@@ -64,6 +74,8 @@ class BasicStep(Step):
         self.run_args = run_args
 
     def run(self, data_in: Stream):
+        print(self.run_method)
+        print(data_in)
         output = self.run_method(data_in, *self.run_args)
         return self._post_run(output)
 
@@ -83,15 +95,51 @@ class MultiStep(Step):
 
 
 def slide(filename: str):
-    return Input(Slide(filename))
+    slide = Slide(filename)
+    global _
+    _ = slide.patches
+    return Input(slide)
 
 
 def classify(classifier_cls: str, *args):
-    return BasicStep(
-        getattr(classifiers, classifier_cls).create(*args).classify)
+    try:
+        classifier_cls = getattr(classifiers, classifier_cls)
+    except AttributeError:
+        try:
+            classifier_cls = getattr(classifiers,
+                                     classifier_cls + 'Classifier')
+        except AttributeError:
+            raise RuntimeError(f'Classifier {classifier_cls} does not exist')
+    return BasicStep(classifier_cls.create(*args).classify)
 
 
-#  slide(slide_filename) | classify('tissue_detection', model) | filter_('tissue' > 0.8) |karolinska(mask_filename) | tiff_render(filename) + json_render(filename)
+class RenderOutput(Enum):
+    VECT = 'vect'
+    TIFF = 'tiff'
+
+
+_renderers = {
+    RenderOutput.VECT: VectorialRenderer,
+    RenderOutput.TIFF: BasicFeatureTIFFRenderer
+}
+
+
+def get_renderer(render_output: RenderOutput):
+    return _renderers[render_output]()
+
+
+def render(output: str, filename: str):
+    return BasicStep(get_renderer(RenderOutput(output)).render, filename)
+
+
+if __name__ == '__main__':
+    import sys
+    pipeline = eval(sys.argv[1])
+    #  pipeline = slide('tests/integration/input.tiff') | classify(
+    #      'Tissue', 'models/LSVM_tissue_bg_model_promort.pickle') | classify(
+    #          'KarolinskaTrueValue', 'tests/integration/input.tiff')
+    pipeline.root.run()
+
 #  pipeline = slide(
 #      '/home/mauro/projects/slide_classifier/tests/integration/input.tiff'
 #  ) | classify(
