@@ -1,6 +1,6 @@
 import abc
 from openslide import OpenSlide, open_slide, OpenSlideUnsupportedFormatError
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Union
 import os
 import sys
 import pandas as pd
@@ -155,8 +155,10 @@ class PatchCollection(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def filter(self,
-               condition: "PatchCollection.Projection") -> "PatchCollection":
+    def filter(
+        self,
+        condition: Union[str,
+                         "PatchCollection.Projection"]) -> "PatchCollection":
         pass
 
     @abc.abstractmethod
@@ -307,9 +309,14 @@ class PandasPatchCollection(PatchCollection):
         self._dataframe.loc[coordinates[::-1],
                             list(features.keys())] = list(features.values())
 
-    def filter(self,
-               condition: "PatchCollection.Projection") -> "PatchCollection":
-        return self._loc[condition._series]
+    def filter(
+        self,
+        condition: Union[str,
+                         "PatchCollection.Projection"]) -> "PatchCollection":
+        return PandasPatchCollection.from_pandas(
+            self.slide,
+            self.patch_size, self._dataframe.query(condition)) if isinstance(
+                condition, str) else self._loc[condition._series]
 
     def update(self, other: "PandasPatchCollection"):
         self.dataframe.update(other.dataframe)

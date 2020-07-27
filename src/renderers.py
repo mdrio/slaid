@@ -27,17 +27,16 @@ def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
 class BasicFeatureTIFFRenderer(Renderer):
     def __init__(
         self,
-        rgb_convert: Callable = karolinska_rgb_convert,
-        shape: Tuple[int, int] = PATCH_SIZE,
+        rgb_convert: Callable = None,
     ):
-        self._shape = shape
-        self._rgb_convert = rgb_convert
+        self._rgb_convert = rgb_convert or karolinska_rgb_convert
 
-    def render(self, filename: str, slide: Slide):
+    def render(self, slide: Slide, filename: str):
+        shape = slide.dimensions
         imwrite(filename,
                 self._rgb_convert(slide.patches),
                 dtype='uint8',
-                shape=(self._shape[1], self._shape[0], 4),
+                shape=(shape[1], shape[0], 4),
                 photometric='rgb',
                 tile=slide.patches.patch_size,
                 extrasamples=('ASSOCALPHA', ))

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Callable, Any
 from enum import Enum
-from commons import Slide
+from commons import Slide, PatchCollection
 import classifiers
 from renderers import VectorialRenderer, BasicFeatureTIFFRenderer
 
@@ -74,10 +74,8 @@ class BasicStep(Step):
         self.run_args = run_args
 
     def run(self, data_in: Stream):
-        print(self.run_method)
-        print(data_in)
         output = self.run_method(data_in, *self.run_args)
-        return self._post_run(output)
+        return self._post_run(output if output is not None else data_in)
 
 
 class MultiStep(Step):
@@ -111,6 +109,19 @@ def classify(classifier_cls: str, *args):
         except AttributeError:
             raise RuntimeError(f'Classifier {classifier_cls} does not exist')
     return BasicStep(classifier_cls.create(*args).classify)
+
+
+def tissue_detection(model_filname):
+
+    tissue_detector = classifiers.TissueClassifier.create(model_filname)
+    return BasicStep(tissue_detector.classify)
+
+
+def classify_karolinska(mask_filename,
+                        patch_filter: PatchCollection.Projection = None):
+    classifier = classifiers.KarolinskaTrueValueClassifier.create(
+        mask_filename)
+    return BasicStep(classifier.classify, patch_filter)
 
 
 class RenderOutput(Enum):
