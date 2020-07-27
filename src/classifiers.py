@@ -129,6 +129,7 @@ class BasicTissueMaskPredictor(TissueMaskPredictor):
 
 class TissueFeature:
     TISSUE_PERCENTAGE = 'tissue_percentage'
+    TISSUE_MASK = 'tissue_mask'
 
 
 class TissueClassifier(Classifier):
@@ -136,11 +137,13 @@ class TissueClassifier(Classifier):
                  predictor: TissueMaskPredictor,
                  mask_threshold: float = 0.5,
                  patch_threshold: float = 0.8,
-                 level: int = 2):
+                 level: int = 2,
+                 include_mask_feature=False):
         self._predictor = predictor
         self._mask_threshold = mask_threshold
         self._patch_threshold = patch_threshold
         self._level = level
+        self._include_mask_feature = include_mask_feature
 
     @staticmethod
     def create(model_filename,
@@ -223,19 +226,24 @@ class TissueClassifier(Classifier):
             slide, tissue_mask, slide.patches.patch_size)
 
         slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
+        if self._include_mask_feature:
+            slide.patches.add_feature(TissueFeature.TISSUE_MASK)
 
         for (coor_x, coor_y) in patch_coordinates:
             patch = slide.read_region(location=(coor_x, coor_y),
                                       level=extraction_lev,
                                       size=(dim_x, dim_y))
 
-            tissue_area = np.sum(
-                self._predictor.get_tissue_mask(patch, self._patch_threshold))
+            tissue_mask = self._predictor.get_tissue_mask(
+                patch, self._patch_threshold)
 
-            slide.patches.update_patch((coor_x, coor_y),
-                                       features={
-                                           TissueFeature.TISSUE_PERCENTAGE:
-                                           tissue_area / patch_area
-                                       })
+            tissue_area = np.sum(tissue_mask)
+
+            features = {
+                TissueFeature.TISSUE_PERCENTAGE: tissue_area / patch_area
+            }
+            if self._include_mask_feature:
+                features[TissueFeature.TISSUE_MASK] = tissue_mask
+            slide.patches.update_patch((coor_x, coor_y), features=features)
 
         return slide

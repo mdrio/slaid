@@ -4,7 +4,9 @@ import os
 from PIL import Image
 import classifiers as cl
 from commons import Slide
-from renderers import JSONEncoder, BasicFeatureTIFFRenderer, karolinska_rgb_convert
+from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
+    karolinska_rgb_convert
+from test_classifiers import GreenIsTissueModel
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -15,11 +17,6 @@ def generate_row_first_row_cancer(filename, slide_size, patch_size):
     data[0:patch_size[1], 0:w] = [2, 255, 0]
     img = Image.fromarray(data, 'RGB')
     img.save(filename)
-
-
-class GreenIsTissueModel(cl.Model):
-    def predict(self, array: np.array) -> np.array:
-        return array[:, 1] / 255
 
 
 def main():
