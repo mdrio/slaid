@@ -135,15 +135,4 @@ def render(output: str, filename: str):
 if __name__ == '__main__':
     import sys
     pipeline = eval(sys.argv[1])
-    #  pipeline = slide('tests/integration/input.tiff') | classify(
-    #      'Tissue', 'models/LSVM_tissue_bg_model_promort.pickle') | classify(
-    #          'KarolinskaTrueValue', 'tests/integration/input.tiff')
     pipeline.root.run()
-
-#  pipeline = slide(
-#      '/home/mauro/projects/slide_classifier/tests/integration/input.tiff'
-#  ) | classify(
-#      'KarolinskaTrueValueClassifier',
-#      '/home/mauro/projects/slide_classifier/tests/integration/input.tiff')
-#
-#  pipeline.run()
