@@ -192,7 +192,6 @@ class TissueClassifier(Classifier):
         mask = mask.resize((xx, yy), resample=Image.BILINEAR)
         tissue = [(x, y) for x in range(xx) for y in range(yy)
                   if mask.getpixel((x, y)) > 0]
-        random.shuffle(tissue)  # randomly permute the elements
 
         ext_lev_ds = slide.level_downsamples[extraction_lev]
         return [
