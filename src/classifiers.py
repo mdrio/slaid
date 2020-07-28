@@ -208,6 +208,7 @@ class TissueClassifier(Classifier):
                  extraction_lev: int = 2,
                  pixel_threshold: float = 0.8,
                  level: int = 2,
+                 minimum_tissue_ratio=0.01,
                  include_mask_feature=False) -> Slide:
 
         lev = slide.get_best_level_for_downsample(16)
@@ -231,12 +232,13 @@ class TissueClassifier(Classifier):
                                       level=extraction_lev,
                                       size=(dim_x, dim_y))
 
-            tissue_mask = self._predictor.get_tissue_mask(patch, pixel_threshold)
+            tissue_mask = self._predictor.get_tissue_mask(
+                patch, pixel_threshold)
 
             tissue_area = np.sum(tissue_mask)
-            tissue_percent = tissue_area / patch_area
-            if tissue_percent > threshold:
-                features = {TissueFeature.TISSUE_PERCENTAGE: tissue_percent}
+            tissue_ratio = tissue_area / patch_area
+            if tissue_ratio > minimum_tissue_ratio:
+                features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
                 if include_mask_feature:
                     features[TissueFeature.TISSUE_MASK] = tissue_mask
                 slide.patches.update_patch((coor_x, coor_y), features=features)
