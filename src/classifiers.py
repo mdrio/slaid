@@ -206,14 +206,14 @@ class TissueClassifier(Classifier):
     def classify(self,
                  slide: Slide,
                  extraction_lev: int = 2,
-                 threshold: float = 0.8,
+                 pixel_threshold: float = 0.8,
                  level: int = 2,
                  include_mask_feature=False) -> Slide:
 
         lev = slide.get_best_level_for_downsample(16)
         lev_dim = slide.level_dimensions[lev]
         thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
-        tissue_mask = self._predictor.get_tissue_mask(thumb, threshold)
+        tissue_mask = self._predictor.get_tissue_mask(thumb, pixel_threshold)
 
         dim_x, dim_y = slide.patches.patch_size
         patch_area = dim_x * dim_y
@@ -231,7 +231,7 @@ class TissueClassifier(Classifier):
                                       level=extraction_lev,
                                       size=(dim_x, dim_y))
 
-            tissue_mask = self._predictor.get_tissue_mask(patch, threshold)
+            tissue_mask = self._predictor.get_tissue_mask(patch, pixel_threshold)
 
             tissue_area = np.sum(tissue_mask)
             tissue_percent = tissue_area / patch_area
