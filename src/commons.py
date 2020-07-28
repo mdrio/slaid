@@ -4,6 +4,7 @@ from typing import Tuple, Dict, Any, List, Union
 import os
 import sys
 import pandas as pd
+import numpy as np
 from collections import defaultdict, OrderedDict
 import inspect
 
@@ -96,6 +97,22 @@ class Patch:
     def __str__(self):
         return (f'slide: {self.slide}, x: {self.x}, '
                 f'y: {self.y}, size: {self.size}')
+
+    def __eq__(self, other):
+        def _check_features():
+            res = self.features.keys() == other.features.keys()
+            for f, v in self.features.items():
+                if isinstance(v, np.ndarray):
+                    res = res and np.array_equal(v, other.features[f])
+                else:
+                    res = res and v == other.features[f]
+                if not res:
+                    break
+            return res
+
+        return self.slide == other.slide and (self.x, self.y) == (
+            other.x,
+            other.y) and self.size == other.size and _check_features()
 
 
 def round_to_patch(coordinates, patch_size):

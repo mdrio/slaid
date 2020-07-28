@@ -1,5 +1,6 @@
 import abc
 import json
+import pickle
 from tifffile import imwrite
 import numpy as np
 from typing import List, Callable, Union
@@ -79,3 +80,12 @@ class VectorialRenderer(Renderer):
     def render(self, slide: Slide, filename: str):
         with open(filename, 'w') as json_file:
             json.dump(slide.patches, json_file, cls=JSONEncoder)
+
+
+class PickleRenderer(Renderer):
+    def render(self, filename: str, slide: Slide):
+        pass
+
+    def render_patch(self, filename: str, patch: Patch):
+        with open(filename, 'wb') as f:
+            pickle.dump(patch, f)
