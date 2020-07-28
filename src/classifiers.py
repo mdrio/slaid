@@ -172,7 +172,7 @@ class TissueClassifier(Classifier):
                                         slide,
                                         tissue_mask,
                                         patch_size=PATCH_SIZE,
-                                        extraction_lev=0):
+                                        extraction_lev=2):
 
         tissue_mask *= 255
         # resize and use to extract patches
@@ -221,7 +221,10 @@ class TissueClassifier(Classifier):
         #  patch_area_th = patch_area * self._patch_threshold
 
         patch_coordinates = self._get_tissue_patches_coordinates(
-            slide, tissue_mask, slide.patches.patch_size)
+            slide,
+            tissue_mask,
+            slide.patches.patch_size,
+            extraction_lev=extraction_lev)
 
         slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
         if include_mask_feature:
