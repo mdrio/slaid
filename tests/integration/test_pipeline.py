@@ -37,7 +37,7 @@ def main():
 
     print('tissue classification')
 
-    tissue_classifier.classify(slide)
+    tissue_classifier.classify(slide, extraction_lev=0)
     print('cancer classification')
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
