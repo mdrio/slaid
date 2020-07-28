@@ -3,14 +3,17 @@ import json
 import pickle
 from tifffile import imwrite
 import numpy as np
-from typing import List, Callable, Union
+from typing import List, Callable, Any
 from commons import Patch, PatchCollection, Slide
 from classifiers import KarolinskaFeature
 
 
 class Renderer(abc.ABC):
     @abc.abstractmethod
-    def render(self, filename: str, slide: Slide):
+    def render(self,
+               filename: str,
+               slide: Slide,
+               one_file_per_patch: bool = False):
         pass
 
     @abc.abstractmethod
@@ -39,7 +42,12 @@ class BasicFeatureTIFFRenderer(Renderer):
     ):
         self._rgb_convert = rgb_convert or convert_to_heatmap
 
-    def render(self, filename: str, slide: Slide):
+    def render(self,
+               filename: str,
+               slide: Slide,
+               one_file_per_patch: bool = False):
+        if one_file_per_patch:
+            raise NotImplementedError()
         shape = slide.dimensions
         imwrite(filename,
                 self._rgb_convert(slide.patches),
@@ -77,15 +85,32 @@ class JSONEncoder(json.JSONEncoder):
 
 
 class VectorialRenderer(Renderer):
-    def render(self, slide: Slide, filename: str):
+    def render(self,
+               slide: Slide,
+               filename: str,
+               one_file_per_patch: bool = False):
+        if one_file_per_patch:
+            raise NotImplementedError()
         with open(filename, 'w') as json_file:
             json.dump(slide.patches, json_file, cls=JSONEncoder)
 
 
 class PickleRenderer(Renderer):
-    def render(self, filename: str, slide: Slide):
-        pass
+    def _render(self, filename: str, obj: Any):
+        with open(filename, 'wb') as f:
+            pickle.dump(obj, f)
+
+    def render(self,
+               filename: str,
+               slide: Slide,
+               one_file_per_patch: bool = False):
+        if one_file_per_patch:
+
+            for patch in slide.patches:
+                self.render_patch(f'{filename}-{patch.x}-{patch.y}.pkl', patch)
+
+        else:
+            self._render(filename, slide)
 
     def render_patch(self, filename: str, patch: Patch):
-        with open(filename, 'wb') as f:
-            pickle.dump(patch, f)
+        self._render(filename, patch)
