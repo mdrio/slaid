@@ -1,11 +1,13 @@
 import json
+import pickle
+import glob
 import numpy as np
 import os
 from PIL import Image
 import classifiers as cl
-from commons import Slide
+from commons import Slide, Patch
 from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
-    convert_to_heatmap
+    convert_to_heatmap, PickleRenderer
 from test_classifiers import GreenIsTissueModel
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -49,6 +51,15 @@ def main():
 
     print('rendering...')
     renderer.render(tiff_filename, slide)
+    pickle_renderer = PickleRenderer()
+    pkl_filename = '/tmp/test'
+    [os.remove(f) for f in glob.glob(f'{pkl_filename}*.pkl')]
+    pickle_renderer.render(pkl_filename, slide, True)
+    for patch in slide.patches:
+        fn = f'{pkl_filename}-{patch.x}-{patch.y}.pkl'
+        assert os.path.exists(fn)
+        with open(fn, 'rb') as f:
+            assert isinstance(pickle.load(f), Patch)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)
