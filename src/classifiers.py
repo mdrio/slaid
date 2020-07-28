@@ -208,10 +208,11 @@ class TissueClassifier(Classifier):
                  extraction_lev: int = 2,
                  pixel_threshold: float = 0.8,
                  level: int = 2,
-                 minimum_tissue_ratio=0.01,
+                 minimum_tissue_ratio: float = 0.01,
+                 downsampling: int = 16,
                  include_mask_feature=False) -> Slide:
 
-        lev = slide.get_best_level_for_downsample(16)
+        lev = slide.get_best_level_for_downsample(downsampling)
         lev_dim = slide.level_dimensions[lev]
         thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
         tissue_mask = self._predictor.get_tissue_mask(thumb, pixel_threshold)
