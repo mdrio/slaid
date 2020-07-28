@@ -3,7 +3,8 @@ import numpy as np
 import os
 from PIL import Image
 import classifiers as cl
-from commons import Slide, PandasPatchCollection, JSONEncoder
+from commons import Slide
+from renderers import JSONEncoder, BasicFeatureTIFFRenderer, karolinska_rgb_convert
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -47,10 +48,10 @@ def main():
     with open(json_filename, 'w') as json_file:
         json.dump(slide.patches, json_file, cls=JSONEncoder)
 
-    renderer = cl.BasicFeatureTIFFRenderer(cl.karolinska_rgb_convert,
-                                           slide.dimensions)
+    renderer = BasicFeatureTIFFRenderer(karolinska_rgb_convert,
+                                        slide.dimensions)
     print('rendering...')
-    renderer.render(tiff_filename, slide.patches)
+    renderer.render(tiff_filename, slide)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)

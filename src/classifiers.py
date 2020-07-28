@@ -1,49 +1,13 @@
 import abc
+import pickle
 from commons import Patch, Slide, get_class, round_to_patch
-from typing import List, Tuple, Callable, Dict
+from typing import Tuple, Dict
 import numpy as np
-from tifffile import imwrite
 from PIL import Image
 import random
 import os
 from multiprocessing import Pool
-from commons import PatchCollection
-
-
-class FeatureTIFFRenderer(abc.ABC):
-    @abc.abstractmethod
-    def render(self, filename: str, patches: List[Patch]):
-        pass
-
-
-def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
-    for patch in patches:
-        cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
-        cancer_percentage = 0 if cancer_percentage is None\
-             else cancer_percentage
-        mask_value = int(round(cancer_percentage * 255))
-        data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
-                                                                      0)
-        yield np.full(patch.size + (4, ), data, 'uint8')
-
-
-class BasicFeatureTIFFRenderer:
-    def __init__(
-        self,
-        rgb_convert: Callable,
-        shape: Tuple[int, int],
-    ):
-        self._shape = shape
-        self._rgb_convert = rgb_convert
-
-    def render(self, filename: str, patches: PatchCollection):
-        imwrite(filename,
-                self._rgb_convert(patches),
-                dtype='uint8',
-                shape=(self._shape[1], self._shape[0], 4),
-                photometric='rgb',
-                tile=patches.patch_size,
-                extrasamples=('ASSOCALPHA', ))
+from commons import PatchCollection, PATCH_SIZE
 
 
 class Classifier(abc.ABC):
@@ -137,6 +101,11 @@ class Model(abc.ABC):
 
 
 class BasicTissueMaskPredictor(TissueMaskPredictor):
+    @staticmethod
+    def create(model_filename):
+        with open(model_filename, 'rb') as f:
+            return BasicTissueMaskPredictor(pickle.load(f))
+
     def __init__(self, model):
         self._model = model
 
@@ -174,9 +143,12 @@ class TissueClassifier(Classifier):
         self._level = level
 
     @staticmethod
-    def create(predictor_cls_name: str, *args):
-        #  return TissueClassifier(
-        #      get_class(predictor_cls_name, 'classifiers').create(*args))
+    def create(model_filename,
+               predictor_cls_name: str = 'BasicTissueMaskPredictor'):
+
+        return TissueClassifier(
+            get_class(predictor_cls_name,
+                      'classifiers').create(model_filename))
         raise NotImplementedError()
 
     def _get_mask_tissue_from_slide(self, slide, threshold, level=2):
@@ -201,7 +173,7 @@ class TissueClassifier(Classifier):
     def _get_tissue_patches_coordinates(self,
                                         slide,
                                         tissue_mask,
-                                        patch_size,
+                                        patch_size=PATCH_SIZE,
                                         extraction_lev=0):
 
         tissue_mask *= 255

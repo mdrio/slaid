@@ -185,6 +185,16 @@ class TestPandasPatchCollection(unittest.TestCase):
         for p in filtered_collection:
             self.assertTrue(p.features['feature'] > 0)
 
+    def test_filter_textual(self):
+        for i, p in enumerate(self.collection):
+            self.collection.update_patch(patch=p, features={
+                'feature': i,
+            })
+        filtered_collection = self.collection.filter('feature > 0')
+
+        for p in filtered_collection:
+            self.assertTrue(p.features['feature'] > 0)
+
     def test_filter_and_condition(self):
         for i, p in enumerate(self.collection):
             self.collection.update_patch(patch=p,
