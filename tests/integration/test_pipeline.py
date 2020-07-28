@@ -45,8 +45,8 @@ def main():
     with open(json_filename, 'w') as json_file:
         json.dump(slide.patches, json_file, cls=JSONEncoder)
 
-    renderer = BasicFeatureTIFFRenderer(karolinska_rgb_convert,
-                                        slide.dimensions)
+    renderer = BasicFeatureTIFFRenderer(karolinska_rgb_convert)
+
     print('rendering...')
     renderer.render(tiff_filename, slide)
 

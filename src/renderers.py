@@ -2,8 +2,8 @@ import abc
 import json
 from tifffile import imwrite
 import numpy as np
-from typing import List, Tuple, Callable
-from commons import Patch, PatchCollection, PATCH_SIZE, Slide
+from typing import List, Callable
+from commons import Patch, PatchCollection, Slide
 from classifiers import KarolinskaFeature
 
 
@@ -31,7 +31,7 @@ class BasicFeatureTIFFRenderer(Renderer):
     ):
         self._rgb_convert = rgb_convert or karolinska_rgb_convert
 
-    def render(self, slide: Slide, filename: str):
+    def render(self, filename: str, slide: Slide):
         shape = slide.dimensions
         imwrite(filename,
                 self._rgb_convert(slide.patches),
