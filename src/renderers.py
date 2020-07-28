@@ -2,25 +2,32 @@ import abc
 import json
 from tifffile import imwrite
 import numpy as np
-from typing import List, Callable
+from typing import List, Callable, Union
 from commons import Patch, PatchCollection, Slide
 from classifiers import KarolinskaFeature
 
 
 class Renderer(abc.ABC):
     @abc.abstractmethod
-    def render(self, filename: str, patches: List[Patch]):
+    def render(self, filename: str, slide: Slide):
+        pass
+
+    @abc.abstractmethod
+    def render_patch(self, filename: str, patch: Patch):
         pass
 
 
-def karolinska_rgb_convert(patches: PatchCollection) -> np.array:
-    for patch in patches:
+def convert_to_heatmap(patches: List[Patch]) -> np.array:
+    def _rgb_convert(patch: Patch) -> np.array:
         cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
         cancer_percentage = 0 if cancer_percentage is None\
              else cancer_percentage
         mask_value = int(round(cancer_percentage * 255))
-        data = (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
+        return (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
                                                                       0)
+
+    for patch in patches:
+        data = _rgb_convert(patch)
         yield np.full(patch.size + (4, ), data, 'uint8')
 
 
@@ -29,7 +36,7 @@ class BasicFeatureTIFFRenderer(Renderer):
         self,
         rgb_convert: Callable = None,
     ):
-        self._rgb_convert = rgb_convert or karolinska_rgb_convert
+        self._rgb_convert = rgb_convert or convert_to_heatmap
 
     def render(self, filename: str, slide: Slide):
         shape = slide.dimensions
@@ -39,6 +46,13 @@ class BasicFeatureTIFFRenderer(Renderer):
                 shape=(shape[1], shape[0], 4),
                 photometric='rgb',
                 tile=slide.patches.patch_size,
+                extrasamples=('ASSOCALPHA', ))
+
+    def render_patch(self, filename: str, patch: Patch):
+        data = list(self._rgb_convert([patch]))[0]
+        imwrite(filename,
+                data,
+                photometric='rgb',
                 extrasamples=('ASSOCALPHA', ))
 
 

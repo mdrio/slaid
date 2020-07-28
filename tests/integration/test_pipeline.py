@@ -5,7 +5,7 @@ from PIL import Image
 import classifiers as cl
 from commons import Slide
 from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
-    karolinska_rgb_convert
+    convert_to_heatmap
 from test_classifiers import GreenIsTissueModel
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -45,7 +45,7 @@ def main():
     with open(json_filename, 'w') as json_file:
         json.dump(slide.patches, json_file, cls=JSONEncoder)
 
-    renderer = BasicFeatureTIFFRenderer(karolinska_rgb_convert)
+    renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
     print('rendering...')
     renderer.render(tiff_filename, slide)
