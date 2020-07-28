@@ -45,9 +45,11 @@ class TestTissueDetector(unittest.TestCase):
     def test_mask(self):
         slide = Slide('data/input.tiff')
         model = GreenIsTissueModel()
-        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model),
-                                           include_mask_feature=True)
-        tissue_detector.classify(slide)
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+
+        tissue_detector.classify(slide,
+                                 include_mask_feature=True,
+                                 extraction_lev=0)
         for patch in slide.patches:
             if (patch.y == 0):
                 self.assertEqual(
@@ -59,9 +61,8 @@ class TestTissueDetector(unittest.TestCase):
                 self.assertEqual(
                     patch.features[TissueFeature.TISSUE_PERCENTAGE], 0)
 
-                if patch.features[TissueFeature.TISSUE_MASK] is not None:
-                    self.assertEqual(
-                        patch.features[TissueFeature.TISSUE_MASK].all(), 0)
+                self.assertEqual(patch.features[TissueFeature.TISSUE_MASK],
+                                 None)
 
 
 class KarolinskaTest(unittest.TestCase):

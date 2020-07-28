@@ -16,15 +16,19 @@ class Classifier(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def classify_patch(self, patch: Patch) -> Dict:
+    def classify_patch(self, patch: Patch, *args, **kwargs) -> Dict:
         pass
 
-    def classify(self, slide: Slide, patch_filter=None) -> Slide:
+    def classify(self,
+                 slide: Slide,
+                 patch_filter=None,
+                 *args,
+                 **kwargs) -> Slide:
         patches = slide.patches if patch_filter is None else\
             slide.patches.filter(patch_filter)
 
         for patch in patches:
-            features = self.classify_patch(patch)
+            features = self.classify_patch(patch, *args, **kwargs)
             slide.patches.update_patch(patch=patch, features=features)
         return slide
 
@@ -133,17 +137,8 @@ class TissueFeature:
 
 
 class TissueClassifier(Classifier):
-    def __init__(self,
-                 predictor: TissueMaskPredictor,
-                 mask_threshold: float = 0.5,
-                 patch_threshold: float = 0.8,
-                 level: int = 2,
-                 include_mask_feature=False):
+    def __init__(self, predictor: TissueMaskPredictor):
         self._predictor = predictor
-        self._mask_threshold = mask_threshold
-        self._patch_threshold = patch_threshold
-        self._level = level
-        self._include_mask_feature = include_mask_feature
 
     @staticmethod
     def create(model_filename,
@@ -209,24 +204,27 @@ class TissueClassifier(Classifier):
     def classify_patch(self, patch: Patch) -> Patch:
         raise NotImplementedError
 
-    def classify(self, slide: Slide) -> Slide:
+    def classify(self,
+                 slide: Slide,
+                 extraction_lev: int = 2,
+                 threshold: float = 0.8,
+                 level: int = 2,
+                 include_mask_feature=False) -> Slide:
 
         lev = slide.get_best_level_for_downsample(16)
         lev_dim = slide.level_dimensions[lev]
         thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
-        tissue_mask = self._predictor.get_tissue_mask(thumb,
-                                                      self._mask_threshold)
+        tissue_mask = self._predictor.get_tissue_mask(thumb, threshold)
 
         dim_x, dim_y = slide.patches.patch_size
         patch_area = dim_x * dim_y
         #  patch_area_th = patch_area * self._patch_threshold
-        extraction_lev = 0  # TODO check it is correct
 
         patch_coordinates = self._get_tissue_patches_coordinates(
             slide, tissue_mask, slide.patches.patch_size)
 
         slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
-        if self._include_mask_feature:
+        if include_mask_feature:
             slide.patches.add_feature(TissueFeature.TISSUE_MASK)
 
         for (coor_x, coor_y) in patch_coordinates:
@@ -234,16 +232,14 @@ class TissueClassifier(Classifier):
                                       level=extraction_lev,
                                       size=(dim_x, dim_y))
 
-            tissue_mask = self._predictor.get_tissue_mask(
-                patch, self._patch_threshold)
+            tissue_mask = self._predictor.get_tissue_mask(patch, threshold)
 
             tissue_area = np.sum(tissue_mask)
-
-            features = {
-                TissueFeature.TISSUE_PERCENTAGE: tissue_area / patch_area
-            }
-            if self._include_mask_feature:
-                features[TissueFeature.TISSUE_MASK] = tissue_mask
-            slide.patches.update_patch((coor_x, coor_y), features=features)
+            tissue_percent = tissue_area / patch_area
+            if tissue_percent > threshold:
+                features = {TissueFeature.TISSUE_PERCENTAGE: tissue_percent}
+                if include_mask_feature:
+                    features[TissueFeature.TISSUE_MASK] = tissue_mask
+                slide.patches.update_patch((coor_x, coor_y), features=features)
 
         return slide
