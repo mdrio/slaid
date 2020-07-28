@@ -207,7 +207,6 @@ class TissueClassifier(Classifier):
                  slide: Slide,
                  extraction_lev: int = 2,
                  pixel_threshold: float = 0.8,
-                 level: int = 2,
                  minimum_tissue_ratio: float = 0.01,
                  downsampling: int = 16,
                  include_mask_feature=False) -> Slide:
