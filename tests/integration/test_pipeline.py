@@ -54,13 +54,15 @@ def main():
 
     print('rendering...')
     renderer.render(tiff_filename, slide)
+
     pickle_renderer = PickleRenderer()
     pkl_filename = '/tmp/test'
     [os.remove(f) for f in glob.glob(f'{pkl_filename}*.pkl')]
-    pickle_renderer.render(pkl_filename, slide, True)
+
     for patch in slide.patches.filter(
             slide.patches[TissueFeature.TISSUE_MASK].notnull()):
         fn = f'{pkl_filename}-{patch.x}-{patch.y}.pkl'
+        pickle_renderer.render_patch(fn, patch)
         assert os.path.exists(fn)
         with open(fn, 'rb') as f:
             assert isinstance(pickle.load(f), Patch)
