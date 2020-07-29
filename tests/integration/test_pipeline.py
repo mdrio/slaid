@@ -47,8 +47,8 @@ def main():
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
 
-    #  with open(json_filename, 'w') as json_file:
-    #      json.dump(slide.patches, json_file, cls=JSONEncoder)
+    with open(json_filename, 'w') as json_file:
+        json.dump(slide.patches, json_file, cls=JSONEncoder)
 
     renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 

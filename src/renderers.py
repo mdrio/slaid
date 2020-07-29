@@ -67,7 +67,6 @@ class BasicFeatureTIFFRenderer(Renderer):
 
 class JSONEncoder(json.JSONEncoder):
     def _encode_patch(self, patch: Patch):
-
         return {
             'slide': patch.slide.ID,
             'x': patch.x,
@@ -76,11 +75,16 @@ class JSONEncoder(json.JSONEncoder):
             'features': patch.features
         }
 
+    def _encode_array(self, array: np.ndarray):
+        return array.tolist()
+
     def default(self, obj):
         if isinstance(obj, Patch):
             return self._encode_patch(obj)
         elif isinstance(obj, PatchCollection):
             return [self._encode_patch(p) for p in obj]
+        elif isinstance(obj, np.ndarray):
+            return self._encode_array(obj)
         return super().default(obj)
 
 
