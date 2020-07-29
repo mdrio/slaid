@@ -150,6 +150,14 @@ class PatchCollection(abc.ABC):
         def __gt__(self, other):
             pass
 
+        @abc.abstractmethod
+        def isnull(self):
+            pass
+
+        @abc.abstractmethod
+        def notnull(self):
+            pass
+
     @abc.abstractclassmethod
     def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
                     dataframe: pd.DataFrame):
@@ -244,6 +252,12 @@ class PandasPatchCollection(PatchCollection):
         def __or__(self, other):
             return PandasPatchCollection.Projection(self._series
                                                     | other._series)
+
+        def isnull(self):
+            return PandasPatchCollection.Projection(self._series.isnull())
+
+        def notnull(self):
+            return PandasPatchCollection.Projection(self._series.notnull())
 
     class LocIndexer:
         def __init__(self, collection: "PandasPatchCollection"):

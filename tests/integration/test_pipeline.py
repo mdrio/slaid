@@ -6,6 +6,7 @@ import os
 from PIL import Image
 import classifiers as cl
 from commons import Slide, Patch
+from classifiers import TissueFeature
 from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
     convert_to_heatmap, PickleRenderer
 from test_classifiers import GreenIsTissueModel
@@ -39,13 +40,15 @@ def main():
 
     print('tissue classification')
 
-    tissue_classifier.classify(slide, extraction_lev=0)
+    tissue_classifier.classify(slide,
+                               extraction_lev=0,
+                               include_mask_feature=True)
     print('cancer classification')
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
 
-    with open(json_filename, 'w') as json_file:
-        json.dump(slide.patches, json_file, cls=JSONEncoder)
+    #  with open(json_filename, 'w') as json_file:
+    #      json.dump(slide.patches, json_file, cls=JSONEncoder)
 
     renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
@@ -55,11 +58,14 @@ def main():
     pkl_filename = '/tmp/test'
     [os.remove(f) for f in glob.glob(f'{pkl_filename}*.pkl')]
     pickle_renderer.render(pkl_filename, slide, True)
-    for patch in slide.patches:
+    for patch in slide.patches.filter(
+            slide.patches[TissueFeature.TISSUE_MASK].notnull()):
         fn = f'{pkl_filename}-{patch.x}-{patch.y}.pkl'
         assert os.path.exists(fn)
         with open(fn, 'rb') as f:
             assert isinstance(pickle.load(f), Patch)
+            assert TissueFeature.TISSUE_MASK in patch.features
+            print(patch.features[TissueFeature.TISSUE_MASK].shape)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)
