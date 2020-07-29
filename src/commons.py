@@ -4,6 +4,7 @@ from typing import Tuple, Dict, Any, List, Union
 import os
 import sys
 import pandas as pd
+import numpy as np
 from collections import defaultdict, OrderedDict
 import inspect
 
@@ -97,6 +98,22 @@ class Patch:
         return (f'slide: {self.slide}, x: {self.x}, '
                 f'y: {self.y}, size: {self.size}')
 
+    def __eq__(self, other):
+        def _check_features():
+            res = self.features.keys() == other.features.keys()
+            for f, v in self.features.items():
+                if isinstance(v, np.ndarray):
+                    res = res and np.array_equal(v, other.features[f])
+                else:
+                    res = res and v == other.features[f]
+                if not res:
+                    break
+            return res
+
+        return self.slide == other.slide and (self.x, self.y) == (
+            other.x,
+            other.y) and self.size == other.size and _check_features()
+
 
 def round_to_patch(coordinates, patch_size):
     res = []
@@ -131,6 +148,14 @@ class PatchCollection(abc.ABC):
 
         @abc.abstractmethod
         def __gt__(self, other):
+            pass
+
+        @abc.abstractmethod
+        def isnull(self):
+            pass
+
+        @abc.abstractmethod
+        def notnull(self):
             pass
 
     @abc.abstractclassmethod
@@ -227,6 +252,12 @@ class PandasPatchCollection(PatchCollection):
         def __or__(self, other):
             return PandasPatchCollection.Projection(self._series
                                                     | other._series)
+
+        def isnull(self):
+            return PandasPatchCollection.Projection(self._series.isnull())
+
+        def notnull(self):
+            return PandasPatchCollection.Projection(self._series.notnull())
 
     class LocIndexer:
         def __init__(self, collection: "PandasPatchCollection"):

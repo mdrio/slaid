@@ -22,7 +22,7 @@ class DummySlide(Slide):
                  patches: PatchCollection = None,
                  patch_size: Tuple[int, int] = (256, 256)):
 
-        self._id = ID
+        self._id = self._filename = ID
         self.size = size
         self.best_level_for_downsample = best_level_for_downsample
         self._level_dimensions = DummySlide.DummyIndexable(size)
@@ -31,6 +31,15 @@ class DummySlide(Slide):
         self.features = {}
         self._patches = patches or PandasPatchCollection(self, patch_size)
         self.patch_size = patch_size
+
+    def __getstate__(self):
+        return {'ID': self._filename, 'size': self.size}
+
+    def __setstate__(self, dct):
+        self.__init__(**dct)
+
+    def __eq__(self, other):
+        return self.ID == other.ID
 
     @property
     def dimensions(self):

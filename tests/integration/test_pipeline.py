@@ -1,10 +1,15 @@
 import json
+import pickle
+import glob
 import numpy as np
 import os
 from PIL import Image
 import classifiers as cl
-from commons import Slide
-from renderers import JSONEncoder, BasicFeatureTIFFRenderer, karolinska_rgb_convert
+from commons import Slide, Patch
+from classifiers import TissueFeature
+from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
+    convert_to_heatmap, PickleRenderer
+from test_classifiers import GreenIsTissueModel
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -15,11 +20,6 @@ def generate_row_first_row_cancer(filename, slide_size, patch_size):
     data[0:patch_size[1], 0:w] = [2, 255, 0]
     img = Image.fromarray(data, 'RGB')
     img.save(filename)
-
-
-class GreenIsTissueModel(cl.Model):
-    def predict(self, array: np.array) -> np.array:
-        return array[:, 1] / 255
 
 
 def main():
@@ -40,7 +40,9 @@ def main():
 
     print('tissue classification')
 
-    tissue_classifier.classify(slide)
+    tissue_classifier.classify(slide,
+                               extraction_lev=0,
+                               include_mask_feature=True)
     print('cancer classification')
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
@@ -48,10 +50,24 @@ def main():
     with open(json_filename, 'w') as json_file:
         json.dump(slide.patches, json_file, cls=JSONEncoder)
 
-    renderer = BasicFeatureTIFFRenderer(karolinska_rgb_convert,
-                                        slide.dimensions)
+    renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
+
     print('rendering...')
     renderer.render(tiff_filename, slide)
+
+    pickle_renderer = PickleRenderer()
+    pkl_filename = '/tmp/test'
+    [os.remove(f) for f in glob.glob(f'{pkl_filename}*.pkl')]
+
+    for patch in slide.patches.filter(
+            slide.patches[TissueFeature.TISSUE_MASK].notnull()):
+        fn = f'{pkl_filename}-{patch.x}-{patch.y}.pkl'
+        pickle_renderer.render_patch(fn, patch)
+        assert os.path.exists(fn)
+        with open(fn, 'rb') as f:
+            assert isinstance(pickle.load(f), Patch)
+            assert TissueFeature.TISSUE_MASK in patch.features
+            print(patch.features[TissueFeature.TISSUE_MASK].shape)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)

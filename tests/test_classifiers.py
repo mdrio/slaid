@@ -1,10 +1,15 @@
 import unittest
-from commons import Patch, PandasPatchCollection
+from commons import Slide
 from classifiers import BasicTissueMaskPredictor,\
     TissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature
 import numpy as np
 from test_commons import DummySlide
+
+
+class GreenIsTissueModel:
+    def predict(self, array: np.array) -> np.array:
+        return array[:, 1] / 255
 
 
 class DummyModel:
@@ -36,6 +41,28 @@ class TestTissueDetector(unittest.TestCase):
         for patch in slide.patches:
             self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
                              1)
+
+    def test_mask(self):
+        slide = Slide('data/input.tiff')
+        model = GreenIsTissueModel()
+        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+
+        tissue_detector.classify(slide,
+                                 include_mask_feature=True,
+                                 extraction_lev=0)
+        for patch in slide.patches:
+            if (patch.y == 0):
+                self.assertEqual(
+                    patch.features[TissueFeature.TISSUE_PERCENTAGE], 1)
+                self.assertEqual(
+                    patch.features[TissueFeature.TISSUE_MASK].all(), 1)
+
+            else:
+                self.assertEqual(
+                    patch.features[TissueFeature.TISSUE_PERCENTAGE], 0)
+
+                self.assertEqual(patch.features[TissueFeature.TISSUE_MASK],
+                                 None)
 
 
 class KarolinskaTest(unittest.TestCase):
