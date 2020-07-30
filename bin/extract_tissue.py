@@ -5,7 +5,6 @@ import pickle
 import slaid
 from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import TissueClassifier
-from slaid.renderers import PickleRenderer
 
 
 def main(slide_filename,
@@ -13,13 +12,13 @@ def main(slide_filename,
          output_filename,
          extraction_level,
          patch_size=PATCH_SIZE):
-    slide = Slide(slide_filename, patch_size=patch_size)
+    slide = Slide(slide_filename,
+                  patch_size=patch_size,
+                  extraction_level=extraction_level)
 
     tissue_classifier = TissueClassifier.create(model_filename)
 
-    tissue_classifier.classify(slide,
-                               extraction_lev=extraction_level,
-                               include_mask_feature=True)
+    tissue_classifier.classify(slide, include_mask_feature=True)
 
     #  pickle_renderer = PickleRenderer()
     #  pickle_renderer.render(output_filename, slide)
@@ -44,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('-l',
                         dest='extraction_level',
                         help='extraction_level',
-                        default=0,
+                        default=2,
                         type=int)
 
     args = parser.parse_args()
