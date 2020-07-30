@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import pkg_resources
 import slaid
-from slaid.commons import Slide, PATCH_SIZE
+from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import TissueClassifier
 from slaid.renderers import PickleRenderer
 
@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('-m',
                         dest='model',
                         help='path to model',
+                        action=UniqueStore,
                         default=default_model)
     parser.add_argument('--patch_size', dest='patch_size', default=PATCH_SIZE)
     parser.add_argument('-l',
