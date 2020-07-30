@@ -1,7 +1,7 @@
 import unittest
 from typing import Tuple
 from PIL import Image
-from commons import Patch, Slide, round_to_patch,\
+from slaid.commons import Patch, Slide, round_to_patch,\
     PatchCollection, PandasPatchCollection
 
 

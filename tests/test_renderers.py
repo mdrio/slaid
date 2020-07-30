@@ -3,10 +3,10 @@ import json
 import pickle
 from PIL import Image
 import numpy as np
-from renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
+from slaid.renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
 from test_commons import DummySlide
-from commons import Patch
-from classifiers import KarolinskaFeature
+from slaid.commons import Patch
+from slaid.classifiers import KarolinskaFeature
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
