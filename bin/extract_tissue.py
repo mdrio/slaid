@@ -41,7 +41,8 @@ if __name__ == '__main__':
     parser.add_argument('-l',
                         dest='extraction_level',
                         help='extraction_level',
-                        default=0)
+                        default=0,
+                        type=int)
 
     args = parser.parse_args()
     main(args.slide, args.model, args.output, args.extraction_level,
