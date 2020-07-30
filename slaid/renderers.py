@@ -104,17 +104,12 @@ class PickleRenderer(Renderer):
         with open(filename, 'wb') as f:
             pickle.dump(obj, f)
 
-    def render(self,
-               filename: str,
-               slide: Slide,
-               one_file_per_patch: bool = False):
-        if one_file_per_patch:
-
-            for patch in slide.patches:
-                self.render_patch(f'{filename}-{patch.x}-{patch.y}.pkl', patch)
-
-        else:
-            self._render(filename, slide)
+    def render(
+        self,
+        filename: str,
+        slide: Slide,
+    ):
+        self._render(filename, slide.patches.dataframe)
 
     def render_patch(self, filename: str, patch: Patch):
-        self._render(filename, patch)
+        raise NotImplementedError()

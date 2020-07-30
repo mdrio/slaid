@@ -24,7 +24,7 @@ def main(slide_filename,
     #  pickle_renderer = PickleRenderer()
     #  pickle_renderer.render(output_filename, slide)
     # FIXME
-    pickle.dump(slide.patches, open(output_filename, 'wb'))
+    pickle.dump(slide.patches.dataframe, open(output_filename, 'wb'))
 
 
 if __name__ == '__main__':

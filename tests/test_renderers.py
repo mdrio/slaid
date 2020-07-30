@@ -24,16 +24,15 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
 
 
 class PickleRendererTest(unittest.TestCase):
-    def test_render_patch(self):
+    def test_render(self):
         data = np.random.randint(0, 255, (10, 10, 4))
         slide = DummySlide('slide', (100, 100))
-        patch = Patch(slide, (0, 0), (10, 10), features={'mask': data})
         pickle_renderer = PickleRenderer()
-        output = '/tmp/patch.pkl'
-        pickle_renderer.render_patch(output, patch)
+        output = '/tmp/slide-df.pkl'
+        pickle_renderer.render(output, slide)
         with open(output, 'rb') as f:
-            pickled_patch = pickle.load(f)
-        self.assertEqual(patch, pickled_patch)
+            pickled_df = pickle.load(f)
+        self.assertTrue(slide.patches.dataframe.equals(pickled_df))
 
 
 class JsonRendererTest(unittest.TestCase):
