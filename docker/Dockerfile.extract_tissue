@@ -1,0 +1,7 @@
+ARG MODEL
+FROM slaid
+ENV MODEL=$MODEL
+
+ENTRYPOINT ["extract_tissue.py"]
+CMD ["-m", "$MODEL"]
+
