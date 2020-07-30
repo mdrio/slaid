@@ -19,7 +19,7 @@ def main(lib_version='', docker_build_dir='../docker-build'):
             model = os.path.basename(model)
             model_name = os.path.splitext(model)[0]
             model = pkg_resources.resource_filename('slaid', f'models/{model}')
-            command = f'docker build {docker_build_dir} -f {dockerfile} -t {"slaid-"+lib_version if lib_version else "slaid"}:{model_name} --build-arg MODEL={model}'
+            command = f'docker build {docker_build_dir} -f {dockerfile} -t slaid:{lib_version + "-" if lib_version else ""}{model_name} --build-arg MODEL={model}'
             print(command)
             print(command.split())
             subprocess.run(command.split(' '), check=True)
@@ -28,7 +28,7 @@ def main(lib_version='', docker_build_dir='../docker-build'):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-l', dest='lib_version', default='')
+    parser.add_argument('-v', dest='lib_version', default='')
     parser.add_argument('-d',
                         dest='docker_build_dir',
                         default='../docker-build')
