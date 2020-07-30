@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import pkg_resources
+import pickle
 import slaid
 from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import TissueClassifier
@@ -20,8 +21,10 @@ def main(slide_filename,
                                extraction_lev=extraction_level,
                                include_mask_feature=True)
 
-    pickle_renderer = PickleRenderer()
-    pickle_renderer.render(output_filename, slide)
+    #  pickle_renderer = PickleRenderer()
+    #  pickle_renderer.render(output_filename, slide)
+    # FIXME
+    pickle.dump(slide.patches, open(output_filename, 'wb'))
 
 
 if __name__ == '__main__':
