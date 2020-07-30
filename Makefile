@@ -1,12 +1,10 @@
 docker-build:
-	cp setup.py docker/
-	cp requirements.txt docker/
-	cp -r slaid docker/
-	cp -r bin docker/
-	cd docker &&	docker build . -f ../Dockerfile -t slaid
+	mkdir docker-build
+	cp setup.py docker-build/
+	cp requirements.txt docker-build/
+	cp -r slaid docker-build/
+	cp -r bin docker-build/
+	cd docker-build &&	docker build . -f ../Dockerfile -t slaid
 
 clean:
-	cd docker; rm setup.py
-	cd docker; rm requirements.txt
-	cd docker; rm -r slaid
-	cd docker; rm -r bin
+	rm -r docker-build
