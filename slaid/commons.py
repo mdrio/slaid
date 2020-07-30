@@ -1,4 +1,5 @@
 import abc
+import argparse
 from openslide import OpenSlide, open_slide, OpenSlideUnsupportedFormatError
 from typing import Tuple, Dict, Any, List, Union
 import os
@@ -357,3 +358,11 @@ class PandasPatchCollection(PatchCollection):
                                                'left',
                                                on=['y', 'x']).set_index(
                                                    self._dataframe.index)
+
+
+# from https://stackoverflow.com/questions/23032514/argparse-disable-same-argument-occurrences/23032953#23032953
+class UniqueStore(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string):
+        if getattr(namespace, self.dest, self.default) is not self.default:
+            parser.error(option_string + " appears several times.")
+        setattr(namespace, self.dest, values)

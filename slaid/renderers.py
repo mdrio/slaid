@@ -4,8 +4,8 @@ import pickle
 from tifffile import imwrite
 import numpy as np
 from typing import List, Callable, Any
-from commons import Patch, PatchCollection, Slide
-from classifiers import KarolinskaFeature
+from slaid.commons import Patch, PatchCollection, Slide
+from slaid.classifiers import KarolinskaFeature
 
 
 class Renderer(abc.ABC):

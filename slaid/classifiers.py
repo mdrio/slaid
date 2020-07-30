@@ -1,13 +1,13 @@
 import abc
 import pickle
-from commons import Patch, Slide, get_class, round_to_patch
 from typing import Tuple, Dict
+from slaid.commons import Patch, Slide, get_class, round_to_patch,\
+    PatchCollection, PATCH_SIZE
 import numpy as np
 from PIL import Image
 import random
 import os
 from multiprocessing import Pool
-from commons import PatchCollection, PATCH_SIZE
 
 
 class Classifier(abc.ABC):
@@ -146,7 +146,7 @@ class TissueClassifier(Classifier):
 
         return TissueClassifier(
             get_class(predictor_cls_name,
-                      'classifiers').create(model_filename))
+                      'slaid.classifiers').create(model_filename))
         raise NotImplementedError()
 
     def _get_mask_tissue_from_slide(self, slide, threshold, level=2):
