@@ -43,13 +43,11 @@ class TestTissueDetector(unittest.TestCase):
                              1)
 
     def test_mask(self):
-        slide = Slide('data/input.tiff')
+        slide = Slide('data/input.tiff', extraction_level=0)
         model = GreenIsTissueModel()
         tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
 
-        tissue_detector.classify(slide,
-                                 include_mask_feature=True,
-                                 extraction_lev=0)
+        tissue_detector.classify(slide, include_mask_feature=True)
         for patch in slide.patches:
             if (patch.y == 0):
                 self.assertEqual(
