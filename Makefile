@@ -8,7 +8,7 @@ docker-main:
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
 	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(TAG)
-
+	docker tag slaid:$(TAG) slaid
 
 install:
 	pip install -e .
@@ -21,3 +21,7 @@ docker-per-model:
 	cd docker; ./build_docker_per_model.py  -v $(TAG)
 clean:
 	rm -r docker-build
+
+docker-push: docker
+	cd docker/; ./docker-push.sh slaid
+	cd docker/; ./docker-push.sh slaid:$(TAG)
