@@ -1,5 +1,5 @@
 VERSION := $(shell cat VERSION)
-docker-build: docker-main docker-per-model
+docker: test docker-main docker-per-model
 
 docker-main:
 	mkdir -p docker-build
@@ -8,6 +8,13 @@ docker-main:
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
 	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(VERSION)
+
+
+install:
+	pip install -e .
+
+test: install
+	cd tests; ./run_all_tests.sh
 
 docker-per-model:
 	mkdir -p docker-build
