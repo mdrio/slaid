@@ -1,6 +1,6 @@
 import abc
 import argparse
-from openslide import OpenSlide, open_slide, OpenSlideUnsupportedFormatError
+from openslide import open_slide
 from typing import Tuple, Dict, Any, List, Union
 import os
 import sys
@@ -21,13 +21,11 @@ class Slide:
                  filename: str,
                  features: Dict = None,
                  patches: 'PatchCollection' = None,
-                 patch_size: Tuple[int, int] = PATCH_SIZE):
+                 patch_size: Tuple[int, int] = PATCH_SIZE,
+                 extraction_level=2):
         self._filename = filename
-
-        try:
-            self._slide = OpenSlide(filename)
-        except OpenSlideUnsupportedFormatError:
-            self._slide = open_slide(filename)
+        self._extraction_level = extraction_level
+        self._slide = open_slide(filename)
         self.features = features or {}
         if patches is None and patch_size:
             self._patches = patches or PandasPatchCollection(self, patch_size)
@@ -39,27 +37,38 @@ class Slide:
         return self._patches
 
     @property
+    def extraction_level(self):
+        return self._extraction_level
+
+    @property
     def dimensions(self):
         return self._slide.dimensions
+
+    @property
+    def dimensions_at_extraction_level(self):
+        return self._slide.level_dimensions[self._extraction_level]
 
     @property
     def ID(self):
         return os.path.basename(self._filename)
 
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]):
-        return self._slide.read_region(location, level, size)
+    def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
+        return self._slide.read_region(location, self.extraction_level, size)
 
     def __getstate__(self):
-        return self._filename
+        return {
+            'filename': self._filename,
+            'extraction_level': self._extraction_level
+        }
 
-    def __setstate__(self, filename):
-        self.__init__(filename)
+    def __setstate__(self, dct):
+        self.__init__(**dct)
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
+        dimensions = self.dimensions_at_extraction_level
         patch_size = patch_size if patch_size else PATCH_SIZE
-        for y in range(0, self.dimensions[1], patch_size[1]):
-            for x in range(0, self.dimensions[0], patch_size[0]):
+        for y in range(0, dimensions[1], patch_size[1]):
+            for x in range(0, dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
 
     def get_best_level_for_downsample(self, downsample: int):

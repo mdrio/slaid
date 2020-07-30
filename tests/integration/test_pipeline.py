@@ -31,7 +31,9 @@ def main():
     json_filename = os.path.join(DIR, 'test.json')
     tiff_filename = os.path.join(DIR, 'test.tiff')
 
-    mask = slide = Slide(slide_filename, patch_size=patch_size)
+    mask = slide = Slide(slide_filename,
+                         patch_size=patch_size,
+                         extraction_level=0)
 
     tissue_classifier = cl.TissueClassifier(
         cl.BasicTissueMaskPredictor(GreenIsTissueModel()))
@@ -40,9 +42,7 @@ def main():
 
     print('tissue classification')
 
-    tissue_classifier.classify(slide,
-                               extraction_lev=0,
-                               include_mask_feature=True)
+    tissue_classifier.classify(slide, include_mask_feature=True)
     print('cancer classification')
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)

@@ -45,8 +45,7 @@ class DummySlide(Slide):
     def dimensions(self):
         return self.size
 
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]):
+    def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
         if self.data is None:
             return Image.new('RGB', size)
         else:
@@ -54,6 +53,14 @@ class DummySlide(Slide):
                              location[0]:location[0] + size[0]]
             mask = Image.fromarray(data, 'RGB')
             return mask
+
+    @property
+    def extraction_level(self):
+        return 0
+
+    @property
+    def dimensions_at_extraction_level(self):
+        return self.dimensions
 
     @property
     def ID(self):

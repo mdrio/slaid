@@ -54,9 +54,8 @@ class KarolinskaTrueValueClassifier(Classifier):
     def create(mask_filename):
         return KarolinskaTrueValueClassifier(Slide(mask_filename))
 
-    def classify_patch(self, patch: Patch) -> Dict:
+    def classify_patch(self, patch: Patch, extraction_level: int = 2) -> Dict:
         image = self.mask.read_region(location=(patch.x, patch.y),
-                                      level=0,
                                       size=patch.size)
 
         data = np.array(image.getchannel(0).getdata())
@@ -149,7 +148,7 @@ class TissueClassifier(Classifier):
                       'slaid.classifiers').create(model_filename))
         raise NotImplementedError()
 
-    def _get_mask_tissue_from_slide(self, slide, threshold, level=2):
+    def _get_mask_tissue_from_slide(self, slide, threshold):
 
         dims = slide.level_dimensions
         ds = [int(i) for i in slide.level_downsamples]
@@ -162,25 +161,26 @@ class TissueClassifier(Classifier):
         delta_x = x1 - x0
         delta_y = y1 - y0
 
-        pil_img = slide.read_region(location=(x0, y0),
-                                    level=level,
-                                    size=(delta_x // ds[level],
-                                          delta_y // ds[level]))
+        pil_img = slide.read_region(
+            location=(x0, y0),
+            size=(delta_x // ds[slide.extraction_level],
+                  delta_y // ds[slide.extraction_level]))
         return self._predictor.get_tissue_mask(pil_img, threshold)
 
-    def _get_tissue_patches_coordinates(self,
-                                        slide,
-                                        tissue_mask,
-                                        patch_size=PATCH_SIZE,
-                                        extraction_lev=2):
+    def _get_tissue_patches_coordinates(
+        self,
+        slide,
+        tissue_mask,
+        patch_size=PATCH_SIZE,
+    ):
 
         tissue_mask *= 255
         # resize and use to extract patches
         lev = slide.get_best_level_for_downsample(16)
         lev_dim = slide.level_dimensions[lev]
 
-        big_x = slide.level_dimensions[extraction_lev][0]
-        big_y = slide.level_dimensions[extraction_lev][1]
+        big_x = slide.level_dimensions[slide.extraction_level][0]
+        big_y = slide.level_dimensions[slide.extraction_level][1]
 
         # downsampling factor of level0 with respect  patch size
         dim_x, dim_y = patch_size
@@ -193,7 +193,7 @@ class TissueClassifier(Classifier):
         tissue = [(x, y) for x in range(xx) for y in range(yy)
                   if mask.getpixel((x, y)) > 0]
 
-        ext_lev_ds = slide.level_downsamples[extraction_lev]
+        ext_lev_ds = slide.level_downsamples[slide.extraction_level]
         return [
             round_to_patch((round(x * big_x / xx * ext_lev_ds),
                             round(y * big_y / yy * ext_lev_ds)), patch_size)
@@ -205,7 +205,6 @@ class TissueClassifier(Classifier):
 
     def classify(self,
                  slide: Slide,
-                 extraction_lev: int = 2,
                  pixel_threshold: float = 0.8,
                  minimum_tissue_ratio: float = 0.01,
                  downsampling: int = 16,
@@ -213,7 +212,7 @@ class TissueClassifier(Classifier):
 
         lev = slide.get_best_level_for_downsample(downsampling)
         lev_dim = slide.level_dimensions[lev]
-        thumb = slide.read_region(location=(0, 0), level=lev, size=lev_dim)
+        thumb = slide.read_region(location=(0, 0), size=lev_dim)
         tissue_mask = self._predictor.get_tissue_mask(thumb, pixel_threshold)
 
         dim_x, dim_y = slide.patches.patch_size
@@ -224,7 +223,7 @@ class TissueClassifier(Classifier):
             slide,
             tissue_mask,
             slide.patches.patch_size,
-            extraction_lev=extraction_lev)
+        )
 
         slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
         if include_mask_feature:
@@ -232,7 +231,6 @@ class TissueClassifier(Classifier):
 
         for (coor_x, coor_y) in patch_coordinates:
             patch = slide.read_region(location=(coor_x, coor_y),
-                                      level=extraction_lev,
                                       size=(dim_x, dim_y))
 
             tissue_mask = self._predictor.get_tissue_mask(
