@@ -28,7 +28,7 @@ if __name__ == '__main__':
     import argparse
 
     default_model = pkg_resources.resource_filename(
-        slaid.__name__, 'models/LSVM_tissue_bg_model_promort.pickle')
+        slaid.__name__, 'models/extract_tissue_LSVM-1.0.pickle')
     parser = argparse.ArgumentParser()
     parser.add_argument('slide')
     parser.add_argument('output')
