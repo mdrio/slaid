@@ -4,10 +4,10 @@ import glob
 import numpy as np
 import os
 from PIL import Image
-import classifiers as cl
-from commons import Slide, Patch
-from classifiers import TissueFeature
-from renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
+import slaid.classifiers as cl
+from slaid.commons import Slide, Patch
+from slaid.classifiers import TissueFeature
+from slaid.renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
     convert_to_heatmap, PickleRenderer
 from test_classifiers import GreenIsTissueModel
 
@@ -67,7 +67,6 @@ def main():
         with open(fn, 'rb') as f:
             assert isinstance(pickle.load(f), Patch)
             assert TissueFeature.TISSUE_MASK in patch.features
-            print(patch.features[TissueFeature.TISSUE_MASK].shape)
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)

@@ -1,6 +1,6 @@
 import unittest
-from commons import Slide
-from classifiers import BasicTissueMaskPredictor,\
+from slaid.commons import Slide
+from slaid.classifiers import BasicTissueMaskPredictor,\
     TissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature
 import numpy as np
