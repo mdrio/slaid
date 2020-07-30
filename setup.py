@@ -3,9 +3,12 @@ import setuptools
 with open('requirements.txt') as f:
     reqs = [line for line in f]
 
+with open('VERSION') as f:
+    VERSION = f.read()
+
 setuptools.setup(
     name="slaid",  # Replace with your own username
-    version="0.0.1",
+    version=VERSION,
     description="AI for automatic analys of slides",
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),

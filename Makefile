@@ -4,6 +4,7 @@ docker: test docker-main docker-per-model
 docker-main:
 	mkdir -p docker-build
 	cp setup.py docker-build/
+	cp VERSION docker-build/
 	cp requirements.txt docker-build/
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
