@@ -1,88 +1,24 @@
 import unittest
-from typing import Tuple
-from PIL import Image
 from slaid.commons import Patch, Slide, round_to_patch,\
-    PatchCollection, PandasPatchCollection
-
-
-class DummySlide(Slide):
-    class DummyIndexable:
-        def __init__(self, value):
-            self.value = value
-
-        def __getitem__(self, k):
-            return self.value
-
-    def __init__(self,
-                 ID: str,
-                 size: Tuple[int, int],
-                 best_level_for_downsample: int = 1,
-                 level_downsample: int = 1,
-                 data=None,
-                 patches: PatchCollection = None,
-                 patch_size: Tuple[int, int] = (256, 256)):
-
-        self._id = self._filename = ID
-        self.size = size
-        self.best_level_for_downsample = best_level_for_downsample
-        self._level_dimensions = DummySlide.DummyIndexable(size)
-        self._level_downsample = DummySlide.DummyIndexable(level_downsample)
-        self.data = data
-        self.features = {}
-        self._patches = patches or PandasPatchCollection(self, patch_size)
-        self.patch_size = patch_size
-
-    def __getstate__(self):
-        return {'ID': self._filename, 'size': self.size}
-
-    def __setstate__(self, dct):
-        self.__init__(**dct)
-
-    def __eq__(self, other):
-        return self.ID == other.ID
-
-    @property
-    def dimensions(self):
-        return self.size
-
-    def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
-        if self.data is None:
-            return Image.new('RGB', size)
-        else:
-            data = self.data[location[1]:location[1] + size[1],
-                             location[0]:location[0] + size[0]]
-            mask = Image.fromarray(data, 'RGB')
-            return mask
-
-    @property
-    def extraction_level(self):
-        return 0
-
-    @property
-    def dimensions_at_extraction_level(self):
-        return self.dimensions
-
-    @property
-    def ID(self):
-        return self._id
-
-    def get_best_level_for_downsample(self, downsample: int):
-        return self.best_level_for_downsample
-
-    @property
-    def level_dimensions(self):
-        return self._level_dimensions
-
-    @property
-    def level_downsamples(self):
-        return self._level_downsample
-
-    def __len__(self):
-        return self.size[0] * self.size[1] // (self.patch_size[0] *
-                                               self.patch_size[1])
+     PandasPatchCollection
+from slaid.classifiers import BasicTissueMaskPredictor, BasicTissueClassifier,\
+    get_tissue_mask
+from commons import GreenIsTissueModel, DummySlide
 
 
 class TestSlide(unittest.TestCase):
+    def test_get_tissue_mask(self):
+        slide = Slide('data/input.tiff', extraction_level=0)
+        model = GreenIsTissueModel()
+        tissue_classifier = BasicTissueClassifier(
+            BasicTissueMaskPredictor(model))
+
+        tissue_classifier.classify(slide, include_mask_feature=True)
+        mask = get_tissue_mask(slide)
+
+        self.assertTrue(mask[0:255, :].all(), 1)
+        self.assertEqual(mask[255:, :].all(), 0)
+
     def test_iterate(self):
         patch_size = (256, 256)
         slide_size = (1024, 512)

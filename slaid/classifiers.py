@@ -134,6 +134,25 @@ class TissueFeature:
     TISSUE_MASK = 'tissue_mask'
 
 
+class TissueMaskNotAvailable(Exception):
+    pass
+
+
+def get_tissue_mask(slide):
+    if TissueFeature.TISSUE_MASK not in slide.patches.features:
+        raise TissueMaskNotAvailable()
+    mask = np.zeros(slide.dimensions, dtype=np.uint8)
+
+    tissue = slide.patches.filter(slide.patches['tissue_mask'].notnull())
+    for p in tissue:
+        print(p.features['tissue_mask'].shape)
+        print(mask[p.x:p.x + p.features['tissue_mask'].shape[0],
+                   p.y:p.y + p.features['tissue_mask'].shape[1]].shape)
+        mask[p.x:p.x + p.features['tissue_mask'].shape[0], p.y:p.y +
+             p.features['tissue_mask'].shape[1]] = p.features['tissue_mask']
+    return mask.transpose()
+
+
 class TissueClassifier(Classifier, abc.ABC):
     def __init__(self, predictor: TissueMaskPredictor):
         self._predictor = predictor
@@ -169,21 +188,23 @@ class BasicTissueClassifier(TissueClassifier):
                  include_mask_feature=False) -> Slide:
         area = slide.read_region(location=(0, 0), size=slide.dimensions)
         mask = self._predictor.get_tissue_mask(area, pixel_threshold)
+        # FIXME
+        mask = mask.transpose()
         slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
         if include_mask_feature:
             slide.patches.add_feature(TissueFeature.TISSUE_MASK)
 
         patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
         for patch in slide.patches:
-            patch_mask = mask[patch.y:patch.y + patch.size[1],
-                              patch.x:patch.x + patch.size[0]]
+            patch_mask = mask[patch.x:patch.x + patch.size[0],
+                              patch.y:patch.y + patch.size[1]]
             tissue_area = np.sum(patch_mask)
             tissue_ratio = tissue_area / patch_area
             if tissue_ratio > minimum_tissue_ratio:
                 features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
                 if include_mask_feature:
-                    features[TissueFeature.TISSUE_MASK] = np.array(patch_mask,
-                                                                   dtype=bool)
+                    features[TissueFeature.TISSUE_MASK] = np.array(
+                        patch_mask, dtype=np.uint8)
                 slide.patches.update_patch(patch=patch, features=features)
 
 

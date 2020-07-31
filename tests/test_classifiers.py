@@ -4,20 +4,7 @@ from slaid.classifiers import BasicTissueMaskPredictor,\
     InterpolatedTissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature, BasicTissueClassifier
 import numpy as np
-from test_commons import DummySlide
-
-
-class GreenIsTissueModel:
-    def predict(self, array: np.array) -> np.array:
-        return array[:, 1] / 255
-
-
-class DummyModel:
-    def __init__(self, func):
-        self.func = func
-
-    def predict(self, array):
-        return self.func(array.shape[0])
+from commons import DummyModel, GreenIsTissueModel, DummySlide
 
 
 class TestTissueClassifierTest:
