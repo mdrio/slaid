@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import pkg_resources
-import pickle
+import cloudpickle as pickle
 import slaid
 from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import BasicTissueClassifier
