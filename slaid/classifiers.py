@@ -138,10 +138,10 @@ class TissueMaskNotAvailable(Exception):
     pass
 
 
-def get_tissue_mask(slide):
+def get_tissue_mask(slide: Slide):
     if TissueFeature.TISSUE_MASK not in slide.patches.features:
         raise TissueMaskNotAvailable()
-    mask = np.zeros(slide.dimensions, dtype=np.uint8)
+    mask = np.zeros(slide.dimensions_at_extraction_level, dtype=np.uint8)
 
     tissue = slide.patches.filter(slide.patches['tissue_mask'].notnull())
     for p in tissue:
