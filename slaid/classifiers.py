@@ -241,7 +241,8 @@ class TissueClassifier(Classifier):
             if tissue_ratio > minimum_tissue_ratio:
                 features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
                 if include_mask_feature:
-                    features[TissueFeature.TISSUE_MASK] = tissue_mask
+                    features[TissueFeature.TISSUE_MASK] = np.array(tissue_mask,
+                                                                   dtype=bool)
                 slide.patches.update_patch((coor_x, coor_y), features=features)
 
         return slide
