@@ -1,7 +1,7 @@
 import unittest
 from slaid.commons import Slide
 from slaid.classifiers import BasicTissueMaskPredictor,\
-    TissueClassifier, TissueFeature, \
+    InterpolatedTissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature
 import numpy as np
 from test_commons import DummySlide
@@ -25,7 +25,8 @@ class TestTissueDetector(unittest.TestCase):
         patch_size = (10, 10)
         slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.zeros)
-        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+        tissue_detector = InterpolatedTissueClassifier(
+            BasicTissueMaskPredictor(model))
 
         tissue_detector.classify(slide)
         for patch in slide.patches:
@@ -36,7 +37,8 @@ class TestTissueDetector(unittest.TestCase):
         patch_size = (10, 10)
         slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.ones)
-        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+        tissue_detector = InterpolatedTissueClassifier(
+            BasicTissueMaskPredictor(model))
         tissue_detector.classify(slide)
         for patch in slide.patches:
             self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
@@ -45,7 +47,8 @@ class TestTissueDetector(unittest.TestCase):
     def test_mask(self):
         slide = Slide('data/input.tiff', extraction_level=0)
         model = GreenIsTissueModel()
-        tissue_detector = TissueClassifier(BasicTissueMaskPredictor(model))
+        tissue_detector = InterpolatedTissueClassifier(
+            BasicTissueMaskPredictor(model))
 
         tissue_detector.classify(slide, include_mask_feature=True)
         for patch in slide.patches:

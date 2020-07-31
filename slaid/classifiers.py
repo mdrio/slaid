@@ -11,8 +11,8 @@ from multiprocessing import Pool
 
 
 class Classifier(abc.ABC):
-    @abc.abstractstaticmethod
-    def create(*args):
+    @abc.abstractclassmethod
+    def create(cls, *args):
         pass
 
     @abc.abstractmethod
@@ -38,9 +38,9 @@ class KarolinskaFeature:
 
 
 class KarolinskaRandomClassifier(Classifier):
-    @staticmethod
-    def create(*args):
-        return KarolinskaRandomClassifier()
+    @classmethod
+    def create(cls, *args):
+        return cls()
 
     def classify_patch(self, patch: Patch) -> Dict:
         return {KarolinskaFeature.CANCER_PERCENTAGE: random.random()}
@@ -50,9 +50,9 @@ class KarolinskaTrueValueClassifier(Classifier):
     def __init__(self, mask: Slide):
         self.mask = mask
 
-    @staticmethod
-    def create(mask_filename):
-        return KarolinskaTrueValueClassifier(Slide(mask_filename))
+    @classmethod
+    def create(cls, mask_filename):
+        return cls(Slide(mask_filename))
 
     def classify_patch(self, patch: Patch, extraction_level: int = 2) -> Dict:
         image = self.mask.read_region(location=(patch.x, patch.y),
@@ -69,10 +69,9 @@ class ParallelClassifier(Classifier):
     def __init__(self, classifier: Classifier):
         self._classifier = classifier
 
-    @staticmethod
-    def create(classifier_cls_name: str, *args):
-        return ParallelClassifier(
-            get_class(classifier_cls_name, 'classifiers').create(*args))
+    @classmethod
+    def create(cls, classifier_cls_name: str, *args):
+        return cls(get_class(classifier_cls_name, 'classifiers').create(*args))
 
     def classify_patch(self, patch: Patch) -> Dict:
         return self._classifier.classify_patch(patch)
@@ -135,19 +134,30 @@ class TissueFeature:
     TISSUE_MASK = 'tissue_mask'
 
 
-class TissueClassifier(Classifier):
+class TissueClassifier(Classifier, abc.ABC):
     def __init__(self, predictor: TissueMaskPredictor):
         self._predictor = predictor
 
-    @staticmethod
-    def create(model_filename,
+    @classmethod
+    def create(cls,
+               model_filename,
                predictor_cls_name: str = 'BasicTissueMaskPredictor'):
 
-        return TissueClassifier(
+        return cls(
             get_class(predictor_cls_name,
                       'slaid.classifiers').create(model_filename))
-        raise NotImplementedError()
 
+    @abc.abstractmethod
+    def classify(self,
+                 slide: Slide,
+                 pixel_threshold: float = 0.8,
+                 minimum_tissue_ratio: float = 0.01,
+                 downsampling: int = 16,
+                 include_mask_feature=False) -> Slide:
+        pass
+
+
+class InterpolatedTissueClassifier(TissueClassifier):
     def _get_mask_tissue_from_slide(self, slide, threshold):
 
         dims = slide.level_dimensions

@@ -113,7 +113,8 @@ def classify(classifier_cls: str, *args):
 
 def tissue_detection(model_filname):
 
-    tissue_detector = classifiers.TissueClassifier.create(model_filname)
+    tissue_detector = classifiers.InterpolatedTissueClassifier.create(
+        model_filname)
     return BasicStep(tissue_detector.classify)
 
 

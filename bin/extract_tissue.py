@@ -4,7 +4,7 @@ import pkg_resources
 import pickle
 import slaid
 from slaid.commons import Slide, PATCH_SIZE, UniqueStore
-from slaid.classifiers import TissueClassifier
+from slaid.classifiers import InterpolatedTissueClassifier
 
 
 def main(slide_filename,
@@ -16,7 +16,7 @@ def main(slide_filename,
                   patch_size=patch_size,
                   extraction_level=extraction_level)
 
-    tissue_classifier = TissueClassifier.create(model_filename)
+    tissue_classifier = InterpolatedTissueClassifier.create(model_filename)
 
     tissue_classifier.classify(slide, include_mask_feature=True)
 
