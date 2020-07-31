@@ -24,11 +24,12 @@ class Slide:
                  patch_size: Tuple[int, int] = PATCH_SIZE,
                  extraction_level=2):
         self._filename = filename
-        self._extraction_level = extraction_level
         self._slide = open_slide(filename)
         self.features = features or {}
+        self._extraction_level = extraction_level
         if patches is None and patch_size:
-            self._patches = patches or PandasPatchCollection(self, patch_size)
+            self._patches = patches or PandasPatchCollection(
+                self, patch_size, extraction_level)
         else:
             self._patches = patches
 
@@ -39,10 +40,6 @@ class Slide:
     @property
     def patches(self):
         return self._patches
-
-    @property
-    def extraction_level(self):
-        return self._extraction_level
 
     @property
     def dimensions(self):
@@ -57,7 +54,7 @@ class Slide:
         return os.path.basename(self._filename)
 
     def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
-        return self._slide.read_region(location, self.extraction_level, size)
+        return self._slide.read_region(location, self._extraction_level, size)
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         dimensions = self.dimensions_at_extraction_level
@@ -168,13 +165,21 @@ class PatchCollection(abc.ABC):
                     dataframe: pd.DataFrame):
         pass
 
-    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
+    def __init__(self,
+                 slide: Slide,
+                 patch_size: Tuple[int, int] = PATCH_SIZE,
+                 extraction_level=""):
         self._slide = slide
         self._patch_size = patch_size
+        self._extraction_level = extraction_level
 
     @property
     def slide(self) -> Slide:
         return self._slide
+
+    @property
+    def extraction_level(self) -> int:
+        return self._extraction_level
 
     @property
     def patch_size(self) -> Tuple[int, int]:
@@ -281,8 +286,11 @@ class PandasPatchCollection(PatchCollection):
         patch_collection._dataframe = dataframe
         return patch_collection
 
-    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
-        super().__init__(slide, patch_size)
+    def __init__(self,
+                 slide: Slide,
+                 patch_size: Tuple[int, int] = PATCH_SIZE,
+                 extraction_level=2):
+        super().__init__(slide, patch_size, extraction_level)
         self._dataframe = self._init_dataframe()
         self._loc = PandasPatchCollection.LocIndexer(self)
 
