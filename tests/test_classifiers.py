@@ -2,7 +2,7 @@ import unittest
 from slaid.commons import Slide
 from slaid.classifiers import BasicTissueMaskPredictor,\
     InterpolatedTissueClassifier, TissueFeature, \
-    KarolinskaTrueValueClassifier, KarolinskaFeature
+    KarolinskaTrueValueClassifier, KarolinskaFeature, BasicTissueClassifier
 import numpy as np
 from test_commons import DummySlide
 
@@ -20,13 +20,14 @@ class DummyModel:
         return self.func(array.shape[0])
 
 
-class TestTissueDetector(unittest.TestCase):
+class TestTissueClassifierTest:
+    classifier_cls = None
+
     def test_detector_no_tissue(self):
         patch_size = (10, 10)
         slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.zeros)
-        tissue_detector = InterpolatedTissueClassifier(
-            BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
 
         tissue_detector.classify(slide)
         for patch in slide.patches:
@@ -37,8 +38,7 @@ class TestTissueDetector(unittest.TestCase):
         patch_size = (10, 10)
         slide = DummySlide('slide', (100, 100), patch_size=patch_size)
         model = DummyModel(np.ones)
-        tissue_detector = InterpolatedTissueClassifier(
-            BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
         tissue_detector.classify(slide)
         for patch in slide.patches:
             self.assertEqual(patch.features[TissueFeature.TISSUE_PERCENTAGE],
@@ -47,8 +47,7 @@ class TestTissueDetector(unittest.TestCase):
     def test_mask(self):
         slide = Slide('data/input.tiff', extraction_level=0)
         model = GreenIsTissueModel()
-        tissue_detector = InterpolatedTissueClassifier(
-            BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
 
         tissue_detector.classify(slide, include_mask_feature=True)
         for patch in slide.patches:
@@ -64,6 +63,15 @@ class TestTissueDetector(unittest.TestCase):
 
                 self.assertEqual(patch.features[TissueFeature.TISSUE_MASK],
                                  None)
+
+
+class InteropolatedTissueClassifierTest(TestTissueClassifierTest,
+                                        unittest.TestCase):
+    classifier_cls = InterpolatedTissueClassifier
+
+
+class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+    classifier_cls = BasicTissueClassifier
 
 
 class KarolinskaTest(unittest.TestCase):

@@ -157,6 +157,36 @@ class TissueClassifier(Classifier, abc.ABC):
         pass
 
 
+class BasicTissueClassifier(TissueClassifier):
+    def classify_patch(self, patch: Patch) -> Patch:
+        raise NotImplementedError
+
+    def classify(self,
+                 slide: Slide,
+                 pixel_threshold: float = 0.8,
+                 minimum_tissue_ratio: float = 0.01,
+                 downsampling: int = 16,
+                 include_mask_feature=False) -> Slide:
+        area = slide.read_region(location=(0, 0), size=slide.dimensions)
+        mask = self._predictor.get_tissue_mask(area, pixel_threshold)
+        slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
+        if include_mask_feature:
+            slide.patches.add_feature(TissueFeature.TISSUE_MASK)
+
+        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
+        for patch in slide.patches:
+            patch_mask = mask[patch.y:patch.y + patch.size[1],
+                              patch.x:patch.x + patch.size[0]]
+            tissue_area = np.sum(patch_mask)
+            tissue_ratio = tissue_area / patch_area
+            if tissue_ratio > minimum_tissue_ratio:
+                features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
+                if include_mask_feature:
+                    features[TissueFeature.TISSUE_MASK] = np.array(patch_mask,
+                                                                   dtype=bool)
+                slide.patches.update_patch(patch=patch, features=features)
+
+
 class InterpolatedTissueClassifier(TissueClassifier):
     def _get_mask_tissue_from_slide(self, slide, threshold):
 
