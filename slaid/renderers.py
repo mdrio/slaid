@@ -1,6 +1,6 @@
 import abc
 import json
-import pickle
+import cloudpickle as pickle
 from tifffile import imwrite
 import numpy as np
 from typing import List, Callable, Any
@@ -109,7 +109,7 @@ class PickleRenderer(Renderer):
         filename: str,
         slide: Slide,
     ):
-        self._render(filename, slide.patches.dataframe)
+        self._render(filename, slide)
 
     def render_patch(self, filename: str, patch: Patch):
         raise NotImplementedError()

@@ -32,6 +32,10 @@ class Slide:
         else:
             self._patches = patches
 
+    def __eq__(self, other):
+        return self._filename == other._filename and\
+            self.features == other.features and self.patches == other.patches
+
     @property
     def patches(self):
         return self._patches
@@ -54,15 +58,6 @@ class Slide:
 
     def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
         return self._slide.read_region(location, self.extraction_level, size)
-
-    def __getstate__(self):
-        return {
-            'filename': self._filename,
-            'extraction_level': self._extraction_level
-        }
-
-    def __setstate__(self, dct):
-        self.__init__(**dct)
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         dimensions = self.dimensions_at_extraction_level
@@ -367,6 +362,9 @@ class PandasPatchCollection(PatchCollection):
                                                'left',
                                                on=['y', 'x']).set_index(
                                                    self._dataframe.index)
+
+    def __eq__(self, other):
+        return self._dataframe.equals(other._dataframe)
 
 
 # from https://stackoverflow.com/questions/23032514/argparse-disable-same-argument-occurrences/23032953#23032953
