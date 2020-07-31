@@ -183,7 +183,8 @@ class BasicTissueClassifier(TissueClassifier):
                  minimum_tissue_ratio: float = 0.01,
                  downsampling: int = 16,
                  include_mask_feature=False) -> Slide:
-        area = slide.read_region(location=(0, 0), size=slide.dimensions)
+        area = slide.read_region(location=(0, 0),
+                                 size=slide.dimensions_at_extraction_level)
         mask = self._predictor.get_tissue_mask(area, pixel_threshold)
         # FIXME
         mask = mask.transpose()
