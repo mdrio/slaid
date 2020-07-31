@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import pkg_resources
-import cloudpickle as pickle
 import slaid
 from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import BasicTissueClassifier
+from slaid.renderers import PickleRenderer
 
 
 def main(slide_filename,
@@ -20,10 +20,8 @@ def main(slide_filename,
 
     tissue_classifier.classify(slide, include_mask_feature=True)
 
-    #  pickle_renderer = PickleRenderer()
-    #  pickle_renderer.render(output_filename, slide)
-    # FIXME
-    pickle.dump(slide, open(output_filename, 'wb'))
+    pickle_renderer = PickleRenderer()
+    pickle_renderer.render(output_filename, slide)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 import abc
 import argparse
-from openslide import open_slide
+from openslide import open_slide, ImageSlide
 from typing import Tuple, Dict, Any, List, Union
 import os
 import sys
@@ -30,12 +30,25 @@ class Slide:
         if patches is None and patch_size:
             self._patches = patches or PandasPatchCollection(
                 self, patch_size, extraction_level)
+            self._patch_size = patch_size
         else:
             self._patches = patches
+            self._patch_size = patches.patch_size
 
     def __eq__(self, other):
         return self._filename == other._filename and\
             self.features == other.features and self.patches == other.patches
+
+    def get_thumbnail(self) -> "Slide":
+        _slide = ImageSlide(
+            self._slide.get_thumbnail(self.dimensions_at_extraction_level))
+
+        slide = Slide(self._filename,
+                      self.features,
+                      self.patches,
+                      extraction_level=self._extraction_level)
+        slide._slide = _slide
+        return slide
 
     @property
     def patches(self):

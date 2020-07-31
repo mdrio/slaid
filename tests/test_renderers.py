@@ -35,8 +35,7 @@ class PickleRendererTest(unittest.TestCase):
         output = '/tmp/slide-df.pkl'
         pickle_renderer.render(output, slide)
         os.remove(tmp_slide)
-        with open(output, 'rb') as f:
-            pickled_slide = pickle.load(f)
+        pickled_slide = pickle_renderer.load(output)
         self.assertEqual(slide, pickled_slide)
 
 
