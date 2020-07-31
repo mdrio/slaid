@@ -145,9 +145,6 @@ def get_tissue_mask(slide):
 
     tissue = slide.patches.filter(slide.patches['tissue_mask'].notnull())
     for p in tissue:
-        print(p.features['tissue_mask'].shape)
-        print(mask[p.x:p.x + p.features['tissue_mask'].shape[0],
-                   p.y:p.y + p.features['tissue_mask'].shape[1]].shape)
         mask[p.x:p.x + p.features['tissue_mask'].shape[0], p.y:p.y +
              p.features['tissue_mask'].shape[1]] = p.features['tissue_mask']
     return mask.transpose()
