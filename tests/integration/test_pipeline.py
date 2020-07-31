@@ -1,5 +1,5 @@
 import json
-import pickle
+import cloudpickle as pickle
 import glob
 import numpy as np
 import os
@@ -24,6 +24,7 @@ def generate_row_first_row_cancer(filename, slide_size, patch_size):
 
 def main():
     slide_filename = os.path.join(DIR, 'input.tiff')
+    print(slide_filename)
     patch_size = (256, 256)
     slide_size = (20 * patch_size[1], 10 * patch_size[0])
     generate_row_first_row_cancer(slide_filename, slide_size, patch_size)
@@ -63,7 +64,8 @@ def main():
     pickle_renderer.render(pickled_slide_fn, slide)
     os.remove(slide_filename)
     with open(pickled_slide_fn, 'rb') as f:
-        pickle.load(f)
+        pickled_slide = pickle.load(f)
+        assert pickled_slide == slide
 
     #  for patch in slide.patches.filter(
     #          slide.patches[TissueFeature.TISSUE_MASK].notnull()):

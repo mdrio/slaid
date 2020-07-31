@@ -1,11 +1,14 @@
 import unittest
 import json
-import pickle
+from shutil import copy
+import uuid
+import os
+import cloudpickle as pickle
 from PIL import Image
 import numpy as np
 from slaid.renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
 from test_commons import DummySlide
-from slaid.commons import Patch
+from slaid.commons import Patch, Slide
 from slaid.classifiers import KarolinskaFeature
 
 
@@ -25,14 +28,16 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
 
 class PickleRendererTest(unittest.TestCase):
     def test_render(self):
-        data = np.random.randint(0, 255, (10, 10, 4))
-        slide = DummySlide('slide', (100, 100))
+        tmp_slide = uuid.uuid4().hex
+        copy('data/input.tiff', tmp_slide)
+        slide = Slide(tmp_slide, extraction_level=0)
         pickle_renderer = PickleRenderer()
         output = '/tmp/slide-df.pkl'
         pickle_renderer.render(output, slide)
+        os.remove(tmp_slide)
         with open(output, 'rb') as f:
-            pickled_df = pickle.load(f)
-        self.assertTrue(slide.patches.dataframe.equals(pickled_df))
+            pickled_slide = pickle.load(f)
+        self.assertEqual(slide, pickled_slide)
 
 
 class JsonRendererTest(unittest.TestCase):

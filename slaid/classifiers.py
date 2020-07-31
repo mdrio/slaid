@@ -179,8 +179,8 @@ class TissueClassifier(Classifier):
         lev = slide.get_best_level_for_downsample(16)
         lev_dim = slide.level_dimensions[lev]
 
-        big_x = slide.level_dimensions[slide.extraction_level][0]
-        big_y = slide.level_dimensions[slide.extraction_level][1]
+        big_x = slide.level_dimensions[slide.patches.extraction_level][0]
+        big_y = slide.level_dimensions[slide.patches.extraction_level][1]
 
         # downsampling factor of level0 with respect  patch size
         dim_x, dim_y = patch_size
@@ -193,7 +193,7 @@ class TissueClassifier(Classifier):
         tissue = [(x, y) for x in range(xx) for y in range(yy)
                   if mask.getpixel((x, y)) > 0]
 
-        ext_lev_ds = slide.level_downsamples[slide.extraction_level]
+        ext_lev_ds = slide.level_downsamples[slide.patches.extraction_level]
         return [
             round_to_patch((round(x * big_x / xx * ext_lev_ds),
                             round(y * big_y / yy * ext_lev_ds)), patch_size)
