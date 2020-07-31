@@ -11,8 +11,8 @@ from multiprocessing import Pool
 
 
 class Classifier(abc.ABC):
-    @abc.abstractstaticmethod
-    def create(*args):
+    @abc.abstractclassmethod
+    def create(cls, *args):
         pass
 
     @abc.abstractmethod
@@ -38,9 +38,9 @@ class KarolinskaFeature:
 
 
 class KarolinskaRandomClassifier(Classifier):
-    @staticmethod
-    def create(*args):
-        return KarolinskaRandomClassifier()
+    @classmethod
+    def create(cls, *args):
+        return cls()
 
     def classify_patch(self, patch: Patch) -> Dict:
         return {KarolinskaFeature.CANCER_PERCENTAGE: random.random()}
@@ -50,9 +50,9 @@ class KarolinskaTrueValueClassifier(Classifier):
     def __init__(self, mask: Slide):
         self.mask = mask
 
-    @staticmethod
-    def create(mask_filename):
-        return KarolinskaTrueValueClassifier(Slide(mask_filename))
+    @classmethod
+    def create(cls, mask_filename):
+        return cls(Slide(mask_filename))
 
     def classify_patch(self, patch: Patch, extraction_level: int = 2) -> Dict:
         image = self.mask.read_region(location=(patch.x, patch.y),
@@ -69,10 +69,9 @@ class ParallelClassifier(Classifier):
     def __init__(self, classifier: Classifier):
         self._classifier = classifier
 
-    @staticmethod
-    def create(classifier_cls_name: str, *args):
-        return ParallelClassifier(
-            get_class(classifier_cls_name, 'classifiers').create(*args))
+    @classmethod
+    def create(cls, classifier_cls_name: str, *args):
+        return cls(get_class(classifier_cls_name, 'classifiers').create(*args))
 
     def classify_patch(self, patch: Patch) -> Dict:
         return self._classifier.classify_patch(patch)
@@ -135,19 +134,78 @@ class TissueFeature:
     TISSUE_MASK = 'tissue_mask'
 
 
-class TissueClassifier(Classifier):
+class TissueMaskNotAvailable(Exception):
+    pass
+
+
+def get_tissue_mask(slide):
+    if TissueFeature.TISSUE_MASK not in slide.patches.features:
+        raise TissueMaskNotAvailable()
+    mask = np.zeros(slide.dimensions, dtype=np.uint8)
+
+    tissue = slide.patches.filter(slide.patches['tissue_mask'].notnull())
+    for p in tissue:
+        mask[p.x:p.x + p.features['tissue_mask'].shape[0], p.y:p.y +
+             p.features['tissue_mask'].shape[1]] = p.features['tissue_mask']
+    return mask.transpose()
+
+
+class TissueClassifier(Classifier, abc.ABC):
     def __init__(self, predictor: TissueMaskPredictor):
         self._predictor = predictor
 
-    @staticmethod
-    def create(model_filename,
+    @classmethod
+    def create(cls,
+               model_filename,
                predictor_cls_name: str = 'BasicTissueMaskPredictor'):
 
-        return TissueClassifier(
+        return cls(
             get_class(predictor_cls_name,
                       'slaid.classifiers').create(model_filename))
-        raise NotImplementedError()
 
+    @abc.abstractmethod
+    def classify(self,
+                 slide: Slide,
+                 pixel_threshold: float = 0.8,
+                 minimum_tissue_ratio: float = 0.01,
+                 downsampling: int = 16,
+                 include_mask_feature=False) -> Slide:
+        pass
+
+
+class BasicTissueClassifier(TissueClassifier):
+    def classify_patch(self, patch: Patch) -> Patch:
+        raise NotImplementedError
+
+    def classify(self,
+                 slide: Slide,
+                 pixel_threshold: float = 0.8,
+                 minimum_tissue_ratio: float = 0.01,
+                 downsampling: int = 16,
+                 include_mask_feature=False) -> Slide:
+        area = slide.read_region(location=(0, 0), size=slide.dimensions)
+        mask = self._predictor.get_tissue_mask(area, pixel_threshold)
+        # FIXME
+        mask = mask.transpose()
+        slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
+        if include_mask_feature:
+            slide.patches.add_feature(TissueFeature.TISSUE_MASK)
+
+        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
+        for patch in slide.patches:
+            patch_mask = mask[patch.x:patch.x + patch.size[0],
+                              patch.y:patch.y + patch.size[1]]
+            tissue_area = np.sum(patch_mask)
+            tissue_ratio = tissue_area / patch_area
+            if tissue_ratio > minimum_tissue_ratio:
+                features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
+                if include_mask_feature:
+                    features[TissueFeature.TISSUE_MASK] = np.array(
+                        patch_mask, dtype=np.uint8)
+                slide.patches.update_patch(patch=patch, features=features)
+
+
+class InterpolatedTissueClassifier(TissueClassifier):
     def _get_mask_tissue_from_slide(self, slide, threshold):
 
         dims = slide.level_dimensions

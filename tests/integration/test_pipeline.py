@@ -36,7 +36,7 @@ def main():
                          patch_size=patch_size,
                          extraction_level=0)
 
-    tissue_classifier = cl.TissueClassifier(
+    tissue_classifier = cl.InterpolatedTissueClassifier(
         cl.BasicTissueMaskPredictor(GreenIsTissueModel()))
 
     cancer_classifier = cl.KarolinskaTrueValueClassifier(mask)
