@@ -35,8 +35,11 @@ class PickleRendererTest(unittest.TestCase):
         output = '/tmp/slide-df.pkl'
         pickle_renderer.render(output, slide)
         os.remove(tmp_slide)
-        pickled_slide = pickle_renderer.load(output)
-        self.assertEqual(slide, pickled_slide)
+        pickled = pickle.load(open(output, 'rb'))
+        self.assertEqual(slide.patches, pickled['patches'])
+        self.assertEqual(slide.patches.patch_size, pickled['patch_size'])
+        self.assertEqual(slide.patches.extraction_level,
+                         pickled['extraction_level'])
 
 
 class JsonRendererTest(unittest.TestCase):

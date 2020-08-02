@@ -107,19 +107,14 @@ class PickleRenderer(Renderer):
         filename: str,
         slide: Slide,
     ):
-        s = slide.get_thumbnail()
-        df = s.patches.dataframe
-        s._patches = None
-        s._extraction_level = 0
         with open(filename, 'wb') as f:
-            pickle.dump([s, df], f)
+            pickle.dump(
+                {
+                    'filename': slide._filename,
+                    'patch_size': slide.patches.patch_size,
+                    'extraction_level': slide.patches.extraction_level,
+                    'patches': slide.patches
+                }, f)
 
     def render_patch(self, filename: str, patch: Patch):
         raise NotImplementedError()
-
-    def load(self, filename):
-        with open(filename, 'rb') as f:
-            s, df = pickle.load(f)
-        patches = PandasPatchCollection.from_pandas(s, s._patch_size, df)
-        s._patches = patches
-        return s
