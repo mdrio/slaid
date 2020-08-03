@@ -10,6 +10,7 @@ docker-main:
 	cp -r bin docker-build/
 	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(TAG)
 	docker tag slaid:$(TAG) slaid
+	tests/docker/test_docker.sh
 
 install:
 	pip install -e .
