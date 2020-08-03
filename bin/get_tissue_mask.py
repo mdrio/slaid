@@ -23,7 +23,10 @@ def main(slide_filename,
 
     tissue_classifier = BasicTissueClassifier.create(model_filename)
 
-    tissue_classifier.classify(slide, include_mask_feature=True)
+    tissue_classifier.classify(slide,
+                               pixel_threshold=pixel_threshold,
+                               minimum_tissue_ratio=minimum_tissue_ratio,
+                               include_mask_feature=True)
     with open(output_filename, 'wb') as f:
         pickle.dump(
             {
