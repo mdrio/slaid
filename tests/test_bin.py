@@ -14,19 +14,36 @@ slide = Slide(input_)
 
 
 class GetTissueMaskTest(unittest.TestCase):
-    def test_get_tissue_mask(self):
+    def test_get_tissue_mask_default_value(self):
         subprocess.check_call(['get_tissue_mask.py', input_, output])
         with open(output, 'rb') as f:
             data = pickle.load(f)
-            self.assertTrue('filename' in data)
-            self.assertTrue('extraction_level' in data)
-            self.assertTrue('mask' in data)
+        self.assertTrue('filename' in data)
+        self.assertTrue('extraction_level' in data)
+        self.assertTrue('mask' in data)
 
-            self.assertEqual(data['filename'], input_)
-            self.assertEqual(data['extraction_level'], 2)
-            self.assertEqual(data['mask'].transpose().shape,
-                             slide.dimensions_at_extraction_level)
-            self.assertTrue(sum(sum(data['mask'])) > 0)
+        self.assertEqual(data['filename'], input_)
+        self.assertEqual(data['extraction_level'], 2)
+        self.assertEqual(data['mask'].transpose().shape,
+                         slide.dimensions_at_extraction_level)
+        self.assertTrue(sum(sum(data['mask'])) > 0)
+
+    def test_get_tissue_mask_custom_value(self):
+        extr_level = 3
+        cmd = f'get_tissue_mask.py -l {extr_level} -t 0.7 -T 0.09 {input_} {output}'
+        subprocess.check_call(cmd.split())
+        slide = Slide(input_, extraction_level=extr_level)
+        with open(output, 'rb') as f:
+            data = pickle.load(f)
+        self.assertTrue('filename' in data)
+        self.assertTrue('extraction_level' in data)
+        self.assertTrue('mask' in data)
+
+        self.assertEqual(data['filename'], input_)
+        self.assertEqual(data['extraction_level'], extr_level)
+        self.assertEqual(data['mask'].transpose().shape,
+                         slide.dimensions_at_extraction_level)
+        self.assertTrue(sum(sum(data['mask'])) > 0)
 
 
 class ExtractTissueTest(unittest.TestCase):
