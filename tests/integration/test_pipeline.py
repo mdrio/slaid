@@ -63,9 +63,9 @@ def main():
     pickled_slide_fn = '/tmp/slide.pkl'
     pickle_renderer.render(pickled_slide_fn, slide)
     os.remove(slide_filename)
-    with open(pickled_slide_fn, 'rb') as f:
-        pickled_slide = pickle.load(f)
-        assert pickled_slide == slide
+    #  with open(pickled_slide_fn, 'rb') as f:
+    #      pickled_slide = pickle.load(f)
+    #      assert pickled_slide == slide
 
     #  for patch in slide.patches.filter(
     #          slide.patches[TissueFeature.TISSUE_MASK].notnull()):

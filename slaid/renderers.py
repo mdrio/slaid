@@ -3,8 +3,9 @@ import json
 import cloudpickle as pickle
 from tifffile import imwrite
 import numpy as np
-from typing import List, Callable, Any
-from slaid.commons import Patch, PatchCollection, Slide
+from typing import List, Callable
+from slaid.commons import Patch, PatchCollection, Slide,\
+    PandasPatchCollection
 from slaid.classifiers import KarolinskaFeature
 
 
@@ -100,16 +101,20 @@ class VectorialRenderer(Renderer):
 
 
 class PickleRenderer(Renderer):
-    def _render(self, filename: str, obj: Any):
-        with open(filename, 'wb') as f:
-            pickle.dump(obj, f)
-
+    # FIXME use private attribute of Slide
     def render(
         self,
         filename: str,
         slide: Slide,
     ):
-        self._render(filename, slide)
+        with open(filename, 'wb') as f:
+            pickle.dump(
+                {
+                    'filename': slide._filename,
+                    'patch_size': slide.patches.patch_size,
+                    'extraction_level': slide.patches.extraction_level,
+                    'patches': slide.patches
+                }, f)
 
     def render_patch(self, filename: str, patch: Patch):
         raise NotImplementedError()
