@@ -14,6 +14,8 @@ def main(slide_filename,
          model_filename,
          output_filename,
          extraction_level,
+         pixel_threshold=0.8,
+         minimum_tissue_ratio=0.1,
          patch_size=PATCH_SIZE):
     slide = Slide(slide_filename,
                   patch_size=patch_size,
@@ -21,7 +23,10 @@ def main(slide_filename,
 
     tissue_classifier = BasicTissueClassifier.create(model_filename)
 
-    tissue_classifier.classify(slide, include_mask_feature=True)
+    tissue_classifier.classify(slide,
+                               pixel_threshold=pixel_threshold,
+                               minimum_tissue_ratio=minimum_tissue_ratio,
+                               include_mask_feature=True)
     with open(output_filename, 'wb') as f:
         pickle.dump(
             {
@@ -51,6 +56,17 @@ if __name__ == '__main__':
                         default=2,
                         type=int)
 
+    parser.add_argument('-t',
+                        dest='pixel_threshold',
+                        default=0.8,
+                        help="pixel pixel threshold",
+                        type=float)
+    parser.add_argument('-T',
+                        dest='minimum_tissue_ratio',
+                        default=0.1,
+                        help="minimum tissue ratio",
+                        type=float)
+
     args = parser.parse_args()
     main(args.slide, args.model, args.output, args.extraction_level,
-         args.patch_size)
+         args.pixel_threshold, args.minimum_tissue_ratio, args.patch_size)
