@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-import pkg_resources
 import pickle
+
+import pkg_resources
+
 import slaid
-from slaid.commons import Slide, PATCH_SIZE, UniqueStore
 from slaid.classifiers import BasicTissueClassifier, get_tissue_mask
+from slaid.commons import PATCH_SIZE, Slide, UniqueStore
 
 
 def main(slide_filename,
@@ -23,7 +23,12 @@ def main(slide_filename,
 
     tissue_classifier.classify(slide, include_mask_feature=True)
     with open(output_filename, 'wb') as f:
-        pickle.dump(get_tissue_mask(slide), f)
+        pickle.dump(
+            {
+                'filename': slide_filename,
+                'extraction_level': extraction_level,
+                'mask': get_tissue_mask(slide)
+            }, f)
 
 
 if __name__ == '__main__':

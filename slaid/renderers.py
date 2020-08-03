@@ -113,7 +113,7 @@ class PickleRenderer(Renderer):
                     'filename': slide._filename,
                     'patch_size': slide.patches.patch_size,
                     'extraction_level': slide.patches.extraction_level,
-                    'patches': slide.patches
+                    'features': slide.patches.dataframe
                 }, f)
 
     def render_patch(self, filename: str, patch: Patch):

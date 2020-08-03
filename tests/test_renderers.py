@@ -36,7 +36,7 @@ class PickleRendererTest(unittest.TestCase):
         pickle_renderer.render(output, slide)
         os.remove(tmp_slide)
         pickled = pickle.load(open(output, 'rb'))
-        self.assertEqual(slide.patches, pickled['patches'])
+        self.assertTrue(slide.patches.dataframe.equals(pickled['features']))
         self.assertEqual(slide.patches.patch_size, pickled['patch_size'])
         self.assertEqual(slide.patches.extraction_level,
                          pickled['extraction_level'])
