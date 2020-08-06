@@ -31,6 +31,7 @@ def main(slide_filename,
         pickle.dump(
             {
                 'filename': slide_filename,
+                'dimensions': slide.dimensions,
                 'extraction_level': extraction_level,
                 'mask': get_tissue_mask(slide)
             }, f)

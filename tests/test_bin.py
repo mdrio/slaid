@@ -41,6 +41,7 @@ class GetTissueMaskTest(unittest.TestCase):
         self.assertTrue('mask' in data)
 
         self.assertEqual(data['filename'], input_)
+        self.assertEqual(data['dimensions'], slide.dimensions)
         self.assertEqual(data['extraction_level'], extr_level)
         self.assertEqual(data['mask'].transpose().shape,
                          slide.dimensions_at_extraction_level)
