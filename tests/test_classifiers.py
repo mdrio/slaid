@@ -1,10 +1,10 @@
 import unittest
-from slaid.commons import Slide
 from slaid.classifiers import BasicTissueMaskPredictor,\
     InterpolatedTissueClassifier, TissueFeature, \
     KarolinskaTrueValueClassifier, KarolinskaFeature, BasicTissueClassifier
 import numpy as np
 from commons import DummyModel, GreenIsTissueModel, DummySlide
+from slaid.commons.openslide import Slide
 
 
 class TestTissueClassifierTest:

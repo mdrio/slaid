@@ -1,9 +1,10 @@
 import unittest
-from slaid.commons import Patch, Slide, round_to_patch,\
+from slaid.commons import Patch, round_to_patch,\
      PandasPatchCollection
 from slaid.classifiers import BasicTissueMaskPredictor, BasicTissueClassifier,\
     get_tissue_mask
 from commons import GreenIsTissueModel, DummySlide
+from slaid.commons.openslide import Slide
 
 
 class TestSlide(unittest.TestCase):

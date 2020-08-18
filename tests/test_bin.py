@@ -5,7 +5,7 @@ import pickle
 import subprocess
 import unittest
 
-from slaid.commons import Slide
+from slaid.commons.openslide import Slide
 from slaid.classifiers import TissueFeature
 
 DIR = os.path.dirname(os.path.realpath(__file__))

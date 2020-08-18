@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 import pkg_resources
 import slaid
-from slaid.commons import Slide, PATCH_SIZE, UniqueStore
+from slaid.commons import PATCH_SIZE, UniqueStore
+from slaid.commons.openslide import Slide
 from slaid.classifiers import BasicTissueClassifier
 from slaid.renderers import PickleRenderer
 

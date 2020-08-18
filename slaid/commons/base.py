@@ -1,8 +1,6 @@
 import abc
 import argparse
-from openslide import open_slide, ImageSlide
 from typing import Tuple, Dict, Any, List, Union
-import os
 import sys
 import pandas as pd
 import numpy as np
@@ -16,7 +14,7 @@ def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
-class Slide:
+class Slide(abc.ABC):
     def __init__(self,
                  filename: str,
                  features: Dict = None,
@@ -24,7 +22,6 @@ class Slide:
                  patch_size: Tuple[int, int] = PATCH_SIZE,
                  extraction_level=2):
         self._filename = filename
-        self._slide = open_slide(filename)
         self.features = features or {}
         self._extraction_level = extraction_level
         if patches is None and patch_size:
@@ -39,35 +36,29 @@ class Slide:
         return self._filename == other._filename and\
             self.features == other.features and self.patches == other.patches
 
-    def get_thumbnail(self) -> "Slide":
-        _slide = ImageSlide(
-            self._slide.get_thumbnail(self.dimensions_at_extraction_level))
-
-        slide = Slide(self._filename,
-                      self.features,
-                      self.patches,
-                      extraction_level=self._extraction_level)
-        slide._slide = _slide
-        return slide
+    #  @abc.abstractmethod
+    #  def get_thumbnail(self) -> "Slide":
+    #      pass
 
     @property
     def patches(self):
         return self._patches
 
-    @property
+    @abc.abstractproperty
     def dimensions(self):
-        return self._slide.dimensions
+        pass
 
-    @property
+    @abc.abstractproperty
     def dimensions_at_extraction_level(self):
-        return self._slide.level_dimensions[self._extraction_level]
+        pass
 
-    @property
+    @abc.abstractproperty
     def ID(self):
-        return os.path.basename(self._filename)
+        pass
 
+    @abc.abstractmethod
     def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
-        return self._slide.read_region(location, self._extraction_level, size)
+        pass
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
         dimensions = self.dimensions_at_extraction_level
@@ -76,16 +67,17 @@ class Slide:
             for x in range(0, dimensions[0], patch_size[0]):
                 yield Patch(self, (x, y), patch_size)
 
+    @abc.abstractmethod
     def get_best_level_for_downsample(self, downsample: int):
-        return self._slide.get_best_level_for_downsample(downsample)
+        pass
 
-    @property
+    @abc.abstractproperty
     def level_dimensions(self):
-        return self._slide.level_dimensions
+        pass
 
-    @property
+    @abc.abstractproperty
     def level_downsamples(self):
-        return self._slide.level_downsamples
+        pass
 
 
 class SlideIterator:

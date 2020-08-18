@@ -5,7 +5,8 @@ import numpy as np
 import os
 from PIL import Image
 import slaid.classifiers as cl
-from slaid.commons import Slide, Patch
+from slaid.commons import Patch
+from slaid.commons.openslide import Slide
 from slaid.classifiers import TissueFeature
 from slaid.renderers import JSONEncoder, BasicFeatureTIFFRenderer,\
     convert_to_heatmap, PickleRenderer
