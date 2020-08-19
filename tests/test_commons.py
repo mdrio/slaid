@@ -1,38 +1,79 @@
+import numpy as np
 import unittest
-from slaid.commons import Patch, round_to_patch,\
-     PandasPatchCollection
-from slaid.classifiers import BasicTissueMaskPredictor, BasicTissueClassifier,\
-    get_tissue_mask
-from commons import GreenIsTissueModel, DummySlide
-from slaid.commons.openslide import Slide
+
+from commons import DummySlide, GreenIsTissueModel
+
+from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
+                               get_tissue_mask)
+from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
+from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.openslide import Slide as OpenSlide
+
+image = 'data/test.tif'
 
 
-class TestSlide(unittest.TestCase):
-    def test_get_tissue_mask(self):
-        slide = Slide('data/input.tiff', extraction_level=0)
-        model = GreenIsTissueModel()
-        tissue_classifier = BasicTissueClassifier(
-            BasicTissueMaskPredictor(model))
+class TestSlide:
+    slide: Slide = None
 
-        tissue_classifier.classify(slide, include_mask_feature=True)
-        mask = get_tissue_mask(slide)
+    def test_dimensions(self):
+        self.assertEqual(self.slide.dimensions, (1024, 1024))
 
-        self.assertTrue(mask[0:255, :].all(), 1)
-        self.assertEqual(mask[255:, :].all(), 0)
+    def test_extract_dimensions(self):
+        self.assertEqual(self.slide.dimensions_at_extraction_level,
+                         (1024, 1024))
 
-    def test_iterate(self):
-        patch_size = (256, 256)
-        slide_size = (1024, 512)
-        slide = DummySlide('slide', slide_size)
-        patches = list(slide.iterate_by_patch(patch_size))
-        self.assertEqual(
-            len(patches),
-            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+    def test_read_region(self):
+        region = self.slide.read_region((0, 0), (256, 256))
+        array = np.array(region)
+        print(array.shape)
 
-        expected_coordinates = [(0, 0), (256, 0), (512, 0), (768, 0), (0, 256),
-                                (256, 256), (512, 256), (768, 256)]
-        real_coordinates = [(p.x, p.y) for p in patches]
-        self.assertEqual(real_coordinates, expected_coordinates)
+
+#
+#  def get_best_level_for_downsample(self, downsample: int):
+#      return open_slide(
+#          self._filename).get_best_level_for_downsample(downsample)
+#
+#  @property
+#  def level_dimensions(self):
+#      return self._level_dimensions
+#
+#  @property
+#  def level_downsamples(self):
+#      return open_slide(self._filename).level_downsamples
+#
+#  def test_iterate(self):
+#      patch_size = (256, 256)
+#      slide_size = (1024, 512)
+#      patches = list(self.slide.iterate_by_patch(patch_size))
+#      self.assertEqual(
+#          len(patches),
+#          slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+#
+#      expected_coordinates = [(0, 0), (256, 0), (512, 0), (768, 0), (0, 256),
+#                              (256, 256), (512, 256), (768, 256)]
+#      real_coordinates = [(p.x, p.y) for p in patches]
+#      self.assertEqual(real_coordinates, expected_coordinates)
+#
+
+
+class TestOpenSlide(unittest.TestCase, TestSlide):
+    slide = OpenSlide(image, extraction_level=0)
+
+    #  def test_get_tissue_mask(self):
+    #      model = GreenIsTissueModel()
+    #      tissue_classifier = BasicTissueClassifier(
+    #          BasicTissueMaskPredictor(model))
+    #
+    #      tissue_classifier.classify(self.slide, include_mask_feature=True)
+    #      mask = get_tissue_mask(self.slide)
+    #
+    #      self.assertTrue(mask[0:255, :].all(), 1)
+    #      self.assertEqual(mask[255:, :].all(), 0)
+    #
+
+
+class TestEcvlSlide(unittest.TestCase, TestSlide):
+    slide = EcvlSlide(image, extraction_level=0)
 
 
 class TestRoundToPatch(unittest.TestCase):

@@ -45,11 +45,11 @@ class Slide(abc.ABC):
         return self._patches
 
     @abc.abstractproperty
-    def dimensions(self):
+    def dimensions(self) -> Tuple[int, int]:
         pass
 
     @abc.abstractproperty
-    def dimensions_at_extraction_level(self):
+    def dimensions_at_extraction_level(self) -> Tuple[int, int]:
         pass
 
     @abc.abstractproperty

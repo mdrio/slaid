@@ -30,12 +30,12 @@ class Slide(BaseSlide):
     #      return slide
     #
     @property
-    def dimensions(self):
-        return self._slide.dimensions
+    def dimensions(self) -> Tuple[int, int]:
+        return tuple(self._slide.dimensions)
 
     @property
-    def dimensions_at_extraction_level(self):
-        return self._slide.level_dimensions[self._extraction_level]
+    def dimensions_at_extraction_level(self) -> Tuple[int, int]:
+        return tuple(self._slide.level_dimensions[self._extraction_level])
 
     @property
     def ID(self):
