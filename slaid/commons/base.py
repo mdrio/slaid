@@ -36,10 +36,6 @@ class Slide(abc.ABC):
         return self._filename == other._filename and\
             self.features == other.features and self.patches == other.patches
 
-    #  @abc.abstractmethod
-    #  def get_thumbnail(self) -> "Slide":
-    #      pass
-
     @property
     def patches(self):
         return self._patches
