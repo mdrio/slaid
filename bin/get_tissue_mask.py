@@ -8,7 +8,7 @@ import pkg_resources
 import slaid
 from slaid.classifiers import BasicTissueClassifier, get_tissue_mask
 from slaid.commons import PATCH_SIZE, UniqueStore
-from slaid.commons.openslide import Slide
+from slaid.commons.ecvl import Slide
 
 
 def main(slide_filename,

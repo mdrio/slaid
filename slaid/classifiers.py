@@ -3,10 +3,11 @@ import os
 import pickle
 import random
 from multiprocessing import Pool
+from PIL import Image as PIL_Image
 from typing import Dict, Tuple
 
 import numpy as np
-from PIL import Image
+from slaid.commons.ecvl import Image
 
 from slaid.commons import (PATCH_SIZE, Patch, PatchCollection, Slide,
                            get_class, round_to_patch)
@@ -60,7 +61,7 @@ class KarolinskaTrueValueClassifier(Classifier):
         image = self.mask.read_region(location=(patch.x, patch.y),
                                       size=patch.size)
 
-        data = np.array(image.getchannel(0).getdata())
+        data = image.to_array()[2].flatten()
         return {
             KarolinskaFeature.CANCER_PERCENTAGE:
             sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
@@ -114,7 +115,7 @@ class BasicTissueMaskPredictor(TissueMaskPredictor):
         self._model = model
 
     def get_tissue_mask(self, image: Image, threshold: float) -> np.array:
-        np_img = np.array(image)
+        np_img = image.to_array(True)
         n_px = np_img.shape[0] * np_img.shape[1]
         x = np_img[:, :, :3].reshape(n_px, 3)
 
@@ -248,9 +249,9 @@ class InterpolatedTissueClassifier(TissueClassifier):
         xx = round(big_x / dim_x)
         yy = round(big_y / dim_y)
 
-        mask = Image.new('L', lev_dim)
+        mask = PIL_Image.new('L', lev_dim)
         mask.putdata(tissue_mask.flatten())
-        mask = mask.resize((xx, yy), resample=Image.BILINEAR)
+        mask = mask.resize((xx, yy), resample=PIL_Image.BILINEAR)
         tissue = [(x, y) for x in range(xx) for y in range(yy)
                   if mask.getpixel((x, y)) > 0]
 

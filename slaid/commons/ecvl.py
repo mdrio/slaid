@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 import numpy as np
 from openslide import open_slide
@@ -23,7 +23,8 @@ class Image(BaseImage):
     def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
         array = np.array(self._image)
         if PIL_FORMAT:
-            array = array.transpose(1, 2, 0)
+            array = array.transpose(2, 1, 0)
+            array = np.flip(array, 0)
             array[:, :] = np.flip(array[:, :])
         return array
 
@@ -64,8 +65,8 @@ class Slide(BaseSlide):
             self._filename).get_best_level_for_downsample(downsample)
 
     @property
-    def level_dimensions(self):
-        return self._level_dimensions
+    def level_dimensions(self) -> List[Tuple[int, int]]:
+        return [tuple(d) for d in self._level_dimensions]
 
     @property
     def level_downsamples(self):
