@@ -1,13 +1,15 @@
 import abc
+import os
 import pickle
-from typing import Tuple, Dict
-from slaid.commons import Patch, Slide, get_class, round_to_patch,\
-    PatchCollection, PATCH_SIZE
+import random
+from multiprocessing import Pool
+from typing import Dict, Tuple
+
 import numpy as np
 from PIL import Image
-import random
-import os
-from multiprocessing import Pool
+
+from slaid.commons import (PATCH_SIZE, Patch, PatchCollection, Slide,
+                           get_class, round_to_patch)
 
 
 class Classifier(abc.ABC):
