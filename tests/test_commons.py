@@ -1,13 +1,9 @@
 import unittest
 
-import numpy as np
-from commons import DummySlide, GreenIsTissueModel
+from commons import DummySlide
 
-from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
-                               get_tissue_mask)
 from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
-from slaid.commons.openslide import Slide as OpenSlide
 
 IMAGE = 'data/test.tif'
 
@@ -33,47 +29,8 @@ class TestSlide:
         self.assertEqual(array.shape, (256, 256, 3))
 
 
-#
-#  def get_best_level_for_downsample(self, downsample: int):
-#      return open_slide(
-#          self._filename).get_best_level_for_downsample(downsample)
-#
-#  @property
-#  def level_dimensions(self):
-#      return self._level_dimensions
-#
-#  @property
-#  def level_downsamples(self):
-#      return open_slide(self._filename).level_downsamples
-#
-#  def test_iterate(self):
-#      patch_size = (256, 256)
-#      slide_size = (1024, 512)
-#      patches = list(self.slide.iterate_by_patch(patch_size))
-#      self.assertEqual(
-#          len(patches),
-#          slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
-#
-#      expected_coordinates = [(0, 0), (256, 0), (512, 0), (768, 0), (0, 256),
-#                              (256, 256), (512, 256), (768, 256)]
-#      real_coordinates = [(p.x, p.y) for p in patches]
-#      self.assertEqual(real_coordinates, expected_coordinates)
-#
-
 #  class TestOpenSlide(unittest.TestCase, TestSlide):
 #      slide = OpenSlide(IMAGE, extraction_level=0)
-
-#  def test_get_tissue_mask(self):
-#      model = GreenIsTissueModel()
-#      tissue_classifier = BasicTissueClassifier(
-#          BasicTissueMaskPredictor(model))
-#
-#      tissue_classifier.classify(self.slide, include_mask_feature=True)
-#      mask = get_tissue_mask(self.slide)
-#
-#      self.assertTrue(mask[0:255, :].all(), 1)
-#      self.assertEqual(mask[255:, :].all(), 0)
-#
 
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
