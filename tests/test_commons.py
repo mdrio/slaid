@@ -1,6 +1,6 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from commons import DummySlide, GreenIsTissueModel
 
 from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
@@ -9,7 +9,7 @@ from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
 from slaid.commons.openslide import Slide as OpenSlide
 
-image = 'data/test.tif'
+IMAGE = 'data/test.tif'
 
 
 class TestSlide:
@@ -22,10 +22,15 @@ class TestSlide:
         self.assertEqual(self.slide.dimensions_at_extraction_level,
                          (1024, 1024))
 
-    def test_read_region(self):
+    def test_to_array(self):
         region = self.slide.read_region((0, 0), (256, 256))
-        array = np.array(region)
-        print(array.shape)
+        array = region.to_array()
+        self.assertEqual(array.shape, (3, 256, 256))
+
+    def test_to_array_as_PIL(self):
+        region = self.slide.read_region((0, 0), (256, 256))
+        array = region.to_array(True)
+        self.assertEqual(array.shape, (256, 256, 3))
 
 
 #
@@ -55,25 +60,31 @@ class TestSlide:
 #      self.assertEqual(real_coordinates, expected_coordinates)
 #
 
+#  class TestOpenSlide(unittest.TestCase, TestSlide):
+#      slide = OpenSlide(IMAGE, extraction_level=0)
 
-class TestOpenSlide(unittest.TestCase, TestSlide):
-    slide = OpenSlide(image, extraction_level=0)
-
-    #  def test_get_tissue_mask(self):
-    #      model = GreenIsTissueModel()
-    #      tissue_classifier = BasicTissueClassifier(
-    #          BasicTissueMaskPredictor(model))
-    #
-    #      tissue_classifier.classify(self.slide, include_mask_feature=True)
-    #      mask = get_tissue_mask(self.slide)
-    #
-    #      self.assertTrue(mask[0:255, :].all(), 1)
-    #      self.assertEqual(mask[255:, :].all(), 0)
-    #
+#  def test_get_tissue_mask(self):
+#      model = GreenIsTissueModel()
+#      tissue_classifier = BasicTissueClassifier(
+#          BasicTissueMaskPredictor(model))
+#
+#      tissue_classifier.classify(self.slide, include_mask_feature=True)
+#      mask = get_tissue_mask(self.slide)
+#
+#      self.assertTrue(mask[0:255, :].all(), 1)
+#      self.assertEqual(mask[255:, :].all(), 0)
+#
 
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
-    slide = EcvlSlide(image, extraction_level=0)
+    slide = EcvlSlide(IMAGE, extraction_level=0)
+
+
+class TestImage(unittest.TestCase):
+    def test_to_PIL(self):
+        slide = EcvlSlide(IMAGE, extraction_level=0)
+        image = slide.read_region((0, 0), (256, 256))
+        self.assertEqual(image.dimensions, (3, 256, 256))
 
 
 class TestRoundToPatch(unittest.TestCase):

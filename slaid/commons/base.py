@@ -14,6 +14,16 @@ def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
+class Image(abc.ABC):
+    @abc.abstractproperty
+    def dimensions(self) -> Tuple[int, int]:
+        pass
+
+    @abc.abstractmethod
+    def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
+        pass
+
+
 class Slide(abc.ABC):
     def __init__(self,
                  filename: str,
@@ -53,7 +63,8 @@ class Slide(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def read_region(self, location: Tuple[int, int], size: Tuple[int, int]):
+    def read_region(self, location: Tuple[int, int],
+                    size: Tuple[int, int]) -> Image:
         pass
 
     def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
