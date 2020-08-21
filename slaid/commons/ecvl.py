@@ -1,15 +1,26 @@
 import os
-from typing import Dict, Tuple, List
+from typing import Dict, List, Tuple
 
 import numpy as np
+import pyecvl.ecvl as ecvl
 from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
+from pyeddl.tensor import Tensor as EddlTensor
 
 from slaid.commons import PATCH_SIZE
 from slaid.commons import Image as BaseImage
 from slaid.commons import PatchCollection
 from slaid.commons import Slide as BaseSlide
+from slaid.commons import Tensor as BaseTensor
+
+
+class Tensor(BaseTensor):
+    def __init__(self, tensor: EddlTensor):
+        self._tensor = tensor
+
+    def getdata(self):
+        return self._tensor.getdata()
 
 
 class Image(BaseImage):
@@ -27,6 +38,9 @@ class Image(BaseImage):
             array = np.flip(array, 0)
             array[:, :] = np.flip(array[:, :])
         return array
+
+    def to_tensor(self):
+        return ecvl.ImageToTensor(self._image)
 
 
 class Slide(BaseSlide):

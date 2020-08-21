@@ -1,17 +1,24 @@
 import abc
 import argparse
-from typing import Tuple, Dict, Any, List, Union
-import sys
-import pandas as pd
-import numpy as np
-from collections import defaultdict, OrderedDict
 import inspect
+import sys
+from collections import OrderedDict, defaultdict
+from typing import Any, Dict, List, Tuple, Union
+
+import numpy as np
+import pandas as pd
 
 PATCH_SIZE = (256, 256)
 
 
 def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
+
+
+class Tensor(abc.ABC):
+    @abc.abstractmethod
+    def getdata() -> np.ndarray:
+        pass
 
 
 class Image(abc.ABC):
@@ -21,6 +28,10 @@ class Image(abc.ABC):
 
     @abc.abstractmethod
     def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def to_tensor(self):
         pass
 
 

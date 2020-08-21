@@ -7,15 +7,18 @@ from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
                                InterpolatedTissueClassifier, KarolinskaFeature,
                                KarolinskaTrueValueClassifier, TissueFeature)
 from slaid.commons.ecvl import Slide
+#  from slaid.classifiers.eddl import TissueMaskPredictor as\
+#  EddlTissueMaskPredictor
 
 
 class TestTissueClassifierTest:
     classifier_cls = None
+    predictor_cls = None
 
     def test_detector_no_tissue(self):
         slide = Slide('data/test.tif', extraction_level=0)
         model = DummyModel(np.zeros)
-        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(self.predictor_cls(model))
 
         tissue_detector.classify(slide)
         for patch in slide.patches:
@@ -55,10 +58,17 @@ class TestTissueClassifierTest:
 class InteropolatedTissueClassifierTest(TestTissueClassifierTest,
                                         unittest.TestCase):
     classifier_cls = InterpolatedTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
 
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     classifier_cls = BasicTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
+
+
+#  class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+#      classifier_cls = BasicTissueClassifier
+#      predictor_cls = EddlTissueMaskPredictor
 
 
 class KarolinskaTest(unittest.TestCase):
