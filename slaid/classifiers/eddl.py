@@ -3,7 +3,6 @@ from typing import List, Tuple
 
 import numpy as np
 import pyeddl.eddl as eddl
-from pyeddl.eddl import Model as EddlModel
 from pyeddl.tensor import Tensor
 
 from slaid.classifiers import Model as BaseModel
@@ -38,17 +37,19 @@ def load_model(model_weights, gpu=True):
 
 
 class Model(BaseModel):
-    def __init__(self, model: EddlModel):
+    def __init__(self, model):
         self._model = model
 
     def predict(self, array: np.array) -> np.array:
+        #  np_img = np_img.transpose((1,2,0)) # Convert to channel last
+
         s = array.shape
         n_px = s[0] * s[1]
         array = array[:, :, :3].reshape(n_px, 3)
 
         t_eval = Tensor.fromarray(array)
 
-        predictions = eddl.predict(self.model,
+        predictions = eddl.predict(self._model,
                                    [t_eval])  # Prediction.. get probabilities
         temp_mask = []
         for prob_T in predictions:
