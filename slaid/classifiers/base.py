@@ -99,10 +99,13 @@ class TissueMaskPredictor(abc.ABC):
         pass
 
 
-class Model(abc.ABC):
-    @abc.abstractmethod
+class Model:
+    def __init__(self, filename: str):
+        with open(filename, 'rb') as f:
+            self._model = pickle.load(f)
+
     def predict(self, array: np.array) -> np.array:
-        pass
+        return self._model.predict(array)
 
 
 class BasicTissueMaskPredictor(TissueMaskPredictor):

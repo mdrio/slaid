@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import pickle
 
 import pkg_resources
 
 import slaid
-from slaid.classifiers import BasicTissueClassifier, get_tissue_mask
+from slaid.classifiers import BasicTissueClassifier, get_tissue_mask,\
+    BasicTissueMaskPredictor
 from slaid.commons import PATCH_SIZE, UniqueStore
 from slaid.commons.ecvl import Slide
 
@@ -17,12 +19,24 @@ def main(slide_filename,
          extraction_level,
          pixel_threshold=0.8,
          minimum_tissue_ratio=0.1,
-         patch_size=PATCH_SIZE):
+         patch_size=PATCH_SIZE,
+         gpu=False):
     slide = Slide(slide_filename,
                   patch_size=patch_size,
                   extraction_level=extraction_level)
 
-    tissue_classifier = BasicTissueClassifier.create(model_filename)
+    slide = Slide(slide_filename,
+                  patch_size=patch_size,
+                  extraction_level=extraction_level)
+
+    if os.path.splitext(model_filename)[-1] in ('.pkl', '.pickle'):
+        from slaid.classifiers import Model
+        model = Model(model_filename)
+    else:
+        from slaid.classifiers.eddl import Model
+        model = Model(model_filename, gpu)
+
+    tissue_classifier = BasicTissueClassifier(BasicTissueMaskPredictor(model))
 
     tissue_classifier.classify(slide,
                                pixel_threshold=pixel_threshold,
@@ -69,6 +83,11 @@ if __name__ == '__main__':
                         help="minimum tissue ratio",
                         type=float)
 
+    parser.add_argument('--gpu',
+                        dest='gpu',
+                        default=False,
+                        help="not include tissue mask",
+                        action='store_true')
     args = parser.parse_args()
     main(args.slide, args.model, args.output, args.extraction_level,
          args.pixel_threshold, args.minimum_tissue_ratio, args.patch_size)

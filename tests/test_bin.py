@@ -14,9 +14,12 @@ output = '/tmp/output.pkl'
 slide = Slide(input_)
 
 
-class GetTissueMaskTest(unittest.TestCase):
+class GetTissueMaskTest:
+    model = None
+
     def test_get_tissue_mask_default_value(self):
-        subprocess.check_call(['get_tissue_mask.py', input_, output])
+        subprocess.check_call(
+            ['get_tissue_mask.py', '-m', self.model, input_, output])
         with open(output, 'rb') as f:
             data = pickle.load(f)
         self.assertTrue('filename' in data)
@@ -31,7 +34,7 @@ class GetTissueMaskTest(unittest.TestCase):
 
     def test_get_tissue_mask_custom_value(self):
         extr_level = 3
-        cmd = f'get_tissue_mask.py -l {extr_level} -t 0.7 -T 0.09 {input_} {output}'
+        cmd = f'get_tissue_mask.py -m {self.model} -l {extr_level} -t 0.7 -T 0.09 {input_} {output}'
         subprocess.check_call(cmd.split())
         slide = Slide(input_, extraction_level=extr_level)
         with open(output, 'rb') as f:
@@ -48,9 +51,20 @@ class GetTissueMaskTest(unittest.TestCase):
         self.assertTrue(sum(sum(data['mask'])) > 0)
 
 
-class ExtractTissueTest(unittest.TestCase):
+class SVMGetTissueMaskTest(GetTissueMaskTest, unittest.TestCase):
+    model = '../slaid/models/extract_tissue_LSVM-1.0.pickle'
+
+
+class EddlGetTissueMaskTest(GetTissueMaskTest, unittest.TestCase):
+    model = '../slaid/models/extract_tissue_edl-1.0.0.bin'
+
+
+class ExtractTissueTest:
+    model = None
+
     def test_extract_tissue_default(self):
-        subprocess.check_call(['extract_tissue.py', input_, output])
+        subprocess.check_call(
+            ['extract_tissue.py', '-m', self.model, input_, output])
         with open(output, 'rb') as f:
             data = pickle.load(f)
             self.assertTrue('filename' in data)
@@ -65,7 +79,7 @@ class ExtractTissueTest(unittest.TestCase):
 
     def test_extract_tissue_custom(self):
         extr_level = 3
-        cmd = f'extract_tissue.py -l {extr_level} --no-mask -t 0.7 -T 0.09  {input_} {output}'
+        cmd = f'extract_tissue.py -m {self.model} -l {extr_level} --no-mask -t 0.7 -T 0.09  {input_} {output}'
         subprocess.check_call(cmd.split())
         with open(output, 'rb') as f:
             data = pickle.load(f)
@@ -78,6 +92,14 @@ class ExtractTissueTest(unittest.TestCase):
             self.assertEqual(data['filename'], input_)
             self.assertEqual(data['patch_size'], (256, 256))
             self.assertEqual(data['extraction_level'], extr_level)
+
+
+class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+    model = '../slaid/models/extract_tissue_LSVM-1.0.pickle'
+
+
+class EddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+    model = '../slaid/models/extract_tissue_edl-1.0.0.bin'
 
 
 if __name__ == '__main__':
