@@ -1,13 +1,10 @@
-import pickle
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import pyeddl.eddl as eddl
 from pyeddl.tensor import Tensor
 
 from slaid.classifiers import Model as BaseModel
-from slaid.classifiers import TissueMaskPredictor as BaseTissueMaskPredictor
-from slaid.commons.ecvl import Image
 
 
 def load_model(model_weights, gpu=True):
@@ -40,24 +37,25 @@ class Model(BaseModel):
     def __init__(self, model):
         self._model = model
 
-    def predict(self, array: np.array) -> np.array:
+    def _predict(self, array: np.ndarray) -> List[Tensor]:
+        tensor = Tensor.fromarray(array)
+        return eddl.predict(self._model, [tensor])
+
+    def predict(self, array: np.ndarray) -> np.ndarray:
         #  np_img = np_img.transpose((1,2,0)) # Convert to channel last
 
-        s = array.shape
-        n_px = s[0] * s[1]
-        array = array[:, :, :3].reshape(n_px, 3)
+        #  n_px = s[0] * s[1]
+        #  array = array[:, :, :3].reshape(n_px, 3)
 
-        t_eval = Tensor.fromarray(array)
-
-        predictions = eddl.predict(self._model,
-                                   [t_eval])  # Prediction.. get probabilities
+        predictions = self._predict(array)
         temp_mask = []
         for prob_T in predictions:
             output_np = prob_T.getdata()
             temp_mask.append(output_np[:, 1])
 
         flat_mask = np.vstack(temp_mask)
-        return flat_mask.reshape((s[0], s[1]))
+        #  return flat_mask.reshape((s[0], s[1]))
+        return flat_mask
 
 
 #  class TissueMaskPredictor(BaseTissueMaskPredictor):

@@ -1,12 +1,13 @@
 import unittest
 
 import numpy as np
-from commons import DummyModel, DummySlide, GreenIsTissueModel
+from commons import DummyModel, DummySlide, GreenIsTissueModel, EddlGreenIsTissueModel
 
 from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
                                InterpolatedTissueClassifier, KarolinskaFeature,
                                KarolinskaTrueValueClassifier, TissueFeature)
 from slaid.commons.ecvl import Slide
+
 #  from slaid.classifiers.eddl import TissueMaskPredictor as\
 #  EddlTissueMaskPredictor
 
@@ -14,6 +15,7 @@ from slaid.commons.ecvl import Slide
 class TestTissueClassifierTest:
     classifier_cls = None
     predictor_cls = None
+    model_cls = None
 
     def test_detector_no_tissue(self):
         slide = Slide('data/test.tif', extraction_level=0)
@@ -36,8 +38,8 @@ class TestTissueClassifierTest:
 
     def test_mask(self):
         slide = Slide('data/test.tif', extraction_level=0)
-        model = GreenIsTissueModel()
-        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(
+            BasicTissueMaskPredictor(self.model_cls()))
 
         tissue_detector.classify(slide, include_mask_feature=True)
         for patch in slide.patches:
@@ -55,20 +57,23 @@ class TestTissueClassifierTest:
                                  None)
 
 
-class InteropolatedTissueClassifierTest(TestTissueClassifierTest,
-                                        unittest.TestCase):
+class InterpolatedTissueClassifierTest(TestTissueClassifierTest,
+                                       unittest.TestCase):
     classifier_cls = InterpolatedTissueClassifier
     predictor_cls = BasicTissueMaskPredictor
+    model_cls = GreenIsTissueModel
 
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     classifier_cls = BasicTissueClassifier
     predictor_cls = BasicTissueMaskPredictor
+    model_cls = GreenIsTissueModel
 
 
-#  class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
-#      classifier_cls = BasicTissueClassifier
-#      predictor_cls = EddlTissueMaskPredictor
+class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+    classifier_cls = BasicTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
+    model_cls = EddlGreenIsTissueModel
 
 
 class KarolinskaTest(unittest.TestCase):
