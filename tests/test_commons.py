@@ -10,6 +10,7 @@ IMAGE = 'data/test.tif'
 
 class TestSlide:
     slide: Slide = None
+    slide_cls = None
 
     def test_dimensions(self):
         self.assertEqual(self.slide.dimensions, (1024, 1024))
@@ -28,6 +29,10 @@ class TestSlide:
         array = region.to_array(True)
         self.assertEqual(array.shape, (256, 256, 3))
 
+    def test_file_not_exists(self):
+        with self.assertRaises(FileNotFoundError):
+            self.slide_cls('path/to/file')
+
 
 #  class TestOpenSlide(unittest.TestCase, TestSlide):
 #      slide = OpenSlide(IMAGE, extraction_level=0)
@@ -35,6 +40,7 @@ class TestSlide:
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
     slide = EcvlSlide(IMAGE, extraction_level=0)
+    slide_cls = EcvlSlide
 
 
 class TestImage(unittest.TestCase):

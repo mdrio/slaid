@@ -50,6 +50,8 @@ class Slide(BaseSlide):
                  patches: PatchCollection = None,
                  patch_size: Tuple[int, int] = PATCH_SIZE,
                  extraction_level=2):
+        if not os.path.exists(filename) or not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
         self._level_dimensions = OpenSlideGetLevels(filename)
         #  if not self._level_dimensions:
         #      self._level_dimensions = open_slide(filename).level_dimensions
