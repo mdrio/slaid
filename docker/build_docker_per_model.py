@@ -18,7 +18,7 @@ def main(lib_version='', docker_build_dir='../docker-build'):
         for model in models:
             model = os.path.basename(model)
             model_name = os.path.splitext(model)[0]
-            model = pkg_resources.resource_filename('slaid', f'models/{model}')
+            #  model = pkg_resources.resource_filename('slaid', f'models/{model}')
             command = f'docker build {docker_build_dir} -f {dockerfile} -t slaid:{lib_version + "-" if lib_version else ""}{model_name} --build-arg MODEL={model}'
             print(command)
             print(command.split())

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-
+import pkg_resources
 from slaid.classifiers import BasicTissueClassifier, BasicTissueMaskPredictor
-from slaid.commons import PATCH_SIZE, UniqueStore
+from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import Slide
 from slaid.renderers import PickleRenderer
 
@@ -46,12 +46,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('slide')
     parser.add_argument('output')
-    parser.add_argument(
-        '-m',
-        dest='model',
-        help='path to model',
-        action=UniqueStore,
-    )
+    # workaround since is not possible to pass env variable
+    # to Docker CMD
+    model = os.environ.get("SLAID_MODEL")
+    if model is None:
+        parser.add_argument(
+            '-m',
+            dest='model',
+            help='path to model',
+        )
+    else:
+        model = pkg_resources.resource_filename('slaid', f'models/{model}')
+
     parser.add_argument('--patch_size', dest='patch_size', default=PATCH_SIZE)
     parser.add_argument('-l',
                         dest='extraction_level',
@@ -79,13 +85,9 @@ if __name__ == '__main__':
                         help="not include tissue mask",
                         action='store_true')
 
-    #  parser.add_argument(
-    #      '--model_type',
-    #      dest='model_type',
-    #      default='eddl',
-    #      help="eddl or svm",
-    #  )
     args = parser.parse_args()
-    main(args.slide, args.model, args.output, args.extraction_level,
+    if model is None:
+        model = args.model
+    main(args.slide, model, args.output, args.extraction_level,
          args.pixel_threshold, args.minimum_tissue_ratio, not args.no_mask,
          args.patch_size)
