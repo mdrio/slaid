@@ -1,37 +1,53 @@
 import unittest
-from slaid.commons import Patch, Slide, round_to_patch,\
-     PandasPatchCollection
-from slaid.classifiers import BasicTissueMaskPredictor, BasicTissueClassifier,\
-    get_tissue_mask
-from commons import GreenIsTissueModel, DummySlide
+
+from commons import DummySlide
+
+from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
+from slaid.commons.ecvl import Slide as EcvlSlide
+
+IMAGE = 'data/test.tif'
 
 
-class TestSlide(unittest.TestCase):
-    def test_get_tissue_mask(self):
-        slide = Slide('data/input.tiff', extraction_level=0)
-        model = GreenIsTissueModel()
-        tissue_classifier = BasicTissueClassifier(
-            BasicTissueMaskPredictor(model))
+class TestSlide:
+    slide: Slide = None
+    slide_cls = None
 
-        tissue_classifier.classify(slide, include_mask_feature=True)
-        mask = get_tissue_mask(slide)
+    def test_dimensions(self):
+        self.assertEqual(self.slide.dimensions, (1024, 1024))
 
-        self.assertTrue(mask[0:255, :].all(), 1)
-        self.assertEqual(mask[255:, :].all(), 0)
+    def test_extract_dimensions(self):
+        self.assertEqual(self.slide.dimensions_at_extraction_level,
+                         (1024, 1024))
 
-    def test_iterate(self):
-        patch_size = (256, 256)
-        slide_size = (1024, 512)
-        slide = DummySlide('slide', slide_size)
-        patches = list(slide.iterate_by_patch(patch_size))
-        self.assertEqual(
-            len(patches),
-            slide_size[0] * slide_size[1] / (patch_size[0] * patch_size[1]))
+    def test_to_array(self):
+        region = self.slide.read_region((0, 0), (256, 256))
+        array = region.to_array()
+        self.assertEqual(array.shape, (3, 256, 256))
 
-        expected_coordinates = [(0, 0), (256, 0), (512, 0), (768, 0), (0, 256),
-                                (256, 256), (512, 256), (768, 256)]
-        real_coordinates = [(p.x, p.y) for p in patches]
-        self.assertEqual(real_coordinates, expected_coordinates)
+    def test_to_array_as_PIL(self):
+        region = self.slide.read_region((0, 0), (256, 256))
+        array = region.to_array(True)
+        self.assertEqual(array.shape, (256, 256, 3))
+
+    def test_file_not_exists(self):
+        with self.assertRaises(FileNotFoundError):
+            self.slide_cls('path/to/file')
+
+
+#  class TestOpenSlide(unittest.TestCase, TestSlide):
+#      slide = OpenSlide(IMAGE, extraction_level=0)
+
+
+class TestEcvlSlide(unittest.TestCase, TestSlide):
+    slide = EcvlSlide(IMAGE, extraction_level=0)
+    slide_cls = EcvlSlide
+
+
+class TestImage(unittest.TestCase):
+    def test_to_PIL(self):
+        slide = EcvlSlide(IMAGE, extraction_level=0)
+        image = slide.read_region((0, 0), (256, 256))
+        self.assertEqual(image.dimensions, (3, 256, 256))
 
 
 class TestRoundToPatch(unittest.TestCase):

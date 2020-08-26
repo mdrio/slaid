@@ -8,7 +8,7 @@ from PIL import Image
 import numpy as np
 from slaid.renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
 from test_commons import DummySlide
-from slaid.commons import Patch, Slide
+from slaid.commons import Patch
 from slaid.classifiers import KarolinskaFeature
 
 
@@ -28,13 +28,10 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
 
 class PickleRendererTest(unittest.TestCase):
     def test_render(self):
-        tmp_slide = uuid.uuid4().hex
-        copy('data/input.tiff', tmp_slide)
-        slide = Slide(tmp_slide, extraction_level=0)
+        slide = DummySlide('slide', (256, 256))
         pickle_renderer = PickleRenderer()
         output = '/tmp/slide-df.pkl'
         pickle_renderer.render(output, slide)
-        os.remove(tmp_slide)
         pickled = pickle.load(open(output, 'rb'))
         self.assertTrue(slide.patches.dataframe.equals(pickled['features']))
         self.assertEqual(slide.patches.patch_size, pickled['patch_size'])

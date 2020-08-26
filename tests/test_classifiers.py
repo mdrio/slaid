@@ -1,20 +1,26 @@
 import unittest
-from slaid.commons import Slide
-from slaid.classifiers import BasicTissueMaskPredictor,\
-    InterpolatedTissueClassifier, TissueFeature, \
-    KarolinskaTrueValueClassifier, KarolinskaFeature, BasicTissueClassifier
+
 import numpy as np
-from commons import DummyModel, GreenIsTissueModel, DummySlide
+from commons import DummyModel, DummySlide, GreenIsTissueModel, EddlGreenIsTissueModel
+
+from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
+                               InterpolatedTissueClassifier, KarolinskaFeature,
+                               KarolinskaTrueValueClassifier, TissueFeature)
+from slaid.commons.ecvl import Slide
+
+#  from slaid.classifiers.eddl import TissueMaskPredictor as\
+#  EddlTissueMaskPredictor
 
 
 class TestTissueClassifierTest:
     classifier_cls = None
+    predictor_cls = None
+    model_cls = None
 
     def test_detector_no_tissue(self):
-        patch_size = (10, 10)
-        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
+        slide = Slide('data/test.tif', extraction_level=0)
         model = DummyModel(np.zeros)
-        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
+        tissue_detector = self.classifier_cls(self.predictor_cls(model))
 
         tissue_detector.classify(slide)
         for patch in slide.patches:
@@ -22,8 +28,7 @@ class TestTissueClassifierTest:
                              0)
 
     def test_detector_all_tissue(self):
-        patch_size = (10, 10)
-        slide = DummySlide('slide', (100, 100), patch_size=patch_size)
+        slide = Slide('data/test.tif', extraction_level=0)
         model = DummyModel(np.ones)
         tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
         tissue_detector.classify(slide)
@@ -32,9 +37,9 @@ class TestTissueClassifierTest:
                              1)
 
     def test_mask(self):
-        slide = Slide('data/input.tiff', extraction_level=0)
-        model = GreenIsTissueModel()
-        tissue_detector = self.classifier_cls(BasicTissueMaskPredictor(model))
+        slide = Slide('data/test.tif', extraction_level=0)
+        tissue_detector = self.classifier_cls(
+            BasicTissueMaskPredictor(self.model_cls()))
 
         tissue_detector.classify(slide, include_mask_feature=True)
         for patch in slide.patches:
@@ -52,32 +57,37 @@ class TestTissueClassifierTest:
                                  None)
 
 
-class InteropolatedTissueClassifierTest(TestTissueClassifierTest,
-                                        unittest.TestCase):
+class InterpolatedTissueClassifierTest(TestTissueClassifierTest,
+                                       unittest.TestCase):
     classifier_cls = InterpolatedTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
+    model_cls = GreenIsTissueModel
 
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     classifier_cls = BasicTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
+    model_cls = GreenIsTissueModel
+
+
+class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+    classifier_cls = BasicTissueClassifier
+    predictor_cls = BasicTissueMaskPredictor
+    model_cls = EddlGreenIsTissueModel
 
 
 class KarolinskaTest(unittest.TestCase):
     def test_true_value(self):
-        size = (200, 100)
-        patch_size = (10, 10)
-        #  size = (23904, 28664)
-        #  patch_size = (256, 256)
-        data = np.zeros((size[1], size[0], 3), dtype=np.uint8)
-        data[0:10, 0:50] = [2, 0, 0]
-
-        mask_slide = DummySlide('mask', size, data=data)
+        size = (1024, 256)
+        patch_size = (256, 256)
+        mask_slide = Slide('data/karolinska-mask.tif', extraction_level=0)
         slide = DummySlide('slide', size, patch_size=patch_size)
         cl = KarolinskaTrueValueClassifier(mask_slide)
         slide_classified = cl.classify(slide)
         self.assertEqual(len(slide.patches), len(slide_classified.patches))
         for i, patch in enumerate(slide_classified.patches):
             feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
-            if i <= 4:
+            if i < 1:
                 self.assertEqual(feature, 1)
             else:
                 self.assertEqual(feature, 0)

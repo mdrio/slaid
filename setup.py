@@ -17,6 +17,6 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=reqs,
-    scripts=['bin/extract_tissue.py', 'bin/get_tissue_mask.py'],
+    scripts=['bin/extract_tissue.py'],
     package_data={'': ['models/*']},
     include_package_data=True)
