@@ -56,7 +56,7 @@ class SVMGetTissueMaskTest(GetTissueMaskTest, unittest.TestCase):
 
 
 class EddlGetTissueMaskTest(GetTissueMaskTest, unittest.TestCase):
-    model = '../slaid/models/extract_tissue_edl-1.0.0.bin'
+    model = '../slaid/models/extract_tissue_eddl-1.0.0.bin'
 
 
 class ExtractTissueTest:
@@ -99,7 +99,7 @@ class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
 
 
 class EddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = '../slaid/models/extract_tissue_edl-1.0.0.bin'
+    model = '../slaid/models/extract_tissue_eddl-1.0.0.bin'
 
 
 if __name__ == '__main__':
