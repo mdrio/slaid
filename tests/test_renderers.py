@@ -1,15 +1,18 @@
-import unittest
 import json
-from shutil import copy
-import uuid
 import os
+import unittest
+import uuid
+from shutil import copy
+
 import cloudpickle as pickle
-from PIL import Image
 import numpy as np
-from slaid.renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
+from PIL import Image
 from test_commons import DummySlide
-from slaid.commons import Patch
+
 from slaid.classifiers import KarolinskaFeature
+from slaid.commons import Patch
+from slaid.renderers import (BasicFeatureTIFFRenderer, JSONEncoder,
+                             PickleRenderer)
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
@@ -46,6 +49,22 @@ class JsonRendererTest(unittest.TestCase):
         jsoned_array = np.array(json.loads(jsoned_array))
         self.assertTrue(np.array_equal(array, jsoned_array))
 
+    def test_slide(self):
+        #  given
+        slide = DummySlide('s', (10, 20), patch_size=(10, 10))
+        slide.patches.add_feature('prob', 10)
 
-if __name__ == '__main__':
-    unittest.main()
+        #  when
+        jsoned = json.loads(json.dumps(slide, cls=JSONEncoder))
+        print(jsoned)
+        #  then
+        self.assertEqual(jsoned['slide'], slide.ID)
+        self.assertEqual(tuple(jsoned['patch_size']), slide.patch_size)
+        self.assertEqual(len(slide.patches), len(jsoned['features']))
+
+        for f in jsoned['features']:
+            self.assertEqual(len(f),
+                             len(slide.patches.features) + 2)  # features +x +y
+            self.assertEqual(
+                slide.patches.get_patch((f['x'], f['y'])).features['prob'],
+                f['prob'])
