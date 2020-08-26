@@ -9,7 +9,7 @@ from slaid.commons.ecvl import Slide
 from slaid.classifiers import TissueFeature
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-input_ = os.path.join(DIR, 'data/PH10023-1.svs')
+input_ = os.path.join(DIR, 'data/PH10023-1.thumb.tif')
 output = '/tmp/output.pkl'
 slide = Slide(input_)
 
@@ -33,7 +33,7 @@ class GetTissueMaskTest:
         self.assertTrue(sum(sum(data['mask'])) > 0)
 
     def test_get_tissue_mask_custom_value(self):
-        extr_level = 3
+        extr_level = 1
         cmd = f'get_tissue_mask.py -m {self.model} -l {extr_level} -t 0.7 -T 0.09 {input_} {output}'
         subprocess.check_call(cmd.split())
         slide = Slide(input_, extraction_level=extr_level)
@@ -78,7 +78,7 @@ class ExtractTissueTest:
             self.assertEqual(data['extraction_level'], 2)
 
     def test_extract_tissue_custom(self):
-        extr_level = 3
+        extr_level = 1
         cmd = f'extract_tissue.py -m {self.model} -l {extr_level} --no-mask -t 0.7 -T 0.09  {input_} {output}'
         subprocess.check_call(cmd.split())
         with open(output, 'rb') as f:
