@@ -8,8 +8,8 @@ from test_classifiers import GreenIsTissueModel
 
 import slaid.classifiers as cl
 from slaid.commons.ecvl import Slide
-from slaid.renderers import (BasicFeatureTIFFRenderer, JSONEncoder,
-                             PickleRenderer, convert_to_heatmap)
+from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
+                             to_json, to_pickle)
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -48,32 +48,12 @@ def main():
     cancer_classifier.classify(
         slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
 
-    with open(json_filename, 'w') as json_file:
-        json.dump(slide.patches, json_file, cls=JSONEncoder)
+    to_json(slide, json_filename)
 
     renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
     print('rendering...')
     renderer.render(tiff_filename, slide)
-
-    pickle_renderer = PickleRenderer()
-    pkl_filename = '/tmp/test'
-    [os.remove(f) for f in glob.glob(f'{pkl_filename}*.pkl')]
-
-    pickled_slide_fn = '/tmp/slide.pkl'
-    pickle_renderer.render(pickled_slide_fn, slide)
-    #  with open(pickled_slide_fn, 'rb') as f:
-    #      pickled_slide = pickle.load(f)
-    #      assert pickled_slide == slide
-
-    #  for patch in slide.patches.filter(
-    #          slide.patches[TissueFeature.TISSUE_MASK].notnull()):
-    #      fn = f'{pkl_filename}-{patch.x}-{patch.y}.pkl'
-    #      pickle_renderer.render_patch(fn, patch)
-    #      assert os.path.exists(fn)
-    #      with open(fn, 'rb') as f:
-    #          assert isinstance(pickle.load(f), Patch)
-    #          assert TissueFeature.TISSUE_MASK in patch.features
 
     output_image = Image.open(tiff_filename)
     output_data = np.array(output_image)

@@ -4,4 +4,3 @@ tiffile
 openslide-python
 sklearn
 pandas
-cloudpickle

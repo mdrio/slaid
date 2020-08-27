@@ -1,15 +1,14 @@
-import unittest
 import json
-from shutil import copy
-import uuid
-import os
+import unittest
+
 import cloudpickle as pickle
-from PIL import Image
 import numpy as np
-from slaid.renderers import BasicFeatureTIFFRenderer, PickleRenderer, JSONEncoder
+from PIL import Image
 from test_commons import DummySlide
-from slaid.commons import Patch
+
 from slaid.classifiers import KarolinskaFeature
+from slaid.commons import Patch
+from slaid.renderers import BasicFeatureTIFFRenderer, to_json, to_pickle
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
@@ -26,26 +25,43 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
         self.assertTrue((data[:, :, 0] == 255).all())
 
 
-class PickleRendererTest(unittest.TestCase):
+class ToPickleTest(unittest.TestCase):
     def test_render(self):
+        # given
         slide = DummySlide('slide', (256, 256))
-        pickle_renderer = PickleRenderer()
-        output = '/tmp/slide-df.pkl'
-        pickle_renderer.render(output, slide)
-        pickled = pickle.load(open(output, 'rb'))
+
+        # when
+        pickled = pickle.loads(to_pickle(slide))
+
+        # then
         self.assertTrue(slide.patches.dataframe.equals(pickled['features']))
         self.assertEqual(slide.patches.patch_size, pickled['patch_size'])
         self.assertEqual(slide.patches.extraction_level,
                          pickled['extraction_level'])
 
 
-class JsonRendererTest(unittest.TestCase):
+class ToJsonTest(unittest.TestCase):
     def test_np_array(self):
         array = np.zeros((10, 10))
-        jsoned_array = json.dumps(array, cls=JSONEncoder)
-        jsoned_array = np.array(json.loads(jsoned_array))
+        jsoned_array = json.loads(to_json(array))
         self.assertTrue(np.array_equal(array, jsoned_array))
 
+    def test_slide(self):
+        #  given
+        slide = DummySlide('s', (10, 20), patch_size=(10, 10))
+        prob = 10
+        slide.patches.add_feature('prob', prob)
 
-if __name__ == '__main__':
-    unittest.main()
+        #  when
+        jsoned = json.loads(to_json(slide))
+        #  then
+        self.assertEqual(jsoned['filename'], slide.ID)
+        self.assertEqual(tuple(jsoned['patch_size']), slide.patch_size)
+        self.assertEqual(len(slide.patches), len(jsoned['features']))
+
+        for f in jsoned['features']:
+            self.assertEqual(len(f),
+                             len(slide.patches.features) + 2)  # features +x +y
+            self.assertEqual(
+                slide.patches.get_patch((f['x'], f['y'])).features['prob'],
+                f['prob'])
