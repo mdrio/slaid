@@ -6,19 +6,18 @@ import numpy as np
 from PIL import Image
 from test_commons import DummySlide
 
-from slaid.classifiers import KarolinskaFeature
 from slaid.commons import Patch
 from slaid.renderers import BasicFeatureTIFFRenderer, to_json, to_pickle
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
     def test_render_patch(self):
-        features = {KarolinskaFeature.CANCER_PERCENTAGE: 1}
+        features = {'cancer': 1}
         patch = Patch(DummySlide('slide', (100, 100)), (0, 0), (10, 10),
                       features)
         renderer = BasicFeatureTIFFRenderer()
         output = '/tmp/patch.tiff'
-        renderer.render_patch(output, patch)
+        renderer.render_patch(output, patch, feature='cancer')
         image = Image.open(output)
         data = np.array(image)
         self.assertEqual(data.shape, (10, 10, 4))

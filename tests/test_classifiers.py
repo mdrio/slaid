@@ -1,11 +1,10 @@
 import unittest
 
 import numpy as np
-from commons import DummyModel, DummySlide, GreenIsTissueModel, EddlGreenIsTissueModel
+from commons import DummyModel, GreenIsTissueModel, EddlGreenIsTissueModel
 
 from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
-                               InterpolatedTissueClassifier, KarolinskaFeature,
-                               KarolinskaTrueValueClassifier, TissueFeature)
+                               InterpolatedTissueClassifier, TissueFeature)
 from slaid.commons.ecvl import Slide
 
 #  from slaid.classifiers.eddl import TissueMaskPredictor as\
@@ -74,23 +73,6 @@ class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     classifier_cls = BasicTissueClassifier
     predictor_cls = BasicTissueMaskPredictor
     model_cls = EddlGreenIsTissueModel
-
-
-class KarolinskaTest(unittest.TestCase):
-    def test_true_value(self):
-        size = (1024, 256)
-        patch_size = (256, 256)
-        mask_slide = Slide('data/karolinska-mask.tif', extraction_level=0)
-        slide = DummySlide('slide', size, patch_size=patch_size)
-        cl = KarolinskaTrueValueClassifier(mask_slide)
-        slide_classified = cl.classify(slide)
-        self.assertEqual(len(slide.patches), len(slide_classified.patches))
-        for i, patch in enumerate(slide_classified.patches):
-            feature = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
-            if i < 1:
-                self.assertEqual(feature, 1)
-            else:
-                self.assertEqual(feature, 0)
 
 
 if __name__ == '__main__':

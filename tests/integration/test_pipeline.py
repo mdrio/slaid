@@ -1,6 +1,5 @@
-import glob
-import json
 import os
+import pickle
 
 import numpy as np
 from PIL import Image
@@ -9,7 +8,7 @@ from test_classifiers import GreenIsTissueModel
 import slaid.classifiers as cl
 from slaid.commons.ecvl import Slide
 from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
-                             to_json, to_pickle)
+                             to_json)
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -23,23 +22,19 @@ def generate_row_first_row_cancer(filename, slide_size, patch_size):
 
 
 def main():
-    slide_filename = os.path.join(DIR, '../data/test.tif')
-    print(slide_filename)
+    with open(os.path.join(DIR, '../data/random-model.pkl'), 'rb') as f:
+        model = pickle.load(f)
     patch_size = (256, 256)
-    slide_size = (20 * patch_size[1], 10 * patch_size[0])
-    #  generate_row_first_row_cancer(slide_filename, slide_size, patch_size)
+    slide_filename = os.path.join(DIR, '../data/PH10023-1.thumb.tif')
+    slide = Slide(slide_filename, patch_size=patch_size, extraction_level=0)
 
     json_filename = os.path.join(DIR, 'test.json')
     tiff_filename = os.path.join(DIR, 'test.tiff')
 
-    mask = slide = Slide(slide_filename,
-                         patch_size=patch_size,
-                         extraction_level=0)
-
     tissue_classifier = cl.InterpolatedTissueClassifier(
         cl.BasicTissueMaskPredictor(GreenIsTissueModel()))
 
-    cancer_classifier = cl.KarolinskaTrueValueClassifier(mask)
+    cancer_classifier = cl.BasicClassifier(model, 'cancer')
 
     print('tissue classification')
 

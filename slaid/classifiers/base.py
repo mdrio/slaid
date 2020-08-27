@@ -1,16 +1,12 @@
 import abc
-import os
 import pickle
-import random
-from multiprocessing import Pool
-from PIL import Image as PIL_Image
 from typing import Dict, Tuple
 
 import numpy as np
-from slaid.commons.ecvl import Image
+from PIL import Image as PIL_Image
 
-from slaid.commons import (PATCH_SIZE, Patch, PatchCollection, Slide,
-                           get_class, round_to_patch)
+from slaid.commons import PATCH_SIZE, Patch, Slide, get_class, round_to_patch
+from slaid.commons.ecvl import Image
 
 
 class Classifier(abc.ABC):
@@ -36,61 +32,64 @@ class Classifier(abc.ABC):
         return slide
 
 
-class KarolinskaFeature:
-    CANCER_PERCENTAGE = 'cancer_percentage'
+class BasicClassifier:
+    def __init__(self, model: "Model", feature: str):
+        self._model = model
+        self._feature = feature
 
+    def classify(
+        self,
+        slide: Slide,
+        mask_threshold: float = 0.8,
+        patch_threshold: float = 0.8,
+        include_mask_feature: bool = False,
+    ):
 
-class KarolinskaRandomClassifier(Classifier):
-    @classmethod
-    def create(cls, *args):
-        return cls()
+        image_array = self._get_image_array(slide)
+        prediction = self._model.predict(image_array)
 
-    def classify_patch(self, patch: Patch) -> Dict:
-        return {KarolinskaFeature.CANCER_PERCENTAGE: random.random()}
+        mask = self._get_mask(prediction, image_array.shape, mask_threshold)
 
+        feature_mask = f'{self._feature}_mask'
+        slide.patches.add_feature(self._feature, 0.0)
+        if include_mask_feature:
+            slide.patches.add_feature(feature_mask)
 
-class KarolinskaTrueValueClassifier(Classifier):
-    def __init__(self, mask: Slide):
-        self.mask = mask
+        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
+        for patch in slide.patches:
+            self._update_patch(slide, patch, mask, patch_area, patch_threshold,
+                               include_mask_feature)
 
-    @classmethod
-    def create(cls, mask_filename):
-        return cls(Slide(mask_filename))
+    def _get_image_array(self, slide: Slide) -> np.ndarray:
+        image = slide.read_region((0, 0), slide.dimensions_at_extraction_level)
+        image_array = image.to_array(True)
+        n_px = image_array.shape[0] * image_array.shape[1]
+        image_array = image_array[:, :, :3].reshape(n_px, 3)
+        return image_array
 
-    def classify_patch(self, patch: Patch, extraction_level: int = 2) -> Dict:
-        image = self.mask.read_region(location=(patch.x, patch.y),
-                                      size=patch.size)
+    def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
+                  threshold: float) -> np.ndarray:
+        mask = prediction.reshape(*shape)
+        mask[mask < threshold] = 0
+        mask[mask > threshold] = 1
+        mask = mask.transpose()
+        return mask
 
-        data = image.to_array()[2].flatten()
-        return {
-            KarolinskaFeature.CANCER_PERCENTAGE:
-            sum(map(lambda el: 1 if el == 2 else 0, data)) / len(data)
-        }
+    def _update_patch(self, slide, patch: Patch, patch_area: float,
+                      mask: np.ndarray, threshold: float,
+                      include_mask_feature):
+        patch_mask = mask[patch.x:patch.x + patch.size[0],
+                          patch.y:patch.y + patch.size[1]]
+        tissue_area = np.sum(patch_mask)
+        tissue_ratio = tissue_area / patch_area
+        if tissue_ratio > threshold:
+            features = {self._feature: tissue_ratio}
 
-
-class ParallelClassifier(Classifier):
-    def __init__(self, classifier: Classifier):
-        self._classifier = classifier
-
-    @classmethod
-    def create(cls, classifier_cls_name: str, *args):
-        return cls(get_class(classifier_cls_name, 'classifiers').create(*args))
-
-    def classify_patch(self, patch: Patch) -> Dict:
-        return self._classifier.classify_patch(patch)
-
-    def _classify_patch(self, patch) -> Tuple[Patch, Dict]:
-        return (patch, self.classify_patch(patch))
-
-    def classify(self, patch_collection: PatchCollection) -> PatchCollection:
-        with Pool(os.cpu_count()) as pool:
-            patch_features = pool.map(self._classify_patch,
-                                      iter(patch_collection))
-
-        for patch, features in patch_features:
-            patch_collection.update_patch(patch=patch, features=features)
-
-        return patch_collection
+            if include_mask_feature:
+                # FIXME, duplicate code
+                feature_mask = f'{self._feature}_mask'
+                features[feature_mask] = np.array(patch_mask, dtype=np.uint8)
+            slide.patches.update_patch(patch=patch, features=features)
 
 
 class TissueMaskPredictor(abc.ABC):
