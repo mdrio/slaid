@@ -2,7 +2,7 @@ import abc
 import json
 from typing import Any, Callable, Dict, List, Union
 
-import cloudpickle as pickle
+import pickle
 import numpy as np
 from tifffile import imwrite
 
@@ -12,14 +12,19 @@ from slaid.commons import Patch, Slide
 
 class Renderer(abc.ABC):
     @abc.abstractmethod
-    def render(self,
-               filename: str,
-               slide: Slide,
-               one_file_per_patch: bool = False):
+    def render(
+        self,
+        filename: str,
+        slide: Slide,
+    ):
         pass
 
     @abc.abstractmethod
-    def render_patch(self, filename: str, patch: Patch):
+    def render_patch(
+        self,
+        patch: Patch,
+        filename: str,
+    ):
         pass
 
 
@@ -59,7 +64,11 @@ class BasicFeatureTIFFRenderer(Renderer):
                 tile=slide.patches.patch_size,
                 extrasamples=('ASSOCALPHA', ))
 
-    def render_patch(self, filename: str, patch: Patch):
+    def render_patch(
+        self,
+        filename: str,
+        patch: Patch,
+    ):
         data = list(self._rgb_convert([patch]))[0]
         imwrite(filename,
                 data,
@@ -142,8 +151,9 @@ class SlideJSONEncoder(BaseJSONEncoder):
         self,
         slide: Slide,
     ) -> Union[List, Dict]:
-        dct = dict(slide=slide.ID,
+        dct = dict(filename=slide.ID,
                    patch_size=slide.patches.patch_size,
+                   extraction_level=slide.patches.extraction_level,
                    features=[])
 
         for p in slide.patches:
@@ -183,21 +193,45 @@ class VectorialRenderer(Renderer):
             json.dump(slide.patches, json_file, cls=JSONEncoder)
 
 
-class PickleRenderer(Renderer):
-    # FIXME use private attribute of Slide
-    def render(
-        self,
-        filename: str,
-        slide: Slide,
-    ):
-        with open(filename, 'wb') as f:
-            pickle.dump(
-                {
-                    'filename': slide._filename,
-                    'patch_size': slide.patches.patch_size,
-                    'extraction_level': slide.patches.extraction_level,
-                    'features': slide.patches.dataframe
-                }, f)
+class PickleConverter(abc.ABC):
+    @abc.abstractproperty
+    def target(self):
+        pass
 
-    def render_patch(self, filename: str, patch: Patch):
-        raise NotImplementedError()
+    @abc.abstractstaticmethod
+    def convert(obj: Any):
+        pass
+
+
+class Slide2Dict:
+    target = Slide
+
+    @staticmethod
+    def convert(slide: Slide):
+        return {
+            'filename': slide._filename,
+            'patch_size': slide.patches.patch_size,
+            'extraction_level': slide.patches.extraction_level,
+            'features': slide.patches.dataframe
+        }
+
+
+def to_pickle(obj: Any, filename: str = None) -> Union[str, None]:
+    converters = [Slide2Dict]
+    for converter in converters:
+        if isinstance(obj, converter.target):
+            obj = converter.convert(obj)
+
+    if filename is not None:
+        with open(filename, 'wb') as f:
+            pickle.dump(obj, f)
+    else:
+        return pickle.dumps(obj)
+
+
+def to_json(obj: Any, filename: str = None) -> Union[str, None]:
+    if filename is not None:
+        with open(filename, 'w') as f:
+            json.dump(obj, f, cls=JSONEncoder)
+    else:
+        return json.dumps(obj, cls=JSONEncoder)

@@ -9,7 +9,7 @@ from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
                                get_tissue_mask)
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import Slide
-from slaid.renderers import PickleRenderer
+from slaid.renderers import to_json, to_pickle
 
 
 def main(slide_filename,
@@ -40,19 +40,21 @@ def main(slide_filename,
                                minimum_tissue_ratio=minimum_tissue_ratio,
                                include_mask_feature=include_mask)
 
+    writers = {'json': to_json, 'pickle': to_pickle, 'pkl': to_pickle}
+    ext_with_dot = os.path.splitext(output_filename)[-1]
+    ext = ext_with_dot[1:]
+
     if only_mask:
-        with open(output_filename, 'wb') as f:
-            pickle.dump(
-                {
-                    'filename': slide_filename,
-                    'dimensions': slide.dimensions,
-                    'extraction_level': extraction_level,
-                    'mask': get_tissue_mask(slide)
-                }, f)
+        data_to_dump = {
+            'filename': slide_filename,
+            'dimensions': slide.dimensions,
+            'extraction_level': extraction_level,
+            'mask': get_tissue_mask(slide)
+        }
 
     else:
-        pickle_renderer = PickleRenderer()
-        pickle_renderer.render(output_filename, slide)
+        data_to_dump = slide
+    writers[ext](data_to_dump, output_filename)
 
 
 if __name__ == '__main__':
