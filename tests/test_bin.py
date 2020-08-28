@@ -97,11 +97,11 @@ class ExtractTissueTest:
 
 
 class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = '../slaid/models/extract_tissue_LSVM-1.0.pickle'
+    model = 'slaid/models/extract_tissue_LSVM-1.0.pickle'
 
 
 class EddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = '../slaid/models/extract_tissue_eddl-1.0.0.bin'
+    model = 'slaid/models/extract_tissue_eddl-1.0.0.bin'
 
 
 if __name__ == '__main__':

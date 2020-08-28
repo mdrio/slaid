@@ -16,7 +16,7 @@ class TestTissueClassifierTest:
     model_cls = None
 
     def test_detector_no_tissue(self):
-        slide = Slide('data/test.tif', extraction_level=0)
+        slide = Slide('tests/data/test.tif', extraction_level=0)
         model = DummyModel(np.zeros)
         tissue_detector = self.classifier_cls(model, 'tissue')
 
@@ -26,7 +26,7 @@ class TestTissueClassifierTest:
         self.assertEqual(slide.masks['tissue'].all(), 0)
 
     def test_detector_all_tissue(self):
-        slide = Slide('data/test.tif', extraction_level=0)
+        slide = Slide('tests/data/test.tif', extraction_level=0)
         model = DummyModel(np.ones)
         tissue_detector = self.classifier_cls(model, 'tissue')
         tissue_detector.classify(slide)
@@ -34,7 +34,7 @@ class TestTissueClassifierTest:
             self.assertEqual(patch.features['tissue'], 1)
 
     def test_mask(self):
-        slide = Slide('data/test.tif', extraction_level=0)
+        slide = Slide('tests/data/test.tif', extraction_level=0)
         tissue_detector = self.classifier_cls(self.model_cls(), 'tissue')
 
         tissue_detector.classify(slide, include_mask=True)

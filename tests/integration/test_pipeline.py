@@ -22,26 +22,24 @@ def generate_row_first_row_cancer(filename, slide_size, patch_size):
 
 
 def main():
-    with open(os.path.join(DIR, '../data/random-model.pkl'), 'rb') as f:
+    with open(os.path.join(DIR, 'tests/data/random-model.pkl'), 'rb') as f:
         model = pickle.load(f)
     patch_size = (256, 256)
-    slide_filename = os.path.join(DIR, '../data/PH10023-1.thumb.tif')
+    slide_filename = os.path.join(DIR, 'tests/data/PH10023-1.thumb.tif')
     slide = Slide(slide_filename, patch_size=patch_size, extraction_level=0)
 
     json_filename = os.path.join(DIR, 'test.json')
     tiff_filename = os.path.join(DIR, 'test.tiff')
 
-    tissue_classifier = cl.InterpolatedTissueClassifier(
-        cl.BasicTissueMaskPredictor(GreenIsTissueModel()))
+    tissue_classifier = cl.BasicClassifier(GreenIsTissueModel(), 'tissue')
 
     cancer_classifier = cl.BasicClassifier(model, 'cancer')
 
     print('tissue classification')
 
-    tissue_classifier.classify(slide, include_mask_feature=True)
+    tissue_classifier.classify(slide, include_mask=True)
     print('cancer classification')
-    cancer_classifier.classify(
-        slide, slide.patches[cl.TissueFeature.TISSUE_PERCENTAGE] > 0.5)
+    cancer_classifier.classify(slide, slide.patches['tissue'] > 0.5)
 
     to_json(slide, json_filename)
 
