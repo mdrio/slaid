@@ -28,10 +28,24 @@ class ExtractTissueTest:
         self.assertTrue('extraction_level' in data)
         self.assertTrue('patch_size' in data)
         self.assertTrue('features' in data)
-        self.assertTrue('tissue_mask' in set(data['features'].columns))
         self.assertTrue('tissue' in set(data['features'].columns))
         self.assertEqual(data['filename'], input_)
         self.assertEqual(data['patch_size'], (256, 256))
+        self.assertEqual(data['extraction_level'], 2)
+
+    def test_extract_tissue_only_mask_pkl(self):
+        subprocess.check_call([
+            'extract_tissue.py', '--only-mask', '-m', self.model, input_,
+            output_pkl
+        ])
+        with open(output_pkl, 'rb') as f:
+            data = pickle.load(f)
+
+        self.assertTrue('filename' in data)
+        self.assertTrue('mask' in data)
+        self.assertTrue('dimensions' in data)
+
+        self.assertTrue('extraction_level' in data)
         self.assertEqual(data['extraction_level'], 2)
 
     def test_extract_tissue_default_json(self):
