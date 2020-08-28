@@ -4,7 +4,7 @@ from typing import Dict, Tuple
 
 import numpy as np
 
-from slaid.commons import Patch, Slide
+from slaid.commons import Image, Patch, Slide
 
 
 class Classifier(abc.ABC):
@@ -41,23 +41,47 @@ class BasicClassifier:
         patch_threshold: float = 0.8,
         include_mask: bool = False,
     ):
+        slide.patches.add_feature(self._feature, 0)
+        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
 
-        image_array = self._get_image_array(slide)
+        if patch_filter:
+            patches = slide.patches.filter(patch_filter)
+            for patch in patches:
+                self._classify_patch(patch, slide, patch_area, mask_threshold,
+                                     patch_threshold)
+        else:
+            self._classify_whole_slide(slide, patch_area, mask_threshold,
+                                       patch_threshold, include_mask)
+
+    def _classify_patch(self, patch, slide, patch_area, mask_threshold,
+                        patch_threshold):
+        image = slide.read_region((patch.x, patch.y), patch.size)
+        image_array = self._get_image_array(image)
+        prediction = self._model.predict(image_array)
+        patch_mask = self._get_mask(prediction, patch.size, mask_threshold)
+        self._update_patch(slide, patch, patch_mask, patch_area,
+                           patch_threshold)
+
+    def _classify_whole_slide(self, slide, patch_area, mask_threshold,
+                              patch_threshold, include_mask):
+        image = slide.read_region((0, 0), slide.dimensions_at_extraction_level)
+        image_array = self._get_image_array(image)
         prediction = self._model.predict(image_array)
 
-        mask = self._get_mask(prediction, slide.dimensions_at_extraction_level,
+        mask = self._get_mask(prediction,
+                              slide.dimensions_at_extraction_level[::-1],
                               mask_threshold)
 
-        slide.patches.add_feature(self._feature, 0.0)
+        for patch in slide.patches:
+            patch_mask = mask[patch.y:patch.y + patch.size[1],
+                              patch.x:patch.x + patch.size[0]]
+            self._update_patch(slide, patch, patch_mask, patch_area,
+                               patch_threshold)
+
         if include_mask:
             slide.masks[self._feature] = mask
 
-        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
-        for patch in slide.patches:
-            self._update_patch(slide, patch, mask, patch_area, patch_threshold)
-
-    def _get_image_array(self, slide: Slide) -> np.ndarray:
-        image = slide.read_region((0, 0), slide.dimensions_at_extraction_level)
+    def _get_image_array(self, image: Image) -> np.ndarray:
         image_array = image.to_array(True)
         n_px = image_array.shape[0] * image_array.shape[1]
         image_array = image_array[:, :, :3].reshape(n_px, 3)
@@ -68,19 +92,17 @@ class BasicClassifier:
         mask = prediction.reshape(shape)
         mask[mask < threshold] = 0
         mask[mask > threshold] = 1
-        mask = mask.transpose()
+        mask = np.array(mask, dtype=np.uint8)
         return mask
 
     def _update_patch(
         self,
         slide,
         patch: Patch,
-        mask: np.ndarray,
+        patch_mask: np.ndarray,
         patch_area: float,
         threshold: float,
     ):
-        patch_mask = mask[patch.x:patch.x + patch.size[0],
-                          patch.y:patch.y + patch.size[1]]
         tissue_area = np.sum(patch_mask)
         tissue_ratio = tissue_area / patch_area
         if tissue_ratio > threshold:

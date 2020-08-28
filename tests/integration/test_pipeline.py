@@ -2,10 +2,10 @@ import os
 import pickle
 
 import numpy as np
-from PIL import Image
-from test_classifiers import GreenIsTissueModel
+from commons import AllOneModel
 
 import slaid.classifiers as cl
+from slaid.classifiers.eddl import Model
 from slaid.commons.ecvl import Slide
 from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
                              to_json)
@@ -13,45 +13,38 @@ from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-def generate_row_first_row_cancer(filename, slide_size, patch_size):
-    w, h = slide_size[::-1]
-    data = np.zeros((h, w, 3), dtype=np.uint8)
-    data[0:patch_size[1], 0:w] = [2, 255, 0]
-    img = Image.fromarray(data, 'RGB')
-    img.save(filename)
-
-
 def main():
-    with open(os.path.join(DIR, 'tests/data/random-model.pkl'), 'rb') as f:
-        model = pickle.load(f)
+
+    #  with open('slaid/models/extract_tissue_LSVM-1.0.pickle', 'rb') as f:
+    #      tissue_model = pickle.load(f)
+
+    tissue_model = Model('slaid/models/extract_tissue_eddl-1.0.0.bin', False)
     patch_size = (256, 256)
-    slide_filename = os.path.join(DIR, 'tests/data/PH10023-1.thumb.tif')
+    slide_filename = 'tests/data/PH10023-1.thumb.tif'
     slide = Slide(slide_filename, patch_size=patch_size, extraction_level=0)
 
-    json_filename = os.path.join(DIR, 'test.json')
-    tiff_filename = os.path.join(DIR, 'test.tiff')
+    json_filename = '/tmp/test.json'
+    mask_filename = 'PH10023-1-mask'
+    tiff_filename = '/tmp/test.tiff'
 
-    tissue_classifier = cl.BasicClassifier(GreenIsTissueModel(), 'tissue')
-
-    cancer_classifier = cl.BasicClassifier(model, 'cancer')
+    tissue_classifier = cl.BasicClassifier(tissue_model, 'tissue')
+    cancer_classifier = cl.BasicClassifier(AllOneModel(), 'cancer')
 
     print('tissue classification')
-
     tissue_classifier.classify(slide, include_mask=True)
+
     print('cancer classification')
     cancer_classifier.classify(slide, slide.patches['tissue'] > 0.5)
 
+    print('to_json')
     to_json(slide, json_filename)
 
     renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
     print('rendering...')
-    renderer.render(tiff_filename, slide)
+    renderer.render(tiff_filename, slide, 'tissue')
 
-    output_image = Image.open(tiff_filename)
-    output_data = np.array(output_image)
-    assert (output_data[0:patch_size[1], :, 0] == 255).all()
-    assert (output_data[patch_size[1]:, :, 0] == 0).all()
+    np.save(mask_filename, slide.masks['tissue'])
 
 
 if __name__ == '__main__':

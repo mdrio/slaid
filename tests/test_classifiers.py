@@ -39,6 +39,7 @@ class TestTissueClassifierTest:
 
         tissue_detector.classify(slide, include_mask=True)
         for patch in slide.patches:
+            print(patch.x, patch.y, patch.features)
             if (patch.y == 0):
                 self.assertEqual(patch.features['tissue'], 1)
 

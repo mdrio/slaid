@@ -55,7 +55,7 @@ class BasicFeatureTIFFRenderer(Renderer):
                one_file_per_patch: bool = False):
         if one_file_per_patch:
             raise NotImplementedError()
-        shape = slide.dimensions
+        shape = slide.dimensions_at_extraction_level
         imwrite(filename,
                 self._rgb_convert(slide.patches, feature),
                 dtype='uint8',

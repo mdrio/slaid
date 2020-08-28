@@ -35,6 +35,7 @@ class Image(BaseImage):
         array = np.array(self._image)
         if PIL_FORMAT:
             array = array.transpose(2, 1, 0)
+            array = array[:, :, ::-1]
             #  array = np.flip(array, 1)
             #  array[:, :] = np.flip(array[:, :])
         return array
