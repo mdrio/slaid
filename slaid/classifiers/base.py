@@ -20,6 +20,7 @@ class Classifier(abc.ABC):
     def classify(
         self,
         slide: Slide,
+        patch_filter=None,
         mask_threshold: float = 0.8,
         patch_threshold: float = 0.8,
         include_mask: bool = False,
@@ -35,6 +36,7 @@ class BasicClassifier:
     def classify(
         self,
         slide: Slide,
+        patch_filter=None,
         mask_threshold: float = 0.8,
         patch_threshold: float = 0.8,
         include_mask: bool = False,
@@ -52,8 +54,7 @@ class BasicClassifier:
 
         patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
         for patch in slide.patches:
-            self._update_patch(slide, patch, mask, patch_area, patch_threshold,
-                               include_mask)
+            self._update_patch(slide, patch, mask, patch_area, patch_threshold)
 
     def _get_image_array(self, slide: Slide) -> np.ndarray:
         image = slide.read_region((0, 0), slide.dimensions_at_extraction_level)
@@ -64,26 +65,26 @@ class BasicClassifier:
 
     def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
                   threshold: float) -> np.ndarray:
-        mask = prediction.reshape(*shape)
+        mask = prediction.reshape(shape)
         mask[mask < threshold] = 0
         mask[mask > threshold] = 1
         mask = mask.transpose()
         return mask
 
-    def _update_patch(self, slide, patch: Patch, mask: np.ndarray,
-                      patch_area: float, threshold: float,
-                      include_mask_feature):
+    def _update_patch(
+        self,
+        slide,
+        patch: Patch,
+        mask: np.ndarray,
+        patch_area: float,
+        threshold: float,
+    ):
         patch_mask = mask[patch.x:patch.x + patch.size[0],
                           patch.y:patch.y + patch.size[1]]
         tissue_area = np.sum(patch_mask)
         tissue_ratio = tissue_area / patch_area
         if tissue_ratio > threshold:
             features = {self._feature: tissue_ratio}
-
-            if include_mask_feature:
-                # FIXME, duplicate code
-                feature_mask = f'{self._feature}_mask'
-                features[feature_mask] = np.array(patch_mask, dtype=np.uint8)
             slide.patches.update_patch(patch=patch, features=features)
 
 
