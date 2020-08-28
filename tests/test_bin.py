@@ -6,7 +6,6 @@ import pickle
 import subprocess
 import unittest
 
-from slaid.classifiers import TissueFeature
 from slaid.commons.ecvl import Slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -29,7 +28,8 @@ class ExtractTissueTest:
         self.assertTrue('extraction_level' in data)
         self.assertTrue('patch_size' in data)
         self.assertTrue('features' in data)
-        self.assertTrue(TissueFeature.TISSUE_MASK in data['features'])
+        self.assertTrue('tissue_mask' in set(data['features'].columns))
+        self.assertTrue('tissue' in set(data['features'].columns))
         self.assertEqual(data['filename'], input_)
         self.assertEqual(data['patch_size'], (256, 256))
         self.assertEqual(data['extraction_level'], 2)
@@ -54,7 +54,7 @@ class ExtractTissueTest:
             self.assertTrue('extraction_level' in data)
             self.assertTrue('patch_size' in data)
             self.assertTrue('features' in data)
-            self.assertTrue(TissueFeature.TISSUE_MASK not in data['features'])
+            self.assertTrue('tissue' in set(data['features'].columns))
 
             self.assertEqual(data['filename'], input_)
             self.assertEqual(data['patch_size'], (256, 256))

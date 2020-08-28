@@ -48,12 +48,12 @@ class BasicClassifier:
         image_array = self._get_image_array(slide)
         prediction = self._model.predict(image_array)
 
-        mask = self._get_mask(prediction, image_array.shape, mask_threshold)
+        mask = self._get_mask(prediction, slide.dimensions_at_extraction_level,
+                              mask_threshold)
 
-        feature_mask = f'{self._feature}_mask'
         slide.patches.add_feature(self._feature, 0.0)
         if include_mask_feature:
-            slide.patches.add_feature(feature_mask)
+            slide.masks[self._feature] = mask
 
         patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
         for patch in slide.patches:
@@ -75,8 +75,8 @@ class BasicClassifier:
         mask = mask.transpose()
         return mask
 
-    def _update_patch(self, slide, patch: Patch, patch_area: float,
-                      mask: np.ndarray, threshold: float,
+    def _update_patch(self, slide, patch: Patch, mask: np.ndarray,
+                      patch_area: float, threshold: float,
                       include_mask_feature):
         patch_mask = mask[patch.x:patch.x + patch.size[0],
                           patch.y:patch.y + patch.size[1]]
@@ -141,18 +141,6 @@ class TissueFeature:
 
 class TissueMaskNotAvailable(Exception):
     pass
-
-
-def get_tissue_mask(slide: Slide):
-    if TissueFeature.TISSUE_MASK not in slide.patches.features:
-        raise TissueMaskNotAvailable()
-    mask = np.zeros(slide.dimensions_at_extraction_level, dtype=np.uint8)
-
-    tissue = slide.patches.filter(slide.patches['tissue_mask'].notnull())
-    for p in tissue:
-        mask[p.x:p.x + p.features['tissue_mask'].shape[0], p.y:p.y +
-             p.features['tissue_mask'].shape[1]] = p.features['tissue_mask']
-    return mask.transpose()
 
 
 class TissueClassifier(Classifier, abc.ABC):

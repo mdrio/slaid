@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import pickle
 
 import pkg_resources
 
-from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
-                               get_tissue_mask)
+from slaid.classifiers import BasicClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import Slide
 from slaid.renderers import to_json, to_pickle
@@ -33,11 +31,11 @@ def main(slide_filename,
         from slaid.classifiers.eddl import Model
         model = Model(model_filename, gpu)
 
-    tissue_classifier = BasicTissueClassifier(BasicTissueMaskPredictor(model))
+    tissue_classifier = BasicClassifier(model, 'tissue')
 
     tissue_classifier.classify(slide,
-                               pixel_threshold=pixel_threshold,
-                               minimum_tissue_ratio=minimum_tissue_ratio,
+                               mask_threshold=pixel_threshold,
+                               patch_threshold=minimum_tissue_ratio,
                                include_mask_feature=include_mask)
 
     writers = {'json': to_json, 'pickle': to_pickle, 'pkl': to_pickle}
@@ -49,7 +47,7 @@ def main(slide_filename,
             'filename': slide_filename,
             'dimensions': slide.dimensions,
             'extraction_level': extraction_level,
-            'mask': get_tissue_mask(slide)
+            'mask': slide.masks['tissue']
         }
 
     else:
