@@ -36,7 +36,7 @@ def main(slide_filename,
     tissue_classifier.classify(slide,
                                mask_threshold=pixel_threshold,
                                patch_threshold=minimum_tissue_ratio,
-                               include_mask_feature=include_mask)
+                               include_mask=include_mask)
 
     writers = {'json': to_json, 'pickle': to_pickle, 'pkl': to_pickle}
     ext_with_dot = os.path.splitext(output_filename)[-1]
