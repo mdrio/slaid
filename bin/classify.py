@@ -1,15 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-
+import pickle
 import pkg_resources
 
 from slaid.classifiers import BasicClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import to_json, to_pickle
+from slaid.renderers import to_json
 
-WRITERS = {'json': to_json, 'pkl': to_pickle}
+
+def pickle_dump(obj, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(obj, f)
+
+
+WRITERS = {'json': to_json, 'pkl': pickle_dump}
 
 
 def main(
@@ -44,11 +50,18 @@ def classify_slide(
     patch_size=PATCH_SIZE,
     gpu=False,
     only_mask=False,
-    writer='json',
+    writer='pkl',
 ):
-    slide = create_slide(slide_filename,
-                         extraction_level=extraction_level,
-                         patch_size=patch_size)
+    slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
+    slide_ext = slide_ext_with_dot[1:]
+
+    if slide_ext == 'pkl' or slide_ext == 'pickle':
+        with open(slide_filename, 'rb') as f:
+            slide = pickle.load(f)
+    else:
+        slide = create_slide(slide_filename,
+                             extraction_level=extraction_level,
+                             patch_size=patch_size)
 
     if os.path.splitext(model_filename)[-1] in ('.pkl', '.pickle'):
         from slaid.classifiers import Model
@@ -133,7 +146,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-w',
                         dest='writer',
-                        default='json',
+                        default='pkl',
                         help="writer for serializing the resulting output",
                         choices=WRITERS.keys())
 

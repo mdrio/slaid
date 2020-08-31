@@ -16,20 +16,20 @@ slide = Slide(input_)
 class ExtractTissueTest:
     model = None
 
+    def _test_pickled(self, slide_pickled, extraction_level):
+        self.assertTrue(isinstance(slide_pickled, Slide))
+        self.assertTrue('tissue' in set(slide_pickled.patches.features))
+        self.assertEqual(slide_pickled.ID, os.path.basename(input_))
+        self.assertEqual(slide_pickled.patches.patch_size, (256, 256))
+        self.assertEqual(slide_pickled.patches.extraction_level,
+                         extraction_level)
+
     def test_extract_tissue_default_pkl(self):
         subprocess.check_call(
             ['classify.py', '-w', 'pkl', '-m', self.model, input_])
         with open(f'{input_}.output.pkl', 'rb') as f:
-            data = pickle.load(f)
-
-        self.assertTrue('filename' in data)
-        self.assertTrue('extraction_level' in data)
-        self.assertTrue('patch_size' in data)
-        self.assertTrue('features' in data)
-        self.assertTrue('tissue' in set(data['features'].columns))
-        self.assertEqual(data['filename'], input_)
-        self.assertEqual(data['patch_size'], (256, 256))
-        self.assertEqual(data['extraction_level'], 2)
+            slide_pickled = pickle.load(f)
+            self._test_pickled(slide_pickled, 2)
 
     def test_extract_tissue_only_mask_pkl(self):
         subprocess.check_call([
@@ -60,16 +60,8 @@ class ExtractTissueTest:
         cmd = f'classify.py -m {self.model} -w pkl -l {extr_level} --no-mask -t 0.7 -T 0.09 {input_}'
         subprocess.check_call(cmd.split())
         with open(f'{input_}.output.pkl', 'rb') as f:
-            data = pickle.load(f)
-            self.assertTrue('filename' in data)
-            self.assertTrue('extraction_level' in data)
-            self.assertTrue('patch_size' in data)
-            self.assertTrue('features' in data)
-            self.assertTrue('tissue' in set(data['features'].columns))
-
-            self.assertEqual(data['filename'], input_)
-            self.assertEqual(data['patch_size'], (256, 256))
-            self.assertEqual(data['extraction_level'], extr_level)
+            slide_pickled = pickle.load(f)
+            self._test_pickled(slide_pickled, 1)
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([

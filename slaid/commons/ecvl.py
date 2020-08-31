@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pyecvl.ecvl as ecvl
@@ -10,6 +10,7 @@ from pyeddl.tensor import Tensor as EddlTensor
 
 from slaid.commons import PATCH_SIZE
 from slaid.commons import Image as BaseImage
+from slaid.commons import PatchCollection
 from slaid.commons import Slide as BaseSlide
 from slaid.commons import Tensor as BaseTensor
 

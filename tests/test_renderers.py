@@ -7,7 +7,8 @@ from PIL import Image
 from test_commons import DummySlide
 
 from slaid.commons import Patch
-from slaid.renderers import BasicFeatureTIFFRenderer, to_json, to_pickle
+from slaid.renderers import (BasicFeatureTIFFRenderer, pickle_dumps,
+                             pickle_loads, to_json)
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
@@ -24,19 +25,32 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
         self.assertTrue((data[:, :, 0] == 255).all())
 
 
-class ToPickleTest(unittest.TestCase):
-    def test_render(self):
+class PickleTest(unittest.TestCase):
+    def test_to_pickle(self):
         # given
         slide = DummySlide('slide', (256, 256))
 
         # when
-        pickled = pickle.loads(to_pickle(slide))
+        pickled = pickle.loads(pickle_dumps(slide))
 
         # then
         self.assertTrue(slide.patches.dataframe.equals(pickled['features']))
         self.assertEqual(slide.patches.patch_size, pickled['patch_size'])
         self.assertEqual(slide.patches.extraction_level,
                          pickled['extraction_level'])
+
+    def test_from_pickle(self):
+        # given
+        slide = DummySlide('slide', (256, 256))
+
+        # when
+        pickled = pickle_loads(pickle_dumps(slide))
+
+        # then
+        self.assertEqual(slide, pickled)
+
+
+#
 
 
 class ToJsonTest(unittest.TestCase):
