@@ -1,5 +1,4 @@
 import abc
-import argparse
 import inspect
 import sys
 from collections import OrderedDict, defaultdict
@@ -36,32 +35,15 @@ class Image(abc.ABC):
 
 
 class Slide(abc.ABC):
-    def __init__(self,
-                 filename: str,
-                 features: Dict = None,
-                 patches: 'PatchCollection' = None,
-                 patch_size: Tuple[int, int] = PATCH_SIZE,
-                 extraction_level=2):
+    def __init__(self, filename: str, extraction_level=2):
         self._filename = filename
-        self.features = features or {}
         self._extraction_level = extraction_level
-        if patches is None and patch_size:
-            self._patches = patches or PandasPatchCollection(
-                self, patch_size, extraction_level)
-            self._patch_size = patch_size
-        else:
-            self._patches = patches
-            self._patch_size = patches.patch_size
-
+        self.patches: PatchCollection = None
         self.masks: Dict[str, np.ndarray] = {}
 
     def __eq__(self, other):
         return self._filename == other._filename and\
             self.features == other.features and self.patches == other.patches
-
-    @property
-    def patches(self):
-        return self._patches
 
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
@@ -195,6 +177,7 @@ class PatchCollection(abc.ABC):
                  patch_size: Tuple[int, int] = PATCH_SIZE,
                  extraction_level=""):
         self._slide = slide
+        slide.patches = self
         self._patch_size = patch_size
         self._extraction_level = extraction_level
 
@@ -398,11 +381,3 @@ class PandasPatchCollection(PatchCollection):
 
     def __eq__(self, other):
         return self._dataframe.equals(other._dataframe)
-
-
-# from https://stackoverflow.com/questions/23032514/argparse-disable-same-argument-occurrences/23032953#23032953
-class UniqueStore(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string):
-        if getattr(namespace, self.dest, self.default) is not self.default:
-            parser.error(option_string + " appears several times.")
-        setattr(namespace, self.dest, values)

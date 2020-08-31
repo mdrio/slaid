@@ -6,7 +6,7 @@ import pkg_resources
 
 from slaid.classifiers import BasicClassifier
 from slaid.commons import PATCH_SIZE
-from slaid.commons.ecvl import Slide
+from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json, to_pickle
 
 WRITERS = {'json': to_json, 'pkl': to_pickle}
@@ -46,9 +46,9 @@ def classify_slide(
     only_mask=False,
     writer='json',
 ):
-    slide = Slide(slide_filename,
-                  patch_size=patch_size,
-                  extraction_level=extraction_level)
+    slide = create_slide(slide_filename,
+                         extraction_level=extraction_level,
+                         patch_size=patch_size)
 
     if os.path.splitext(model_filename)[-1] in ('.pkl', '.pickle'):
         from slaid.classifiers import Model
