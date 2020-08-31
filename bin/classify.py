@@ -1,27 +1,51 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import pickle
 
 import pkg_resources
 
-from slaid.classifiers import (BasicTissueClassifier, BasicTissueMaskPredictor,
-                               get_tissue_mask)
+from slaid.classifiers import BasicClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import Slide
 from slaid.renderers import to_json, to_pickle
 
+WRITERS = {'json': to_json, 'pkl': to_pickle}
 
-def main(slide_filename,
-         model_filename,
-         output_filename,
-         extraction_level,
-         pixel_threshold=0.8,
-         minimum_tissue_ratio=0.1,
-         include_mask=True,
-         patch_size=PATCH_SIZE,
-         gpu=False,
-         only_mask=False):
+
+def main(
+    input_path,
+    model_filename,
+    extraction_level,
+    pixel_threshold=0.8,
+    patch_threshold=0.5,
+    include_mask=True,
+    patch_size=PATCH_SIZE,
+    gpu=False,
+    only_mask=False,
+    writer='json',
+):
+
+    slides = [f for f in os.listdir(input_path)
+              ] if os.path.isdir(input_path) else [input_path]
+
+    for slide in slides:
+        classify_slide(slide, model_filename, extraction_level,
+                       pixel_threshold, patch_threshold, include_mask,
+                       patch_size, gpu, only_mask, writer)
+
+
+def classify_slide(
+    slide_filename,
+    model_filename,
+    extraction_level,
+    pixel_threshold=0.8,
+    patch_threshold=0.5,
+    include_mask=True,
+    patch_size=PATCH_SIZE,
+    gpu=False,
+    only_mask=False,
+    writer='json',
+):
     slide = Slide(slide_filename,
                   patch_size=patch_size,
                   extraction_level=extraction_level)
@@ -33,14 +57,15 @@ def main(slide_filename,
         from slaid.classifiers.eddl import Model
         model = Model(model_filename, gpu)
 
-    tissue_classifier = BasicTissueClassifier(BasicTissueMaskPredictor(model))
+    tissue_classifier = BasicClassifier(model, 'tissue')
 
     tissue_classifier.classify(slide,
-                               pixel_threshold=pixel_threshold,
-                               minimum_tissue_ratio=minimum_tissue_ratio,
-                               include_mask_feature=include_mask)
+                               mask_threshold=pixel_threshold,
+                               patch_threshold=patch_threshold,
+                               include_mask=include_mask)
 
-    writers = {'json': to_json, 'pickle': to_pickle, 'pkl': to_pickle}
+    output_filename = f'{slide_filename}.output.{writer}'
+    print(output_filename)
     ext_with_dot = os.path.splitext(output_filename)[-1]
     ext = ext_with_dot[1:]
 
@@ -49,12 +74,12 @@ def main(slide_filename,
             'filename': slide_filename,
             'dimensions': slide.dimensions,
             'extraction_level': extraction_level,
-            'mask': get_tissue_mask(slide)
+            'mask': slide.masks['tissue']
         }
 
     else:
         data_to_dump = slide
-    writers[ext](data_to_dump, output_filename)
+    WRITERS[ext](data_to_dump, output_filename)
 
 
 if __name__ == '__main__':
@@ -62,7 +87,6 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('slide')
-    parser.add_argument('output')
     # workaround since is not possible to pass env variable
     # to Docker CMD
     model = os.environ.get("SLAID_MODEL")
@@ -107,9 +131,15 @@ if __name__ == '__main__':
                         help="use gpu",
                         action='store_true')
 
+    parser.add_argument('-w',
+                        dest='writer',
+                        default='json',
+                        help="writer for serializing the resulting output",
+                        choices=WRITERS.keys())
+
     args = parser.parse_args()
     if model is None:
         model = args.model
-    main(args.slide, model, args.output, args.extraction_level,
-         args.pixel_threshold, args.minimum_tissue_ratio, not args.no_mask,
-         args.patch_size, args.gpu, args.only_mask)
+    main(args.slide, model, args.extraction_level, args.pixel_threshold,
+         args.minimum_tissue_ratio, not args.no_mask, args.patch_size,
+         args.gpu, args.only_mask, args.writer)

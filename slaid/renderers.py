@@ -6,7 +6,6 @@ import pickle
 import numpy as np
 from tifffile import imwrite
 
-from slaid.classifiers import KarolinskaFeature
 from slaid.commons import Patch, Slide
 
 
@@ -28,9 +27,9 @@ class Renderer(abc.ABC):
         pass
 
 
-def convert_to_heatmap(patches: List[Patch]) -> np.array:
+def convert_to_heatmap(patches: List[Patch], feature: str) -> np.array:
     def _rgb_convert(patch: Patch) -> np.array:
-        cancer_percentage = patch.features[KarolinskaFeature.CANCER_PERCENTAGE]
+        cancer_percentage = patch.features[feature]
         cancer_percentage = 0 if cancer_percentage is None\
              else cancer_percentage
         mask_value = int(round(cancer_percentage * 255))
@@ -52,12 +51,13 @@ class BasicFeatureTIFFRenderer(Renderer):
     def render(self,
                filename: str,
                slide: Slide,
+               feature: str,
                one_file_per_patch: bool = False):
         if one_file_per_patch:
             raise NotImplementedError()
-        shape = slide.dimensions
+        shape = slide.dimensions_at_extraction_level
         imwrite(filename,
-                self._rgb_convert(slide.patches),
+                self._rgb_convert(slide.patches, feature),
                 dtype='uint8',
                 shape=(shape[1], shape[0], 4),
                 photometric='rgb',
@@ -68,8 +68,9 @@ class BasicFeatureTIFFRenderer(Renderer):
         self,
         filename: str,
         patch: Patch,
+        feature: str,
     ):
-        data = list(self._rgb_convert([patch]))[0]
+        data = list(self._rgb_convert([patch], feature))[0]
         imwrite(filename,
                 data,
                 photometric='rgb',

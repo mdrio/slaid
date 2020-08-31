@@ -5,7 +5,7 @@ from commons import DummySlide
 from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
 
-IMAGE = 'data/test.tif'
+IMAGE = 'tests/data/test.tif'
 
 
 class TestSlide:

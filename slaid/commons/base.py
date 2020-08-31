@@ -53,6 +53,8 @@ class Slide(abc.ABC):
             self._patches = patches
             self._patch_size = patches.patch_size
 
+        self.masks: Dict[str, np.ndarray] = {}
+
     def __eq__(self, other):
         return self._filename == other._filename and\
             self.features == other.features and self.patches == other.patches

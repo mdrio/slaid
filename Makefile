@@ -16,7 +16,7 @@ install:
 	pip install -e .
 
 test: install
-	cd tests; ./run_all_tests.sh
+	tests/run_all_tests.sh
 
 docker-per-model:
 	mkdir -p docker-build
