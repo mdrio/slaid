@@ -134,6 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('-w',
                         dest='writer',
                         default='json',
+                        help="writer for serializing the resulting output",
                         choices=WRITERS.keys())
 
     args = parser.parse_args()
