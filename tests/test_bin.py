@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from slaid.commons.ecvl import Slide, create_slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
+OUTPUT_DIR = '/tmp'
 input_ = os.path.join(DIR, 'data/PH10023-1.thumb.tif')
 input_basename_no_ext = 'PH10023-1.thumb'
 slide = Slide(input_)
@@ -30,18 +31,23 @@ class ExtractTissueTest:
     def test_extract_tissue_default_pkl(self):
         subprocess.check_call([
             'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
-            input_
+            input_, OUTPUT_DIR
         ])
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        with open(output, 'rb') as f:
             slide_pickled = pickle.load(f)
             self._test_pickled(slide_pickled, 2)
+        os.remove(output)
 
     def test_extract_tissue_only_mask_pkl(self):
         subprocess.check_call([
             'classify.py', '--only-mask', '-f', self.feature, '-w', 'pkl',
-            '-m', self.model, input_
+            '-m', self.model, input_, OUTPUT_DIR
         ])
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        with open(output, 'rb') as f:
             data = pickle.load(f)
 
         self.assertTrue('filename' in data)
@@ -50,44 +56,59 @@ class ExtractTissueTest:
 
         self.assertTrue('extraction_level' in data)
         self.assertEqual(data['extraction_level'], 2)
+        os.remove(output)
 
     def test_extract_tissue_default_json(self):
         subprocess.check_call([
             'classify.py', '-f', self.feature, '-w', 'json', '-m', self.model,
-            input_
+            input_, OUTPUT_DIR
         ])
-        with open(f'{input_basename_no_ext}.{self.feature}.json', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.json')
+        with open(output, 'rb') as f:
             data = json.load(f)
             self.assertTrue('filename' in data)
             self.assertTrue('extraction_level' in data)
             self.assertTrue('patch_size' in data)
             self.assertTrue('features' in data)
+        os.remove(output)
 
     def test_extract_tissue_custom(self):
         extr_level = 1
-        cmd = f'classify.py -m {self.model} -f {self.feature} -w pkl -l {extr_level} --no-mask -t 0.7 -T 0.09 {input_}'
+        cmd = f'classify.py -m {self.model} -f {self.feature} -w pkl -l {extr_level} --no-mask -t 0.7 -T 0.09 {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        with open(output, 'rb') as f:
             slide_pickled = pickle.load(f)
             self._test_pickled(slide_pickled, 1)
+        os.remove(output)
 
     def test_input_as_pickle(self):
         slide = create_slide(input_, 2)
         with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
             pickle.dump(slide, f)
         extr_level = 1
-        cmd = f'classify.py -m {self.model} -f {self.feature} -l {extr_level} {f.name}'
+        cmd = f'classify.py -m {self.model} -f {self.feature} -l {extr_level} {f.name} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(
+            OUTPUT_DIR,
+            f'{os.path.splitext(os.path.basename(f.name))[0]}.{self.feature}.pkl'
+        )
+
+        with open(output, 'rb') as f:
             pickle.load(f)
         os.remove(f.name)
+        #  os.remove(output)
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([
             'classify.py', '-m', self.model, '-w', 'pkl', '-f', self.feature,
-            '--only-mask', input_
+            '--only-mask', input_, OUTPUT_DIR
         ])
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        with open(output, 'rb') as f:
             data = pickle.load(f)
         self.assertTrue('filename' in data)
         self.assertTrue('extraction_level' in data)
@@ -98,13 +119,16 @@ class ExtractTissueTest:
         self.assertEqual(data['mask'].transpose().shape,
                          slide.dimensions_at_extraction_level)
         self.assertTrue(sum(sum(data['mask'])) > 0)
+        os.remove(output)
 
     def test_get_tissue_mask_custom_value(self):
         extr_level = 1
-        cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7 -T 0.09 {input_}'
+        cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7 -T 0.09 {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         slide = Slide(input_, extraction_level=extr_level)
-        with open(f'{input_basename_no_ext}.{self.feature}.pkl', 'rb') as f:
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        with open(output, 'rb') as f:
             data = pickle.load(f)
         self.assertTrue('filename' in data)
         self.assertTrue('extraction_level' in data)
@@ -116,6 +140,7 @@ class ExtractTissueTest:
         self.assertEqual(data['mask'].transpose().shape,
                          slide.dimensions_at_extraction_level)
         self.assertTrue(sum(sum(data['mask'])) > 0)
+        os.remove(output)
 
 
 class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):

@@ -20,6 +20,7 @@ WRITERS = {'json': to_json, 'pkl': pickle_dump}
 
 def main(
     input_path,
+    output_dir,
     model_filename,
     feature,
     extraction_level,
@@ -36,13 +37,14 @@ def main(
               ] if os.path.isdir(input_path) else [input_path]
 
     for slide in slides:
-        classify_slide(slide, model_filename, feature, extraction_level,
-                       pixel_threshold, patch_threshold, include_mask,
-                       patch_size, gpu, only_mask, writer)
+        classify_slide(slide, output_dir, model_filename, feature,
+                       extraction_level, pixel_threshold, patch_threshold,
+                       include_mask, patch_size, gpu, only_mask, writer)
 
 
 def classify_slide(
     slide_filename,
+    output_dir,
     model_filename,
     feature,
     extraction_level,
@@ -82,7 +84,6 @@ def classify_slide(
     slide_basename = os.path.basename(slide_filename)
     slide_basename_no_ext = os.path.splitext(slide_basename)[0]
     output_filename = f'{slide_basename_no_ext}.{feature}.{writer}'
-    print(output_filename)
     ext_with_dot = os.path.splitext(output_filename)[-1]
     ext = ext_with_dot[1:]
 
@@ -96,7 +97,10 @@ def classify_slide(
 
     else:
         data_to_dump = slide
+
+    output_filename = os.path.join(output_dir, output_filename)
     WRITERS[ext](data_to_dump, output_filename)
+    print(output_filename)
 
 
 if __name__ == '__main__':
@@ -104,6 +108,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('slide')
+    parser.add_argument('output_dir')
     # workaround since is not possible to pass env variable
     # to Docker CMD
     model = os.environ.get("SLAID_MODEL")
@@ -161,6 +166,6 @@ if __name__ == '__main__':
     model = model or args.model
     feature = feature or args.feature
 
-    main(args.slide, model, feature, args.extraction_level,
+    main(args.slide, args.output_dir, model, feature, args.extraction_level,
          args.pixel_threshold, args.minimum_tissue_ratio, not args.no_mask,
          args.patch_size, args.gpu, args.only_mask, args.writer)

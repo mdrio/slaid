@@ -20,10 +20,7 @@ def main(lib_version='', docker_build_dir='../docker-build'):
         for model in models:
             model = os.path.basename(model)
             model_name = os.path.splitext(model)[0]
-            command = f'docker build {docker_build_dir} -f {dockerfile}\
-                -t slaid:{lib_version + "-" if lib_version else ""}\
-                {model_name} --build-arg MODEL={model}\
-                --build-arg FEATURE={feature}'
+            command = f'docker build {docker_build_dir} -f {dockerfile} -t slaid:{lib_version + "-" if lib_version else ""}{model_name} --build-arg MODEL={model} --build-arg FEATURE=${feature}'
 
             print(command)
             print(command.split())
