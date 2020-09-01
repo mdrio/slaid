@@ -2,7 +2,6 @@ import abc
 import json
 from typing import Any, Callable, Dict, List, Union
 
-import pickle
 import numpy as np
 from tifffile import imwrite
 
@@ -192,42 +191,6 @@ class VectorialRenderer(Renderer):
             raise NotImplementedError()
         with open(filename, 'w') as json_file:
             json.dump(slide.patches, json_file, cls=JSONEncoder)
-
-
-class PickleConverter(abc.ABC):
-    @abc.abstractproperty
-    def target(self):
-        pass
-
-    @abc.abstractstaticmethod
-    def convert(obj: Any):
-        pass
-
-
-class Slide2Dict:
-    target = Slide
-
-    @staticmethod
-    def convert(slide: Slide):
-        return {
-            'filename': slide._filename,
-            'patch_size': slide.patches.patch_size,
-            'extraction_level': slide.patches.extraction_level,
-            'features': slide.patches.dataframe
-        }
-
-
-def to_pickle(obj: Any, filename: str = None) -> Union[str, None]:
-    converters = [Slide2Dict]
-    for converter in converters:
-        if isinstance(obj, converter.target):
-            obj = converter.convert(obj)
-
-    if filename is not None:
-        with open(filename, 'wb') as f:
-            pickle.dump(obj, f)
-    else:
-        return pickle.dumps(obj)
 
 
 def to_json(obj: Any, filename: str = None) -> Union[str, None]:

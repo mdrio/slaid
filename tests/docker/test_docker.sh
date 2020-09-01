@@ -12,7 +12,7 @@ for model in $(ls $MODEL_DIR); do
   ls -l $DIR/../data/${IMAGE}.output.pkl
   rm $DIR/../data/${IMAGE}.output.pkl
 
-  docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models slaid classify.py -m /models/$model -l 0 /data/$IMAGE
+  docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models slaid classify.py -m /models/$model -l 0 -w json /data/$IMAGE
   ls -l $DIR/../data/${IMAGE}.output.json
   rm $DIR/../data/${IMAGE}.output.json
   
@@ -20,7 +20,7 @@ for model in $(ls $MODEL_DIR); do
   ls -l $DIR/../data/${IMAGE}.output.pkl
   rm $DIR/../data/${IMAGE}.output.pkl
 
-  docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models slaid classify.py --only-mask -m /models/$model -l 0 /data/$IMAGE 
+  docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models slaid classify.py --only-mask -m /models/$model  -w json -l 0 /data/$IMAGE 
   ls -l $DIR/../data/${IMAGE}.output.json
   rm $DIR/../data/${IMAGE}.output.json
 done

@@ -1,13 +1,12 @@
 import json
 import unittest
 
-import cloudpickle as pickle
 import numpy as np
 from PIL import Image
 from test_commons import DummySlide
 
 from slaid.commons import Patch
-from slaid.renderers import BasicFeatureTIFFRenderer, to_json, to_pickle
+from slaid.renderers import BasicFeatureTIFFRenderer, to_json
 
 
 class BasicFeatureTIFFRendererTest(unittest.TestCase):
@@ -22,21 +21,6 @@ class BasicFeatureTIFFRendererTest(unittest.TestCase):
         data = np.array(image)
         self.assertEqual(data.shape, (10, 10, 4))
         self.assertTrue((data[:, :, 0] == 255).all())
-
-
-class ToPickleTest(unittest.TestCase):
-    def test_render(self):
-        # given
-        slide = DummySlide('slide', (256, 256))
-
-        # when
-        pickled = pickle.loads(to_pickle(slide))
-
-        # then
-        self.assertTrue(slide.patches.dataframe.equals(pickled['features']))
-        self.assertEqual(slide.patches.patch_size, pickled['patch_size'])
-        self.assertEqual(slide.patches.extraction_level,
-                         pickled['extraction_level'])
 
 
 class ToJsonTest(unittest.TestCase):

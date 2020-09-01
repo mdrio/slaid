@@ -45,19 +45,11 @@ class Image(BaseImage):
 
 
 class Slide(BaseSlide):
-    def __init__(self,
-                 filename: str,
-                 features: Dict = None,
-                 patches: PatchCollection = None,
-                 patch_size: Tuple[int, int] = PATCH_SIZE,
-                 extraction_level=2):
+    def __init__(self, filename: str, extraction_level=2):
         if not os.path.exists(filename) or not os.path.isfile(filename):
             raise FileNotFoundError(filename)
         self._level_dimensions = OpenSlideGetLevels(filename)
-        #  if not self._level_dimensions:
-        #      self._level_dimensions = open_slide(filename).level_dimensions
-        super().__init__(filename, features, patches, patch_size,
-                         extraction_level)
+        super().__init__(filename, extraction_level)
 
     @property
     def dimensions(self) -> Tuple[int, int]:
@@ -88,3 +80,12 @@ class Slide(BaseSlide):
     @property
     def level_downsamples(self):
         return open_slide(self._filename).level_downsamples
+
+
+def create_slide(filename: str,
+                 extraction_level: int,
+                 patch_size: Tuple[int, int] = PATCH_SIZE):
+    from slaid.commons import PandasPatchCollection
+    slide = Slide(filename, extraction_level)
+    PandasPatchCollection(slide, patch_size, extraction_level)
+    return slide
