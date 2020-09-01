@@ -115,11 +115,6 @@ class DummySlide(Slide):
                                                self.patch_size[1])
 
 
-class RandomModel:
-    def predict(self, array):
-        return np.random.randint(0, 1, array.shape[0])
-
-
 class AllOneModel:
     def predict(self, array):
         return np.ones(array.shape[0], dtype=np.uint8)

@@ -119,6 +119,11 @@ class Model:
         return self._model.predict(array)
 
 
+class RandomModel:
+    def predict(self, array):
+        return np.random.randint(0, 1, array.shape[0])
+
+
 #  class InterpolatedTissueClassifier(TissueClassifier):
 #      def _get_mask_tissue_from_slide(self, slide, threshold):
 #
