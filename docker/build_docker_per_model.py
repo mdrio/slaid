@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
 import glob
+import os
 import subprocess
+
 import pkg_resources
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -14,12 +15,13 @@ def main(lib_version='', docker_build_dir='../docker-build'):
     dockerfiles = glob.glob(f'{os.path.join(DIR,"Dockerfile.*")}')
     for dockerfile in dockerfiles:
         model_type = os.path.splitext(dockerfile)[1][1:]
+        feature = model_type.split('_')[1]
         models = glob.glob(f'../slaid/models/{model_type}*')
         for model in models:
             model = os.path.basename(model)
             model_name = os.path.splitext(model)[0]
-            #  model = pkg_resources.resource_filename('slaid', f'models/{model}')
-            command = f'docker build {docker_build_dir} -f {dockerfile} -t slaid:{lib_version + "-" if lib_version else ""}{model_name} --build-arg MODEL={model}'
+            command = f'docker build {docker_build_dir} -f {dockerfile} -t slaid:{lib_version + "-" if lib_version else ""}{model_name} --build-arg MODEL={model} --build-arg FEATURE=${feature}'
+
             print(command)
             print(command.split())
             subprocess.run(command.split(' '), check=True)
