@@ -18,20 +18,19 @@ def pickle_dump(obj, filename):
 WRITERS = {'json': to_json, 'pkl': pickle_dump}
 
 
-def main(
-    input_path,
-    output_dir,
-    model_filename,
-    feature,
-    extraction_level,
-    pixel_threshold=0.8,
-    patch_threshold=0.5,
-    include_mask=True,
-    patch_size=PATCH_SIZE,
-    gpu=False,
-    only_mask=False,
-    writer='json',
-):
+def main(input_path,
+         output_dir,
+         model_filename,
+         feature,
+         extraction_level,
+         pixel_threshold=0.8,
+         patch_threshold=0.5,
+         include_mask=True,
+         patch_size=PATCH_SIZE,
+         gpu=False,
+         only_mask=False,
+         writer='json',
+         filter_=None):
 
     slides = [f for f in os.listdir(input_path)
               ] if os.path.isdir(input_path) else [input_path]
@@ -39,7 +38,8 @@ def main(
     for slide in slides:
         classify_slide(slide, output_dir, model_filename, feature,
                        extraction_level, pixel_threshold, patch_threshold,
-                       include_mask, patch_size, gpu, only_mask, writer)
+                       include_mask, patch_size, gpu, only_mask, writer,
+                       filter_)
 
 
 def classify_slide(
@@ -55,6 +55,7 @@ def classify_slide(
     gpu=False,
     only_mask=False,
     writer='pkl',
+    filter_=None,
 ):
     slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
     slide_ext = slide_ext_with_dot[1:]
@@ -77,6 +78,7 @@ def classify_slide(
     tissue_classifier = BasicClassifier(model, feature)
 
     tissue_classifier.classify(slide,
+                               patch_filter=filter_,
                                mask_threshold=pixel_threshold,
                                patch_threshold=patch_threshold,
                                include_mask=include_mask)
@@ -162,10 +164,16 @@ if __name__ == '__main__':
                         help="writer for serializing the resulting output",
                         choices=WRITERS.keys())
 
+    parser.add_argument(
+        '-F',
+        dest='filter',
+        default=None,
+        help="filter by patch feature",
+    )
     args = parser.parse_args()
     model = model or args.model
     feature = feature or args.feature
 
     main(args.slide, args.output_dir, model, feature, args.extraction_level,
          args.pixel_threshold, args.minimum_tissue_ratio, not args.no_mask,
-         args.patch_size, args.gpu, args.only_mask, args.writer)
+         args.patch_size, args.gpu, args.only_mask, args.writer, args.filter)
