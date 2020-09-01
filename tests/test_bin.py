@@ -27,6 +27,13 @@ class ExtractTissueTest:
         self.assertEqual(slide_pickled.patches.patch_size, (256, 256))
         self.assertEqual(slide_pickled.patches.extraction_level,
                          extraction_level)
+        self.assertTrue(slide_pickled.patches.dataframe.size > 0)
+        #  self.assertEqual(
+        #      slide_pickled.patches.dataframe.size,
+        #      slide_pickled.dimensions_at_extraction_level[0] *
+        #      slide_pickled.dimensions_at_extraction_level[1] //
+        #      (slide_pickled.patches.patch_size[0] *
+        #       slide_pickled.patches.patch_size[1]))
 
     def test_extract_tissue_default_pkl(self):
         subprocess.check_call([
@@ -100,6 +107,27 @@ class ExtractTissueTest:
             pickle.load(f)
         os.remove(f.name)
         #  os.remove(output)
+
+    def test_input_as_pickle_with_filter(self):
+        slide = create_slide(input_, 2)
+        slide.patches.add_feature('feature')
+        slide.patches.update_patch((0, 0), features={'feature': 1})
+        with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
+            pickle.dump(slide, f)
+        extr_level = 1
+        cmd = f'classify.py -m {self.model} -f {self.feature} -l {extr_level} -F feature>=1 {f.name} {OUTPUT_DIR}'
+        subprocess.check_call(cmd.split())
+        output = os.path.join(
+            OUTPUT_DIR,
+            f'{os.path.splitext(os.path.basename(f.name))[0]}.{self.feature}.pkl'
+        )
+
+        with open(output, 'rb') as f_out:
+            slide_pickled = pickle.load(f_out)
+
+        self.assertTrue(slide_pickled.patches.dataframe.shape == (1, 2))
+        os.remove(f.name)
+        os.remove(output)
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([
