@@ -1,12 +1,11 @@
 import os
-import pickle
 
 import numpy as np
 from commons import AllOneModel
 
 import slaid.classifiers as cl
 from slaid.classifiers.eddl import Model
-from slaid.commons.ecvl import Slide
+from slaid.commons.ecvl import create_slide
 from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
                              to_json)
 
@@ -21,7 +20,7 @@ def main():
     tissue_model = Model('slaid/models/extract_tissue_eddl-1.0.0.bin', False)
     patch_size = (256, 256)
     slide_filename = 'tests/data/PH10023-1.thumb.tif'
-    slide = Slide(slide_filename, patch_size=patch_size, extraction_level=0)
+    slide = create_slide(slide_filename, 0, patch_size)
 
     json_filename = '/tmp/test.json'
     mask_filename = 'PH10023-1-mask'
@@ -42,7 +41,7 @@ def main():
     renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
     print('rendering...')
-    renderer.render(tiff_filename, slide, 'tissue')
+    #  renderer.render(tiff_filename, slide, 'tissue')
 
     np.save(mask_filename, slide.masks['tissue'])
 

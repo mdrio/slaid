@@ -5,8 +5,9 @@ import os
 import pickle
 import subprocess
 import unittest
+from tempfile import NamedTemporaryFile
 
-from slaid.commons.ecvl import Slide
+from slaid.commons.ecvl import Slide, create_slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 input_ = os.path.join(DIR, 'data/PH10023-1.thumb.tif')
@@ -62,6 +63,16 @@ class ExtractTissueTest:
         with open(f'{input_}.output.pkl', 'rb') as f:
             slide_pickled = pickle.load(f)
             self._test_pickled(slide_pickled, 1)
+
+    def test_input_as_pickle(self):
+        slide = create_slide(input_, 2)
+        with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
+            pickle.dump(slide, f)
+        extr_level = 1
+        cmd = f'classify.py -m {self.model} -l {extr_level} {f.name}'
+        subprocess.check_call(cmd.split())
+        with open(f'{input_}.output.pkl', 'rb') as f:
+            pickle.load(f)
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([
