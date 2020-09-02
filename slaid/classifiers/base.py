@@ -121,7 +121,7 @@ class Model:
 
 class RandomModel:
     def predict(self, array):
-        return np.random.randint(0, 1, array.shape[0])
+        return np.random.uniform(0, 1, array.shape[0])
 
 
 #  class InterpolatedTissueClassifier(TissueClassifier):
