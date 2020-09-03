@@ -32,7 +32,7 @@ def main(input_path,
          writer='json',
          filter_=None):
 
-    slides = [f for f in os.listdir(input_path)
+    slides = [os.path.join(input_path, f) for f in os.listdir(input_path)
               ] if os.path.isdir(input_path) else [input_path]
 
     for slide in slides:
@@ -100,6 +100,8 @@ def classify_slide(
     else:
         data_to_dump = slide
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     output_filename = os.path.join(output_dir, output_filename)
     WRITERS[ext](data_to_dump, output_filename)
     print(output_filename)
