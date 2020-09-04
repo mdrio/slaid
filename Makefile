@@ -25,5 +25,4 @@ clean:
 	rm -r docker-build
 
 docker-push: docker
-	cd docker/; ./docker-push.sh slaid
-	cd docker/; ./docker-push.sh slaid:$(TAG)
+	cd docker/; ./docker-push.sh 
