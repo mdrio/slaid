@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
+set -x
 IMG=$1
-while read repo; do docker tag $IMG $repo/$IMG; docker push  $repo/$IMG; done < repo.txt
+while read repo; do  ./docker_cmd.py push -r $repo; done < repo.txt
 
 

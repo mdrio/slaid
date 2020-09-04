@@ -20,7 +20,7 @@ test: install
 
 docker-per-model:
 	mkdir -p docker-build
-	cd docker; ./build_docker_per_model.py  -v $(TAG)
+	cd docker; ./docker_cmd.py -v $(TAG) build
 clean:
 	rm -r docker-build
 
