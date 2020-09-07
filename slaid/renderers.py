@@ -154,6 +154,8 @@ class SlideJSONEncoder(BaseJSONEncoder):
         dct = dict(filename=slide.ID,
                    patch_size=slide.patches.patch_size,
                    extraction_level=slide.patches.extraction_level,
+                   downsample_factor=slide.level_downsamples[
+                       slide.patches.extraction_level],
                    features=[])
 
         for p in slide.patches:
