@@ -18,12 +18,15 @@ def build(image='slaid',
         os.mkdir(docker_build_dir)
 
     kwargs_list = [
-        dict(
-            dockerfile='Dockerfile',
-            build_dir=docker_build_dir,
-            image=image,
-            #  tag=f'{lib_version}',
-            docker_args=docker_args)
+        dict(dockerfile='Dockerfile',
+             build_dir=docker_build_dir,
+             image=image,
+             docker_args=docker_args),
+        dict(dockerfile='Dockerfile',
+             build_dir=docker_build_dir,
+             image=image,
+             tag=f'{lib_version}',
+             docker_args=docker_args)
     ]
 
     for model_path, model_name, feature, dockerfile in get_models():
