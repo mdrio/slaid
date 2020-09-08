@@ -193,6 +193,18 @@ class ExtractTissueTest:
             slide_pickled = pickle.load(f)
             self._test_pickled(slide_pickled, 2)
 
+    def test_extract_tissue_no_overwrite(self):
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        os.makedirs(OUTPUT_DIR)
+        subprocess.check_call(['touch', output])
+        with self.assertRaises(subprocess.CalledProcessError):
+
+            subprocess.check_call([
+                'classify.py', '-f', self.feature, '-w', 'pkl', '-m',
+                self.model, input_, OUTPUT_DIR
+            ])
+
 
 def test_extract_tissue_skip(self):
     output = os.path.join(OUTPUT_DIR,

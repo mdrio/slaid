@@ -105,18 +105,19 @@ def classify_slide(slide_filename,
         os.makedirs(output_dir)
 
     if os.path.exists(output_filename):
-        if not skip_output_if_exist and not overwrite_output_if_exists:
+        if skip_output_if_exist:
+            logging.debug(f"""
+                Skipping classification of slide {slide_filename},
+                already exists.
+                """)
+            return
 
+        elif not overwrite_output_if_exists:
             raise RuntimeError(f"""
                 output for slide {slide_filename} already exists.
                 Set parameter skip_output_if_exist to skip
                 this slide classification or
                 overwrite_output_if_exists to overwrite.
-                """)
-        else:
-            logging.debug(f"""
-                Skipping classification of slide {slide_filename},
-                already exists.
                 """)
 
     WRITERS[writer](data_to_dump, output_filename)
