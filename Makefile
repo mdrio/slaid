@@ -14,15 +14,19 @@ docker-main:
 
 install:
 	pip install -e .
+	touch install
 
 test: install
 	tests/run_all_tests.sh
+	touch test
 
 docker-per-model:
 	mkdir -p docker-build
 	cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build
 clean:
-	rm -r docker-build
+	rm -f install
+	rm -f test
+	rm -rf docker-build
 
 docker-push: docker
 	cd docker/; ./docker-push.sh $(DOCKER_ARGS)
