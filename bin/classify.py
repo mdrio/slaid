@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import logging
 import os
 import pickle
+
 import pkg_resources
 
 from slaid.classifiers import BasicClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json
+
+logging.basicConfig(level=logging.INFO)
 
 
 def pickle_dump(obj, filename):
@@ -25,12 +29,14 @@ def main(input_path,
          extraction_level,
          pixel_threshold=0.8,
          patch_threshold=0.5,
-         include_mask=True,
+         no_mask=False,
          patch_size=PATCH_SIZE,
          gpu=False,
          only_mask=False,
          writer='json',
-         filter_=None):
+         filter_=None,
+         overwrite_output_if_exists=True,
+         skip_output_if_exist=False):
 
     slides = [os.path.join(input_path, f) for f in os.listdir(input_path)
               ] if os.path.isdir(input_path) else [input_path]
@@ -38,25 +44,25 @@ def main(input_path,
     for slide in slides:
         classify_slide(slide, output_dir, model_filename, feature,
                        extraction_level, pixel_threshold, patch_threshold,
-                       include_mask, patch_size, gpu, only_mask, writer,
-                       filter_)
+                       no_mask, patch_size, gpu, only_mask, writer, filter_,
+                       overwrite_output_if_exists, skip_output_if_exist)
 
 
-def classify_slide(
-    slide_filename,
-    output_dir,
-    model_filename,
-    feature,
-    extraction_level,
-    pixel_threshold=0.8,
-    patch_threshold=0.5,
-    include_mask=True,
-    patch_size=PATCH_SIZE,
-    gpu=False,
-    only_mask=False,
-    writer='pkl',
-    filter_=None,
-):
+def classify_slide(slide_filename,
+                   output_dir,
+                   model_filename,
+                   feature,
+                   extraction_level,
+                   pixel_threshold=0.8,
+                   patch_threshold=0.5,
+                   no_mask=False,
+                   patch_size=PATCH_SIZE,
+                   gpu=False,
+                   only_mask=False,
+                   writer='pkl',
+                   filter_=None,
+                   overwrite_output_if_exists=True,
+                   skip_output_if_exist=False):
     slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
     slide_ext = slide_ext_with_dot[1:]
 
@@ -81,13 +87,7 @@ def classify_slide(
                                patch_filter=filter_,
                                mask_threshold=pixel_threshold,
                                patch_threshold=patch_threshold,
-                               include_mask=include_mask)
-
-    slide_basename = os.path.basename(slide_filename)
-    slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-    output_filename = f'{slide_basename_no_ext}.{feature}.{writer}'
-    ext_with_dot = os.path.splitext(output_filename)[-1]
-    ext = ext_with_dot[1:]
+                               include_mask=(not no_mask or only_mask))
 
     if only_mask:
         data_to_dump = {
@@ -100,18 +100,42 @@ def classify_slide(
     else:
         data_to_dump = slide
 
+    output_filename = get_output_filename(slide_filename, output_dir, writer)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    if os.path.exists(output_filename):
+        if not skip_output_if_exist and not overwrite_output_if_exists:
+
+            raise RuntimeError(f"""
+                output for slide {slide_filename} already exists.
+                Set parameter skip_output_if_exist to skip
+                this slide classification or
+                overwrite_output_if_exists to overwrite.
+                """)
+        else:
+            logging.debug(f"""
+                Skipping classification of slide {slide_filename}, 
+                already exists.
+                """)
+
+    WRITERS[writer](data_to_dump, output_filename)
+    logging.info(output_filename)
+
+
+def get_output_filename(slide_filename, output_dir, ext):
+    slide_basename = os.path.basename(slide_filename)
+    slide_basename_no_ext = os.path.splitext(slide_basename)[0]
+    output_filename = f'{slide_basename_no_ext}.{feature}.{ext}'
     output_filename = os.path.join(output_dir, output_filename)
-    WRITERS[ext](data_to_dump, output_filename)
-    print(output_filename)
+    return output_filename
 
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('slide')
+    parser.add_argument('input_path')
     parser.add_argument('output_dir')
     # workaround since is not possible to pass env variable
     # to Docker CMD
@@ -119,7 +143,7 @@ if __name__ == '__main__':
     if model is None:
         parser.add_argument(
             '-m',
-            dest='model',
+            dest='model_filename',
             help='path to model',
         )
     else:
@@ -141,14 +165,14 @@ if __name__ == '__main__':
                         help="pixel pixel threshold",
                         type=float)
     parser.add_argument('-T',
-                        dest='minimum_tissue_ratio',
+                        dest='patch_threshold',
                         default=0.1,
-                        help="minimum tissue ratio",
+                        help="patch threshold",
                         type=float)
     parser.add_argument('--no-mask',
                         dest='no_mask',
                         default=False,
-                        help="not include tissue mask",
+                        help="Not include tissue mask",
                         action='store_true')
     parser.add_argument('--only-mask',
                         dest='only_mask',
@@ -168,14 +192,29 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-F',
-        dest='filter',
+        dest='filter_',
         default=None,
         help="filter by patch feature",
     )
-    args = parser.parse_args()
-    model = model or args.model
-    feature = feature or args.feature
+    parser.add_argument(
+        '--skip',
+        dest='skip_output_if_exist',
+        default=False,
+        action='store_true',
+        help="Skip slide classification if output already exists",
+    )
+    parser.add_argument(
+        '--overwrite',
+        dest='overwrite_output_if_exists',
+        default=False,
+        action='store_true',
+        help="Skip slide classification if output already exists",
+    )
 
-    main(args.slide, args.output_dir, model, feature, args.extraction_level,
-         args.pixel_threshold, args.minimum_tissue_ratio, not args.no_mask,
-         args.patch_size, args.gpu, args.only_mask, args.writer, args.filter)
+    args = parser.parse_args()
+    model = model or args.model_filename
+    feature = feature or args.feature
+    kwargs = dict(model_filename=model, feature=feature)
+    kwargs.update(vars(args))
+
+    main(**kwargs)

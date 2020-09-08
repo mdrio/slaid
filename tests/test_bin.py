@@ -3,6 +3,7 @@
 import json
 import os
 import pickle
+import shutil
 import subprocess
 import unittest
 from tempfile import NamedTemporaryFile
@@ -10,7 +11,7 @@ from tempfile import NamedTemporaryFile
 from slaid.commons.ecvl import Slide, create_slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-OUTPUT_DIR = '/tmp'
+OUTPUT_DIR = '/tmp/test-slaid'
 input_ = os.path.join(DIR, 'data/PH10023-1.thumb.tif')
 input_basename_no_ext = 'PH10023-1.thumb'
 slide = Slide(input_)
@@ -19,6 +20,19 @@ slide = Slide(input_)
 class ExtractTissueTest:
     model = None
     feature = 'tissue'
+
+    @staticmethod
+    def _clean_output_dir():
+        try:
+            shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+        except FileNotFoundError:
+            pass
+
+    def setUp(self):
+        self._clean_output_dir()
+
+    def teardown(self):
+        self._clean_output_dir()
 
     def _test_pickled(self, slide_pickled, extraction_level):
         self.assertTrue(isinstance(slide_pickled, Slide))
@@ -45,7 +59,6 @@ class ExtractTissueTest:
         with open(output, 'rb') as f:
             slide_pickled = pickle.load(f)
             self._test_pickled(slide_pickled, 2)
-        os.remove(output)
 
     def test_extract_tissue_only_mask_pkl(self):
         subprocess.check_call([
@@ -63,7 +76,6 @@ class ExtractTissueTest:
 
         self.assertTrue('extraction_level' in data)
         self.assertEqual(data['extraction_level'], 2)
-        os.remove(output)
 
     def test_extract_tissue_default_json(self):
         subprocess.check_call([
@@ -78,7 +90,6 @@ class ExtractTissueTest:
             self.assertTrue('extraction_level' in data)
             self.assertTrue('patch_size' in data)
             self.assertTrue('features' in data)
-        os.remove(output)
 
     def test_extract_tissue_custom(self):
         extr_level = 1
@@ -106,7 +117,6 @@ class ExtractTissueTest:
         with open(output, 'rb') as f:
             pickle.load(f)
         os.remove(f.name)
-        #  os.remove(output)
 
     def test_input_as_pickle_with_filter(self):
         slide = create_slide(input_, 2)
@@ -127,7 +137,6 @@ class ExtractTissueTest:
 
         self.assertTrue(slide_pickled.patches.dataframe.shape == (1, 2))
         os.remove(f.name)
-        os.remove(output)
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([
@@ -147,7 +156,6 @@ class ExtractTissueTest:
         self.assertEqual(data['mask'].transpose().shape,
                          slide.dimensions_at_extraction_level)
         self.assertTrue(sum(sum(data['mask'])) > 0)
-        os.remove(output)
 
     def test_get_tissue_mask_custom_value(self):
         extr_level = 1
@@ -168,7 +176,39 @@ class ExtractTissueTest:
         self.assertEqual(data['mask'].transpose().shape,
                          slide.dimensions_at_extraction_level)
         self.assertTrue(sum(sum(data['mask'])) > 0)
-        os.remove(output)
+
+    def test_extract_tissue_overwrite(self):
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.pkl')
+        os.makedirs(OUTPUT_DIR)
+        subprocess.check_call(['touch', output])
+        subprocess.check_call([
+            'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
+            '--overwrite', input_, OUTPUT_DIR
+        ])
+        stats = os.stat(output)
+        self.assertTrue(stats.st_size > 0)
+
+        with open(output, 'rb') as f:
+            slide_pickled = pickle.load(f)
+            self._test_pickled(slide_pickled, 2)
+
+
+def test_extract_tissue_skip(self):
+    output = os.path.join(OUTPUT_DIR,
+                          f'{input_basename_no_ext}.{self.feature}.pkl')
+    os.makedirs(OUTPUT_DIR)
+    subprocess.check_call(['touch', output])
+    subprocess.check_call([
+        'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
+        '--skip', input_, OUTPUT_DIR
+    ])
+    stats = os.stat(output)
+    self.assertEqual(stats.st_size, 0)
+
+    with open(output, 'rb') as f:
+        slide_pickled = pickle.load(f)
+        self._test_pickled(slide_pickled, 2)
 
 
 class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
