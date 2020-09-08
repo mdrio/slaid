@@ -94,7 +94,7 @@ def classify_slide(slide_filename,
             'filename': slide_filename,
             'dimensions': slide.dimensions,
             'extraction_level': extraction_level,
-            'mask': slide.masks['tissue']
+            'mask': slide.masks[feature]
         }
 
     else:
@@ -115,7 +115,7 @@ def classify_slide(slide_filename,
                 """)
         else:
             logging.debug(f"""
-                Skipping classification of slide {slide_filename}, 
+                Skipping classification of slide {slide_filename},
                 already exists.
                 """)
 
