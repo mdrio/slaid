@@ -4,3 +4,5 @@ tiffile
 openslide-python
 sklearn
 pandas
+pyecvl
+pyeddl
