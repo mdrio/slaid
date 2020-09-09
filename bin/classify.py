@@ -38,6 +38,9 @@ def main(input_path,
          overwrite_output_if_exists=True,
          skip_output_if_exist=False):
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     slides = [os.path.join(input_path, f) for f in os.listdir(input_path)
               ] if os.path.isdir(input_path) else [input_path]
 
@@ -63,9 +66,26 @@ def classify_slide(slide_filename,
                    filter_=None,
                    overwrite_output_if_exists=True,
                    skip_output_if_exist=False):
+
+    output_filename = get_output_filename(slide_filename, output_dir, writer)
+    if os.path.exists(output_filename):
+        if skip_output_if_exist:
+            logging.debug(f"""
+                Skipping classification of slide {slide_filename},
+                already exists.
+                """)
+            return
+
+        elif not overwrite_output_if_exists:
+            raise RuntimeError(f"""
+                output for slide {slide_filename} already exists.
+                Set parameter skip_output_if_exist to skip
+                this slide classification or
+                overwrite_output_if_exists to overwrite.
+                """)
+
     slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
     slide_ext = slide_ext_with_dot[1:]
-
     if slide_ext == 'pkl' or slide_ext == 'pickle':
         with open(slide_filename, 'rb') as f:
             slide = pickle.load(f)
@@ -99,26 +119,6 @@ def classify_slide(slide_filename,
 
     else:
         data_to_dump = slide
-
-    output_filename = get_output_filename(slide_filename, output_dir, writer)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if os.path.exists(output_filename):
-        if skip_output_if_exist:
-            logging.debug(f"""
-                Skipping classification of slide {slide_filename},
-                already exists.
-                """)
-            return
-
-        elif not overwrite_output_if_exists:
-            raise RuntimeError(f"""
-                output for slide {slide_filename} already exists.
-                Set parameter skip_output_if_exist to skip
-                this slide classification or
-                overwrite_output_if_exists to overwrite.
-                """)
 
     WRITERS[writer](data_to_dump, output_filename)
     logging.info(output_filename)
