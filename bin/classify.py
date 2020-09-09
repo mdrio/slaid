@@ -152,20 +152,26 @@ if __name__ == '__main__':
 
     feature = os.environ.get("SLAID_FEATURE")
     if feature is None:
-        parser.add_argument('-f', dest='feature', help="feature label")
+        parser.add_argument('-f',
+                            '--feature',
+                            dest='feature',
+                            help="feature label")
 
-    parser.add_argument('--patch_size', dest='patch_size', default=PATCH_SIZE)
+    parser.add_argument('--patch-size', dest='patch_size', default=PATCH_SIZE)
     parser.add_argument('-l',
+                        '--level',
                         dest='extraction_level',
                         help='extraction_level',
                         default=2,
                         type=int)
     parser.add_argument('-t',
+                        '--pixel-threshold',
                         dest='pixel_threshold',
                         default=0.8,
                         help="pixel pixel threshold",
                         type=float)
     parser.add_argument('-T',
+                        '--patch-threshold',
                         dest='patch_threshold',
                         default=0.1,
                         help="patch threshold",
@@ -186,6 +192,7 @@ if __name__ == '__main__':
                         help="use gpu",
                         action='store_true')
     parser.add_argument('-w',
+                        '--writer',
                         dest='writer',
                         default='pkl',
                         help="writer for serializing the resulting output",
