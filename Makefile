@@ -1,5 +1,13 @@
 TAG := $(shell cd docker; ./get_docker_tag.sh)
-docker: test docker-main docker-per-model
+
+ifndef skip_test
+	extra_dep_docker:= test
+
+else
+	extra_dep_docker :=
+endif
+
+docker: $(extra_dep_docker) docker-main docker-per-model
 
 docker-main:
 	mkdir -p docker-build
