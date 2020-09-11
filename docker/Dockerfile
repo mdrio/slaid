@@ -1,4 +1,4 @@
-FROM pyecvl-gpu:0.4.2
+FROM dhealth/pylibs-toolkit:0.4.2
 COPY . /tmp/slaid
 WORKDIR /tmp/slaid
 RUN useradd -ms  /bin/bash slaid && \
