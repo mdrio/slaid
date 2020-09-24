@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 OUTDIR=$DIR/../data
 IMAGE='test.tif'
 IMAGE_NO_EXT='test'
-MODEL_DIR=$DIR/../../slaid/models
+MODEL_DIR=$DIR/../../slaid/resources/models
 
 for model in $(ls $MODEL_DIR); do 
   docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models  slaid  classify.py  -m /models/$model -l 0 /data/$IMAGE --overwrite -w pkl -f tissue /data
