@@ -4,6 +4,7 @@ import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
 from slaid.classifiers import BasicClassifier
+from slaid.classifiers.dask import RowClassifier, init_client
 from slaid.commons.ecvl import create_slide
 
 #  from slaid.classifiers.eddl import TissueMaskPredictor as\
@@ -11,16 +12,20 @@ from slaid.commons.ecvl import create_slide
 
 
 class TestTissueClassifierTest:
-    classifier_cls = None
-    predictor_cls = None
-    model_cls = None
+    @staticmethod
+    def get_classifier(model):
+        pass
+
+    @staticmethod
+    def get_model():
+        pass
 
     def test_detector_no_tissue(self):
         slide = create_slide('tests/data/test.tif', extraction_level=0)
         model = DummyModel(np.zeros)
-        tissue_detector = self.classifier_cls(model, 'tissue')
-
+        tissue_detector = self.get_classifier(model)
         tissue_detector.classify(slide, include_mask=True)
+        self.assertEqual(slide.masks['tissue'].shape[::-1], slide.dimensions)
         for patch in slide.patches:
             self.assertEqual(patch.features['tissue'], 0)
         self.assertEqual(slide.masks['tissue'].all(), 0)
@@ -28,32 +33,58 @@ class TestTissueClassifierTest:
     def test_detector_all_tissue(self):
         slide = create_slide('tests/data/test.tif', extraction_level=0)
         model = DummyModel(np.ones)
-        tissue_detector = self.classifier_cls(model, 'tissue')
-        tissue_detector.classify(slide)
+        tissue_detector = self.get_classifier(model)
+        tissue_detector.classify(slide, include_mask=True)
+        self.assertEqual(slide.masks['tissue'].shape[::-1], slide.dimensions)
         for patch in slide.patches:
             self.assertEqual(patch.features['tissue'], 1)
 
     def test_mask(self):
         slide = create_slide('tests/data/test.tif', extraction_level=0)
-        tissue_detector = self.classifier_cls(self.model_cls(), 'tissue')
-
+        tissue_detector = self.get_classifier(self.get_model())
         tissue_detector.classify(slide, include_mask=True)
+        self.assertEqual(slide.masks['tissue'].shape[::-1], slide.dimensions)
+        print(slide.masks['tissue'])
         for patch in slide.patches:
-            if (patch.y == 0):
-                self.assertEqual(patch.features['tissue'], 1)
+            print(patch.x, patch.y, patch.features['tissue'])
+        if (patch.y == 0):
+            self.assertEqual(patch.features['tissue'], 1)
 
-            else:
-                self.assertEqual(patch.features['tissue'], 0)
+        else:
+            self.assertEqual(patch.features['tissue'], 0)
+
+
+#
 
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
-    classifier_cls = BasicClassifier
-    model_cls = GreenIsTissueModel
+    @staticmethod
+    def get_classifier(model):
+        return BasicClassifier(model, 'tissue')
+
+    @staticmethod
+    def get_model():
+        return GreenIsTissueModel()
 
 
-class EddlTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
-    classifier_cls = BasicClassifier
-    model_cls = EddlGreenIsTissueModel
+class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        init_client()
+
+    @staticmethod
+    def get_classifier(model):
+        return RowClassifier(model, 'tissue', 10)
+
+    @staticmethod
+    def get_model():
+        return GreenIsTissueModel()
+
+
+class EddlTissueClassifierTest(BasicTissueClassifierTest):
+    @staticmethod
+    def get_model():
+        return EddlGreenIsTissueModel()
 
 
 if __name__ == '__main__':
