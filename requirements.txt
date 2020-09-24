@@ -7,3 +7,4 @@ pandas
 pyecvl
 pyeddl
 clize
+dask[complete]
