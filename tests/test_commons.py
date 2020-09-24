@@ -13,11 +13,11 @@ class TestSlide:
     slide_cls = None
 
     def test_dimensions(self):
-        self.assertEqual(self.slide.dimensions, (1024, 1024))
+        self.assertEqual(self.slide.dimensions, (512, 1024))
 
     def test_extract_dimensions(self):
         self.assertEqual(self.slide.dimensions_at_extraction_level,
-                         (1024, 1024))
+                         (512, 1024))
 
     def test_to_array(self):
         region = self.slide.read_region((0, 0), (256, 256))
@@ -64,10 +64,10 @@ class TestRoundToPatch(unittest.TestCase):
         self.assertEqual(res, (256, 256))
 
     def test_round_down(self):
-        coordinates = (513, 256)
+        coordinates = (257, 256)
         patch_size = (256, 256)
         res = round_to_patch(coordinates, patch_size)
-        self.assertEqual(res, (512, 256))
+        self.assertEqual(res, (256, 256))
 
     def test_round_up(self):
         coordinates = (511, 256)
