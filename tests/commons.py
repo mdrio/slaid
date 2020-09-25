@@ -3,7 +3,7 @@ from typing import List, Tuple
 import numpy as np
 from pyeddl.tensor import Tensor
 
-from slaid.classifiers.eddl import Model as EddlModel
+from slaid.models.eddl import Model as EddlModel
 from slaid.commons import PandasPatchCollection, Slide
 from slaid.commons.ecvl import Image
 

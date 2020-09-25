@@ -4,7 +4,7 @@ import numpy as np
 from commons import AllOneModel
 
 import slaid.classifiers as cl
-from slaid.classifiers.eddl import Model
+from slaid.models.eddl import Model
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
                              to_json)
