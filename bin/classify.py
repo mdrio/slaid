@@ -114,7 +114,7 @@ def classify_slide(slide_filename,
                              patch_size=patch_size)
 
     if os.path.splitext(model)[-1] in ('.pkl', '.pickle'):
-        from slaid.classifiers import Model
+        from slaid.models import Model
         model = Model(model)
     else:
         from slaid.classifiers.eddl import Model
