@@ -4,7 +4,7 @@ import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
 from slaid.classifiers import BasicClassifier
-from slaid.classifiers.dask import RowClassifier, init_client
+from slaid.classifiers.dask import RowClassifier
 from slaid.commons.ecvl import create_slide
 
 #  from slaid.classifiers.eddl import TissueMaskPredictor as\
@@ -43,6 +43,7 @@ class TestTissueClassifierTest:
         slide = create_slide('tests/data/test.tif', extraction_level=0)
         tissue_detector = self.get_classifier(self.get_model())
         tissue_detector.classify(slide, include_mask=True)
+
         self.assertEqual(slide.masks['tissue'].shape[::-1], slide.dimensions)
         for patch in slide.patches:
             if (patch.y == 0):
@@ -64,11 +65,14 @@ class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
 class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        init_client()
+        #  init_client()
+        import dask
+        dask.config.set(scheduler='synchronous'
+                        )  # overwrite default with single-threaded scheduler
 
     @staticmethod
     def get_classifier(model):
-        return RowClassifier(model, 'tissue', 10)
+        return RowClassifier(model, 'tissue', 200)
 
     @staticmethod
     def get_model():

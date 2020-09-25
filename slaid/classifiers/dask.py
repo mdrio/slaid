@@ -36,12 +36,12 @@ class RowClassifier(BasicClassifier):
                 da.from_delayed(self._get_area_mask(slide, (0, i),
                                                     (dimensions[0], row_size),
                                                     mask_threshold), (
-                                                        row_size,
                                                         dimensions[0],
+                                                        row_size,
                                                     ),
                                 dtype='uint8'))
 
-        mask = da.concatenate(rows, axis=0).compute()
+        mask = da.concatenate(rows, axis=1).transpose().compute()
         # FIXME duplicated code
         for patch in slide.patches:
             patch_mask = mask[patch.y:patch.y + patch.size[1],
@@ -51,15 +51,17 @@ class RowClassifier(BasicClassifier):
 
         if include_mask:
             slide.masks[self._feature] = mask
+        print('sum all mask', np.sum(mask))
 
     @delayed
     def _get_area_mask(self, slide, location, size, threshold):
         image = slide.read_region(location, size)
         image_array = image.to_array(True)
-        n_px = image_array.shape[0] * image_array.shape[1]
+        shape = image_array.shape[:2]
+        n_px = shape[0] * shape[1]
         image_array = image_array[:, :, :3].reshape(n_px, 3)
         prediction = self._model.predict(image_array)
-        mask = prediction.reshape(size)
+        mask = prediction.reshape(shape)
         mask[mask >= threshold] = 1
         mask[mask < threshold] = 0
         mask = np.array(mask, dtype='uint8')
