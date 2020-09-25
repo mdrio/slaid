@@ -44,17 +44,11 @@ class TestTissueClassifierTest:
         tissue_detector = self.get_classifier(self.get_model())
         tissue_detector.classify(slide, include_mask=True)
         self.assertEqual(slide.masks['tissue'].shape[::-1], slide.dimensions)
-        print(slide.masks['tissue'])
         for patch in slide.patches:
-            print(patch.x, patch.y, patch.features['tissue'])
-        if (patch.y == 0):
-            self.assertEqual(patch.features['tissue'], 1)
-
-        else:
-            self.assertEqual(patch.features['tissue'], 0)
-
-
-#
+            if (patch.y == 0):
+                self.assertEqual(patch.features['tissue'], 1)
+            else:
+                self.assertEqual(patch.features['tissue'], 0)
 
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):

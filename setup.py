@@ -18,5 +18,5 @@ setuptools.setup(
     python_requires='>=3.6',
     install_requires=reqs,
     scripts=['bin/classify.py', 'bin/view_mask.py'],
-    package_data={'': ['models/*']},
+    package_data={'': ['resources/models/*']},
     include_package_data=True)

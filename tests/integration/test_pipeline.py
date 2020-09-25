@@ -17,7 +17,8 @@ def main():
     #  with open('slaid/models/extract_tissue_LSVM-1.0.pickle', 'rb') as f:
     #      tissue_model = pickle.load(f)
 
-    tissue_model = Model('slaid/models/extract_tissue_eddl-1.0.0.bin', False)
+    tissue_model = Model(
+        'slaid/resources/models/extract_tissue_eddl-1.0.0.bin', False)
     patch_size = (256, 256)
     slide_filename = 'tests/data/PH10023-1.thumb.tif'
     slide = create_slide(slide_filename, 0, patch_size)

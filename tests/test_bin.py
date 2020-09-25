@@ -224,11 +224,11 @@ def test_extract_tissue_skip(self):
 
 
 class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = 'slaid/models/extract_tissue_LSVM-1.0.pickle'
+    model = 'slaid/resources/models/extract_tissue_LSVM-1.0.pickle'
 
 
 class EddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = 'slaid/models/extract_tissue_eddl-1.0.0.bin'
+    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
 
 
 if __name__ == '__main__':

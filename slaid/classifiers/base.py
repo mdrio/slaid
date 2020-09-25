@@ -1,10 +1,10 @@
 import abc
-import pickle
 from typing import Dict, Tuple
 
 import numpy as np
 
 from slaid.commons import Image, Patch, Slide
+from slaid.models import Model
 
 
 class Classifier(abc.ABC):
@@ -103,25 +103,11 @@ class BasicClassifier:
         patch_area: float,
         threshold: float,
     ):
-        tissue_area = np.sum(patch_mask)
-        tissue_ratio = tissue_area / patch_area
-        if tissue_ratio > threshold:
-            features = {self._feature: tissue_ratio}
+        area = np.sum(patch_mask)
+        ratio = area / patch_area
+        if ratio > threshold:
+            features = {self._feature: ratio}
             slide.patches.update_patch(patch=patch, features=features)
-
-
-class Model:
-    def __init__(self, filename: str):
-        with open(filename, 'rb') as f:
-            self._model = pickle.load(f)
-
-    def predict(self, array: np.array) -> np.array:
-        return self._model.predict(array)
-
-
-class RandomModel:
-    def predict(self, array):
-        return np.random.uniform(0, 1, array.shape[0])
 
 
 #  class InterpolatedTissueClassifier(TissueClassifier):

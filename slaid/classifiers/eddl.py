@@ -4,7 +4,7 @@ import numpy as np
 import pyeddl.eddl as eddl
 from pyeddl.tensor import Tensor
 
-from slaid.classifiers import Model as BaseModel
+from slaid.models import Model as BaseModel
 
 
 class Model(BaseModel):

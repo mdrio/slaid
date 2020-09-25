@@ -34,7 +34,9 @@ class Image(BaseImage):
     def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
         array = np.array(self._image)
         if PIL_FORMAT:
+            # convert to channel last
             array = array.transpose(2, 1, 0)
+            # convert to rgb
             array = array[:, :, ::-1]
             #  array = np.flip(array, 1)
             #  array[:, :] = np.flip(array[:, :])

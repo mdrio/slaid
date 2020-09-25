@@ -5,7 +5,8 @@ import numpy as np
 from dask import delayed
 from dask.distributed import Client
 
-from slaid.classifiers.base import BasicClassifier, Model
+from slaid.classifiers.base import BasicClassifier
+from slaid.models import Model
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('dask')
