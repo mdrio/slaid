@@ -113,12 +113,12 @@ def classify_slide(slide_filename,
                              extraction_level=extraction_level,
                              patch_size=patch_size)
 
-    if os.path.splitext(model_filename)[-1] in ('.pkl', '.pickle'):
+    if os.path.splitext(model)[-1] in ('.pkl', '.pickle'):
         from slaid.models import PickledModel
-        model = PickledModel(model_filename)
+        model = PickledModel(model)
     else:
         from slaid.models.eddl import Model
-        model = Model(model_filename, gpu)
+        model = Model(model, gpu)
 
     tissue_classifier = BasicClassifier(model, feature)
 
