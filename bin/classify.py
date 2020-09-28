@@ -42,20 +42,20 @@ def main(
     output_dir,
     *,
     model: 'm',
-    extraction_level: 'l',
+    extraction_level: ('l', int) = 2,
     feature: 'f',
     pixel_threshold: 't' = 0.8,
     patch_threshold: 'T' = 0.5,
     no_mask=False,
-    patch_size=None,
+    patch_size=f'{PATCH_SIZE[0]}x{PATCH_SIZE[1]}',
     gpu=False,
     only_mask=False,
-    writer: 'w' = 'json',
+    writer: 'w' = 'pkl',
     filter_: 'F' = None,
-    overwrite_output_if_exists=True,
+    overwrite_output_if_exists: 'overwrite' = False,
     skip_output_if_exist=False,
 ):
-
+    patch_size = tuple([int(e) for e in patch_size.split('x')])
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
