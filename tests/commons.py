@@ -4,7 +4,7 @@ import numpy as np
 from pyeddl.tensor import Tensor
 
 from slaid.models.eddl import Model as EddlModel
-from slaid.commons import PandasPatchCollection, Slide
+from slaid.commons import Slide
 from slaid.commons.ecvl import Image
 
 
@@ -44,7 +44,6 @@ class DummySlide(Slide):
         self,
         ID: str,
         size: Tuple[int, int],
-        patch_size: Tuple[int, int] = None,
         best_level_for_downsample: int = 1,
         level_downsample: int = 1,
         data=None,
@@ -56,11 +55,7 @@ class DummySlide(Slide):
         self._level_dimensions = DummySlide.DummyIndexable(size)
         self._level_downsample = DummySlide.DummyIndexable(level_downsample)
         self.data = data
-        self.features = {}
         self.masks = {}
-        self.patch_size = patch_size if patch_size else size
-        self.patches = PandasPatchCollection(self, patch_size,
-                                             self.extraction_level)
 
     def __getstate__(self):
         return {'ID': self._filename, 'size': self.size}

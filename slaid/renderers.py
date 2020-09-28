@@ -151,24 +151,17 @@ class SlideJSONEncoder(BaseJSONEncoder):
         self,
         slide: Slide,
     ) -> Union[List, Dict]:
-        dct = dict(filename=slide.ID,
-                   patch_size=slide.patches.patch_size,
-                   extraction_level=slide.patches.extraction_level,
-                   downsample_factor=slide.level_downsamples[
-                       slide.patches.extraction_level],
-                   features=[])
+        dct = dict(filename=slide.ID, masks={})
 
-        for p in slide.patches:
-            patch_info = dict(x=p.x, y=p.y)
-            for f, v in p.features.items():
-                patch_info[f] = convert_numpy_types(v)
-            dct['features'].append(patch_info)
+        for k, v in slide.masks.items():
+            dct['masks'][k] = dict(array=v.array.tolist(),
+                                   extraction_level=v.extraction_level,
+                                   level_downsample=v.level_downsample)
         return dct
 
 
 class JSONEncoder(json.JSONEncoder):
     encoders = [
-        PatchJSONEncoder(),
         NumpyArrayJSONEncoder(),
         SlideJSONEncoder(),
     ]

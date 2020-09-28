@@ -8,6 +8,8 @@ import subprocess
 import unittest
 from tempfile import NamedTemporaryFile
 
+import numpy as np
+
 from slaid.commons.ecvl import Slide, create_slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -36,18 +38,7 @@ class ExtractTissueTest:
 
     def _test_pickled(self, slide_pickled, extraction_level):
         self.assertTrue(isinstance(slide_pickled, Slide))
-        self.assertTrue('tissue' in set(slide_pickled.patches.features))
         self.assertEqual(slide_pickled.ID, os.path.basename(input_))
-        self.assertEqual(slide_pickled.patches.patch_size, (256, 256))
-        self.assertEqual(slide_pickled.patches.extraction_level,
-                         extraction_level)
-        self.assertTrue(slide_pickled.patches.dataframe.size > 0)
-        #  self.assertEqual(
-        #      slide_pickled.patches.dataframe.size,
-        #      slide_pickled.dimensions_at_extraction_level[0] *
-        #      slide_pickled.dimensions_at_extraction_level[1] //
-        #      (slide_pickled.patches.patch_size[0] *
-        #       slide_pickled.patches.patch_size[1]))
 
     def test_extract_tissue_default_pkl(self):
         subprocess.check_call([
@@ -87,13 +78,13 @@ class ExtractTissueTest:
         with open(output, 'rb') as f:
             data = json.load(f)
             self.assertTrue('filename' in data)
-            self.assertTrue('extraction_level' in data)
-            self.assertTrue('patch_size' in data)
-            self.assertTrue('features' in data)
+            self.assertTrue('extraction_level' in data['masks'][self.feature])
+            self.assertTrue('array' in data['masks'][self.feature])
+            self.assertTrue('level_downsample' in data['masks'][self.feature])
 
     def test_extract_tissue_custom(self):
         extr_level = 1
-        cmd = f'classify.py -m {self.model} -f {self.feature} -w pkl -l {extr_level} --no-mask -t 0.7 -T 0.09 {input_} {OUTPUT_DIR}'
+        cmd = f'classify.py -m {self.model} -f {self.feature} -w pkl -l {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
@@ -103,7 +94,7 @@ class ExtractTissueTest:
         os.remove(output)
 
     def test_input_as_pickle(self):
-        slide = create_slide(input_, 2)
+        slide = create_slide(input_)
         with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
             pickle.dump(slide, f)
         extr_level = 1
@@ -119,7 +110,7 @@ class ExtractTissueTest:
         os.remove(f.name)
 
     def test_input_as_pickle_with_filter(self):
-        slide = create_slide(input_, 2)
+        slide = create_slide(input_)
         slide.patches.add_feature('feature')
         slide.patches.update_patch((0, 0), features={'feature': 1})
         with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
@@ -154,14 +145,15 @@ class ExtractTissueTest:
         self.assertEqual(data['filename'], input_)
         self.assertEqual(data['extraction_level'], 2)
         self.assertEqual(data['mask'].transpose().shape,
-                         slide.dimensions_at_extraction_level)
+                         slide.level_dimensions[data['extraction_level']])
         self.assertTrue(sum(sum(data['mask'])) > 0)
 
     def test_get_tissue_mask_custom_value(self):
         extr_level = 1
-        cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7 -T 0.09 {input_} {OUTPUT_DIR}'
+        cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7  {input_} {OUTPUT_DIR}'
+        print(cmd)
         subprocess.check_call(cmd.split())
-        slide = Slide(input_, extraction_level=extr_level)
+        slide = Slide(input_)
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
         with open(output, 'rb') as f:
@@ -174,8 +166,8 @@ class ExtractTissueTest:
         self.assertEqual(data['dimensions'], slide.dimensions)
         self.assertEqual(data['extraction_level'], extr_level)
         self.assertEqual(data['mask'].transpose().shape,
-                         slide.dimensions_at_extraction_level)
-        self.assertTrue(sum(sum(data['mask'])) > 0)
+                         slide.level_dimensions[extr_level])
+        self.assertTrue(np.sum(data['mask']) > 0)
 
     def test_extract_tissue_overwrite(self):
         output = os.path.join(OUTPUT_DIR,

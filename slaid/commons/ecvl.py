@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pyecvl.ecvl as ecvl
@@ -10,7 +10,6 @@ from pyeddl.tensor import Tensor as EddlTensor
 
 from slaid.commons import PATCH_SIZE
 from slaid.commons import Image as BaseImage
-from slaid.commons import PatchCollection
 from slaid.commons import Slide as BaseSlide
 from slaid.commons import Tensor as BaseTensor
 
@@ -47,29 +46,23 @@ class Image(BaseImage):
 
 
 class Slide(BaseSlide):
-    def __init__(self, filename: str, extraction_level=2):
+    def __init__(self, filename: str):
         if not os.path.exists(filename) or not os.path.isfile(filename):
             raise FileNotFoundError(filename)
         self._level_dimensions = OpenSlideGetLevels(filename)
-        super().__init__(filename, extraction_level)
+        super().__init__(filename)
 
     @property
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._level_dimensions[0])
 
     @property
-    def dimensions_at_extraction_level(self) -> Tuple[int, int]:
-        return tuple(self._level_dimensions[self._extraction_level])
-
-    @property
     def ID(self):
         return os.path.basename(self._filename)
 
-    def read_region(self, location: Tuple[int, int],
+    def read_region(self, location: Tuple[int, int], level,
                     size: Tuple[int, int]) -> Image:
-        return Image(
-            OpenSlideRead(self._filename, self._extraction_level,
-                          location + size))
+        return Image(OpenSlideRead(self._filename, level, location + size))
 
     def get_best_level_for_downsample(self, downsample: int):
         return open_slide(
@@ -84,10 +77,6 @@ class Slide(BaseSlide):
         return open_slide(self._filename).level_downsamples
 
 
-def create_slide(filename: str,
-                 extraction_level: int,
-                 patch_size: Tuple[int, int] = PATCH_SIZE):
-    from slaid.commons import PandasPatchCollection
-    slide = Slide(filename, extraction_level)
-    PandasPatchCollection(slide, patch_size, extraction_level)
+def create_slide(filename: str):
+    slide = Slide(filename)
     return slide

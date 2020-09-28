@@ -2,6 +2,7 @@ import abc
 import inspect
 import sys
 from collections import OrderedDict, defaultdict
+from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
@@ -34,23 +35,20 @@ class Image(abc.ABC):
         pass
 
 
-class Slide(abc.ABC):
-    def __init__(self, filename: str, extraction_level=2):
-        self._filename = filename
-        self._extraction_level = extraction_level
-        self.patches: PatchCollection = None
-        self.masks: Dict[str, np.ndarray] = {}
+@dataclass
+class Mask:
+    array: np.array
+    extraction_level: int
+    level_downsample: int
 
-    def __eq__(self, other):
-        return self._filename == other._filename and\
-            self.features == other.features and self.patches == other.patches
+
+class Slide(abc.ABC):
+    def __init__(self, filename: str):
+        self._filename = filename
+        self.masks: Dict[str, Mask] = {}
 
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
-        pass
-
-    @abc.abstractproperty
-    def dimensions_at_extraction_level(self) -> Tuple[int, int]:
         pass
 
     @abc.abstractproperty

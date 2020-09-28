@@ -44,9 +44,7 @@ def main(
     model: 'm',
     extraction_level: ('l', int) = 2,
     feature: 'f',
-    pixel_threshold: 't' = 0.8,
-    patch_threshold: 'T' = 0.5,
-    no_mask=False,
+    threshold: 't' = 0.8,
     patch_size=f'{PATCH_SIZE[0]}x{PATCH_SIZE[1]}',
     gpu=False,
     only_mask=False,
@@ -64,8 +62,7 @@ def main(
 
     for slide in slides:
         classify_slide(slide, output_dir, model, feature, extraction_level,
-                       pixel_threshold, patch_threshold, no_mask, patch_size,
-                       gpu, only_mask, writer, filter_,
+                       threshold, patch_size, gpu, only_mask, writer, filter_,
                        overwrite_output_if_exists, skip_output_if_exist)
 
 
@@ -74,9 +71,7 @@ def classify_slide(slide_filename,
                    model,
                    feature,
                    extraction_level,
-                   pixel_threshold=0.8,
-                   patch_threshold=0.5,
-                   no_mask=False,
+                   threshold=0.8,
                    patch_size=PATCH_SIZE,
                    gpu=False,
                    only_mask=False,
@@ -109,9 +104,7 @@ def classify_slide(slide_filename,
         with open(slide_filename, 'rb') as f:
             slide = pickle.load(f)
     else:
-        slide = create_slide(slide_filename,
-                             extraction_level=extraction_level,
-                             patch_size=patch_size)
+        slide = create_slide(slide_filename)
 
     if os.path.splitext(model)[-1] in ('.pkl', '.pickle'):
         from slaid.models import PickledModel
@@ -124,16 +117,14 @@ def classify_slide(slide_filename,
 
     tissue_classifier.classify(slide,
                                patch_filter=filter_,
-                               mask_threshold=pixel_threshold,
-                               patch_threshold=patch_threshold,
-                               include_mask=(not no_mask or only_mask))
-
+                               threshold=threshold,
+                               level=extraction_level)
     if only_mask:
         data_to_dump = {
             'filename': slide_filename,
             'dimensions': slide.dimensions,
-            'extraction_level': extraction_level,
-            'mask': slide.masks[feature]
+            'extraction_level': slide.masks[feature].extraction_level,
+            'mask': slide.masks[feature].array
         }
 
     else:

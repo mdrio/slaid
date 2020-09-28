@@ -6,6 +6,7 @@ from dask import delayed
 from dask.distributed import Client
 
 from slaid.classifiers.base import BasicClassifier
+from slaid.commons import Mask
 from slaid.models import Model
 
 logging.basicConfig(level=logging.DEBUG)
@@ -25,17 +26,16 @@ class RowClassifier(BasicClassifier):
     def row_size(self):
         return self._row_size
 
-    def _classify_whole_slide(self, slide, patch_area, mask_threshold,
-                              patch_threshold, include_mask):
+    def _classify_whole_slide(self, slide, threshold, level):
 
-        dimensions = slide.dimensions_at_extraction_level
+        dimensions = slide.level_dimensions[level]
         rows = []
         for i in range(0, dimensions[1], self._row_size):
             row_size = min(self._row_size, dimensions[1] - i)
             rows.append(
                 da.from_delayed(self._get_area_mask(slide, (0, i),
                                                     (dimensions[0], row_size),
-                                                    mask_threshold), (
+                                                    threshold), (
                                                         dimensions[0],
                                                         row_size,
                                                     ),
@@ -46,12 +46,8 @@ class RowClassifier(BasicClassifier):
         for patch in slide.patches:
             patch_mask = mask[patch.y:patch.y + patch.size[1],
                               patch.x:patch.x + patch.size[0]]
-            self._update_patch(slide, patch, patch_mask, patch_area,
-                               patch_threshold)
 
-        if include_mask:
-            slide.masks[self._feature] = mask
-        print('sum all mask', np.sum(mask))
+        slide.masks[self._feature] = Mask(mask, level)
 
     @delayed
     def _get_area_mask(self, slide, location, size, threshold):

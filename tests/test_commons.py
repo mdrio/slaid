@@ -15,17 +15,13 @@ class TestSlide:
     def test_dimensions(self):
         self.assertEqual(self.slide.dimensions, (512, 1024))
 
-    def test_extract_dimensions(self):
-        self.assertEqual(self.slide.dimensions_at_extraction_level,
-                         (512, 1024))
-
     def test_to_array(self):
-        region = self.slide.read_region((0, 0), (256, 256))
+        region = self.slide.read_region((0, 0), 0, (256, 256))
         array = region.to_array()
         self.assertEqual(array.shape, (3, 256, 256))
 
     def test_to_array_as_PIL(self):
-        region = self.slide.read_region((0, 0), (256, 256))
+        region = self.slide.read_region((0, 0), 0, (256, 256))
         array = region.to_array(True)
         self.assertEqual(array.shape, (256, 256, 3))
 
@@ -39,14 +35,14 @@ class TestSlide:
 
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
-    slide = EcvlSlide(IMAGE, extraction_level=0)
+    slide = EcvlSlide(IMAGE)
     slide_cls = EcvlSlide
 
 
 class TestImage(unittest.TestCase):
     def test_to_PIL(self):
-        slide = EcvlSlide(IMAGE, extraction_level=0)
-        image = slide.read_region((0, 0), (256, 256))
+        slide = EcvlSlide(IMAGE)
+        image = slide.read_region((0, 0), 0, (256, 256))
         self.assertEqual(image.dimensions, (3, 256, 256))
 
 
