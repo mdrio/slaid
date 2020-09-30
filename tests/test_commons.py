@@ -79,8 +79,9 @@ class TestConvertPatch(unittest.TestCase):
                             slide.level_downsamples[1])
         level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
                             slide.level_downsamples[0])
-        patch = Patch(100, 100, (100, 100), level_0_mask)
-        converted_patch = convert_patch(patch, slide, level_1_mask)
+        patch = Patch(100, 100, (100, 100))
+        converted_patch = convert_patch(patch, slide, level_0_mask,
+                                        level_1_mask)
         self.assertEqual(converted_patch.x, patch.x // 2)
         self.assertEqual(converted_patch.y, patch.y // 2)
         self.assertEqual(converted_patch.size[0], patch.size[0] // 2)
@@ -92,8 +93,9 @@ class TestConvertPatch(unittest.TestCase):
                             slide.level_downsamples[1])
         level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
                             slide.level_downsamples[0])
-        patch = Patch(100, 100, (100, 100), level_1_mask)
-        converted_patch = convert_patch(patch, slide, level_0_mask)
+        patch = Patch(100, 100, (100, 100))
+        converted_patch = convert_patch(patch, slide, level_1_mask,
+                                        level_0_mask)
         self.assertEqual(converted_patch.x, patch.x * 2)
         self.assertEqual(converted_patch.y, patch.y * 2)
         self.assertEqual(converted_patch.size[0], patch.size[0] * 2)
