@@ -1,8 +1,6 @@
 import unittest
 
-import numpy as np
-
-from slaid.commons import Mask, Patch, Slide, convert_patch, round_to_patch
+from slaid.commons import Patch, Slide, convert_patch, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
 
 IMAGE = 'tests/data/test.tif'
@@ -75,9 +73,8 @@ class TestRoundToPatch(unittest.TestCase):
 class TestConvertPatch(unittest.TestCase):
     def test_convert_down(self):
         slide = EcvlSlide('tests/data/test.tif')
-        patch = Patch(100, 100, (100, 100))
+        patch = Patch(100, 100, (100, 100), slide.level_downsamples[0])
         converted_patch = convert_patch(patch, slide,
-                                        slide.level_downsamples[0],
                                         slide.level_downsamples[1])
         self.assertEqual(converted_patch.x, patch.x // 2)
         self.assertEqual(converted_patch.y, patch.y // 2)
@@ -86,9 +83,8 @@ class TestConvertPatch(unittest.TestCase):
 
     def test_convert_up(self):
         slide = EcvlSlide('tests/data/test.tif')
-        patch = Patch(100, 100, (100, 100))
+        patch = Patch(100, 100, (100, 100), slide.level_downsamples[1])
         converted_patch = convert_patch(patch, slide,
-                                        slide.level_downsamples[1],
                                         slide.level_downsamples[0])
         self.assertEqual(converted_patch.x, patch.x * 2)
         self.assertEqual(converted_patch.y, patch.y * 2)

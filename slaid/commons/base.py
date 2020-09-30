@@ -38,6 +38,7 @@ class Patch:
     x: int
     y: int
     size: Tuple[int, int]
+    level_downsample: float
 
     @property
     def area(self):
@@ -106,8 +107,9 @@ def round_to_patch(coordinates, patch_size):
     return tuple(res)
 
 
-def convert_patch(patch: Patch, slide: Slide, origin_downsample: float,
-                  dest_downsample: float) -> Patch:
+def convert_patch(patch: Patch, slide: Slide, dest_downsample: float) -> Patch:
+    origin_downsample = patch.level_downsample
     factor = origin_downsample / dest_downsample
     size = (int(patch.size[0] * factor), int(patch.size[1] * factor))
-    return Patch(int(patch.x * factor), int(patch.y * factor), size)
+    return Patch(int(patch.x * factor), int(patch.y * factor), size,
+                 dest_downsample)
