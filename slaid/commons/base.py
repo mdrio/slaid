@@ -42,6 +42,13 @@ class Mask:
     level_downsample: int
 
 
+@dataclass
+class Patch:
+    x: int
+    y: int
+    size: Tuple[int, int]
+
+
 class Slide(abc.ABC):
     def __init__(self, filename: str):
         self._filename = filename
@@ -60,11 +67,16 @@ class Slide(abc.ABC):
                     size: Tuple[int, int]) -> Image:
         pass
 
-    def patches(self, level: int, patch_size: Tuple[int, int]):
+    def patches(self, level: int, patch_size: Tuple[int, int]) -> Patch:
         dimensions = self.level_dimensions[level]
         for y in range(0, dimensions[1], patch_size[1]):
             for x in range(0, dimensions[0], patch_size[0]):
-                yield x, y
+                location = (x, y)
+                size = tuple([
+                    min(patch_size[i], dimensions[i] - location[i])
+                    for i in range(2)
+                ])
+                yield Patch(x, y, size)
 
     @abc.abstractmethod
     def get_best_level_for_downsample(self, downsample: int):
@@ -86,39 +98,6 @@ class SlideIterator:
 
     def __iter__(self):
         return self._slide.patches(self._patch_size)
-
-
-class Patch:
-    def __init__(self,
-                 slide: Slide,
-                 coordinates: Tuple[int, int],
-                 size: Tuple[int, int],
-                 features: Dict = None):
-        self.slide = slide
-        self.x = coordinates[0]
-        self.y = coordinates[1]
-        self.size = size
-        self.features = features or {}
-
-    def __str__(self):
-        return (f'slide: {self.slide}, x: {self.x}, '
-                f'y: {self.y}, size: {self.size}')
-
-    def __eq__(self, other):
-        def _check_features():
-            res = self.features.keys() == other.features.keys()
-            for f, v in self.features.items():
-                if isinstance(v, np.ndarray):
-                    res = res and np.array_equal(v, other.features[f])
-                else:
-                    res = res and v == other.features[f]
-                if not res:
-                    break
-            return res
-
-        return self.slide == other.slide and (self.x, self.y) == (
-            other.x,
-            other.y) and self.size == other.size and _check_features()
 
 
 def round_to_patch(coordinates, patch_size):

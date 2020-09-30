@@ -41,16 +41,17 @@ class BasicClassifier(Classifier):
                  level: int = 2,
                  patch_size=None):
 
+        if patch_filter is not None:
+            assert patch_size is not None
+
         if patch_size is not None:
             dimensions = slide.level_dimensions[level]
             mask = np.zeros(dimensions[::-1], dtype='uint8')
-            for x, y in slide.patches(level, patch_size):
-                patch_mask = self.classify_patch(slide, (x, y), level,
-                                                 patch_size)
+            for p in slide.patches(level, patch_size):
+                patch_mask = self.classify_patch(slide, (p.x, p.y), level,
+                                                 p.size)
                 shape = patch_mask.shape[::-1]
-                mask[y:y + shape[1], x:x + shape[0]] = patch_mask
-                #  mask[x:x + patch_mask.shape[0],
-                #       y:y + patch_mask.shape[1]] = patch_mask
+                mask[p.y:p.y + shape[1], p.x:p.x + shape[0]] = patch_mask
         #  if patch_filter:
         #      assert patch_size is not None
         #      patches = slide.patches.filter(patch_filter)
@@ -76,9 +77,6 @@ class BasicClassifier(Classifier):
         size: Tuple[int, int],
         threshold: float = 0.8,
     ) -> np.ndarray:
-        dimensions = slide.level_dimensions[level]
-        size = tuple(
-            [min(size[i], dimensions[i] - location[i]) for i in range(2)])
         image = slide.read_region(location, level, size)
         image_array = self._get_image_array(image)
         prediction = self._model.predict(image_array)
