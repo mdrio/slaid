@@ -1,34 +1,35 @@
 import abc
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 
-from slaid.commons import Image, Mask, Patch, Slide
+from slaid.commons import Image, Mask, Slide
 from slaid.models import Model
 
 
 class Classifier(abc.ABC):
-    @abc.abstractclassmethod
-    def create(cls, *args):
-        pass
-
     @abc.abstractmethod
-    def classify_patch(self, patch: Patch, *args, **kwargs) -> Dict:
-        pass
-
-    @abc.abstractmethod
-    def classify(
+    def classify_patch(
         self,
-        slide: Slide,
-        patch_filter=None,
-        mask_threshold: float = 0.8,
-        patch_threshold: float = 0.8,
-        include_mask: bool = False,
-    ):
+        slide,
+        location: Tuple[int, int],
+        level: int,
+        size: Tuple[int, int],
+        threshold: float = 0.8,
+    ) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def classify(self,
+                 slide: Slide,
+                 patch_filter=None,
+                 threshold: float = 0.8,
+                 level: int = 2,
+                 patch_size=None):
         pass
 
 
-class BasicClassifier:
+class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self._model = model
         self._feature = feature
@@ -40,7 +41,18 @@ class BasicClassifier:
                  level: int = 2,
                  patch_size=None):
 
+        if patch_size is not None:
+            dimensions = slide.level_dimensions[level]
+            mask = np.zeros(dimensions[::-1], dtype='uint8')
+            for x, y in slide.patches(level, patch_size):
+                patch_mask = self.classify_patch(slide, (x, y), level,
+                                                 patch_size)
+                shape = patch_mask.shape[::-1]
+                mask[y:y + shape[1], x:x + shape[0]] = patch_mask
+                #  mask[x:x + patch_mask.shape[0],
+                #       y:y + patch_mask.shape[1]] = patch_mask
         #  if patch_filter:
+        #      assert patch_size is not None
         #      patches = slide.patches.filter(patch_filter)
         #      for patch in patches:
         #          self._classify_patch(patch, slide, patch_area, threshold,
@@ -48,27 +60,35 @@ class BasicClassifier:
         #  else:
         #      self._classify_whole_slide(slide, patch_area, threshold,
         #                                 patch_threshold, include_mask)
-        if patch_size is None:
-            self._classify_whole_slide(slide, threshold, level)
+        else:
+            mask = self._classify_whole_slide(slide, threshold, level)
 
-    def _classify_patch(self, patch, slide, patch_area, mask_threshold,
-                        patch_threshold):
-        image = slide.read_region((patch.x, patch.y), patch.size)
-        image_array = self._get_image_array(image)
-        prediction = self._model.predict(image_array)
-        patch_mask = self._get_mask(prediction, patch.size, mask_threshold)
-        self._update_patch(slide, patch, patch_mask, patch_area,
-                           patch_threshold)
-
-    def _classify_whole_slide(self, slide, threshold, level):
-        image = slide.read_region((0, 0), 0, slide.level_dimensions[level])
-        image_array = self._get_image_array(image)
-        prediction = self._model.predict(image_array)
-
-        mask = self._get_mask(prediction, slide.level_dimensions[level][::-1],
-                              threshold)
         slide.masks[self._feature] = Mask(mask, level,
                                           slide.level_downsamples[level])
+
+    def classify_patch(
+        self,
+        slide,
+        location: Tuple[int, int],
+        level: int,
+        size: Tuple[int, int],
+        threshold: float = 0.8,
+    ) -> np.ndarray:
+        dimensions = slide.level_dimensions[level]
+        size = tuple(
+            [min(size[i], dimensions[i] - location[i]) for i in range(2)])
+        image = slide.read_region(location, level, size)
+        image_array = self._get_image_array(image)
+        prediction = self._model.predict(image_array)
+        return self._get_mask(prediction, size[::-1], threshold)
+
+    def _classify_whole_slide(self, slide, threshold, level):
+        image = slide.read_region((0, 0), level, slide.level_dimensions[level])
+        image_array = self._get_image_array(image)
+        prediction = self._model.predict(image_array)
+
+        return self._get_mask(prediction, slide.level_dimensions[level][::-1],
+                              threshold)
 
     def _get_image_array(self, image: Image) -> np.ndarray:
         image_array = image.to_array(True)
@@ -83,104 +103,3 @@ class BasicClassifier:
         mask[mask > threshold] = 1
         mask = np.array(mask, dtype=np.uint8)
         return mask
-
-
-#  class InterpolatedTissueClassifier(TissueClassifier):
-#      def _get_mask_tissue_from_slide(self, slide, threshold):
-#
-#          dims = slide.level_dimensions
-#          ds = [int(i) for i in slide.level_downsamples]
-#
-#          x0 = 0
-#          y0 = 0
-#          x1 = dims[0][0]
-#          y1 = dims[0][1]
-#
-#          delta_x = x1 - x0
-#          delta_y = y1 - y0
-#
-#          pil_img = slide.read_region(
-#              location=(x0, y0),
-#              size=(delta_x // ds[slide.extraction_level],
-#                    delta_y // ds[slide.extraction_level]))
-#          return self._predictor.get_tissue_mask(pil_img, threshold)
-#
-#      def _get_tissue_patches_coordinates(
-#          self,
-#          slide,
-#          tissue_mask,
-#          patch_size=PATCH_SIZE,
-#      ):
-#
-#          tissue_mask *= 255
-#          # resize and use to extract patches
-#          lev = slide.get_best_level_for_downsample(16)
-#          lev_dim = slide.level_dimensions[lev]
-#
-#          big_x = slide.level_dimensions[slide.patches.extraction_level][0]
-#          big_y = slide.level_dimensions[slide.patches.extraction_level][1]
-#
-#          # downsampling factor of level0 with respect  patch size
-#          dim_x, dim_y = patch_size
-#          xx = round(big_x / dim_x)
-#          yy = round(big_y / dim_y)
-#
-#          mask = PIL_Image.new('L', lev_dim)
-#          mask.putdata(tissue_mask.flatten())
-#          mask = mask.resize((xx, yy), resample=PIL_Image.BILINEAR)
-#          tissue = [(x, y) for x in range(xx) for y in range(yy)
-#                    if mask.getpixel((x, y)) > 0]
-#
-#          ext_lev_ds = slide.level_downsamples[slide.patches.extraction_level]
-#          return [
-#              round_to_patch((round(x * big_x / xx * ext_lev_ds),
-#                              round(y * big_y / yy * ext_lev_ds)), patch_size)
-#              for (x, y) in tissue
-#          ]
-#
-#      def classify_patch(self, patch: Patch) -> Patch:
-#          raise NotImplementedError
-#
-#      def classify(self,
-#                   slide: Slide,
-#                   pixel_threshold: float = 0.8,
-#                   minimum_tissue_ratio: float = 0.01,
-#                   downsampling: int = 16,
-#                   include_mask_feature=False) -> Slide:
-#
-#          lev = slide.get_best_level_for_downsample(downsampling)
-#          lev_dim = slide.level_dimensions[lev]
-#          thumb = slide.read_region(location=(0, 0), size=lev_dim)
-#          tissue_mask = self._predictor.get_tissue_mask(thumb, pixel_threshold)
-#
-#          dim_x, dim_y = slide.patches.patch_size
-#          patch_area = dim_x * dim_y
-#          #  patch_area_th = patch_area * self._patch_threshold
-#
-#          patch_coordinates = self._get_tissue_patches_coordinates(
-#              slide,
-#              tissue_mask,
-#              slide.patches.patch_size,
-#          )
-#
-#          slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
-#          if include_mask_feature:
-#              slide.patches.add_feature(TissueFeature.TISSUE_MASK)
-#
-#          for (coor_x, coor_y) in patch_coordinates:
-#              patch = slide.read_region(location=(coor_x, coor_y),
-#                                        size=(dim_x, dim_y))
-#
-#              tissue_mask = self._predictor.get_tissue_mask(
-#                  patch, pixel_threshold)
-#
-#              tissue_area = np.sum(tissue_mask)
-#              tissue_ratio = tissue_area / patch_area
-#              if tissue_ratio > minimum_tissue_ratio:
-#                  features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
-#                  if include_mask_feature:
-#                      features[TissueFeature.TISSUE_MASK] = np.array(tissue_mask,
-#                                                                     dtype=bool)
-#                  slide.patches.update_patch((coor_x, coor_y), features=features)
-#
-#          return slide

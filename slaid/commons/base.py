@@ -60,12 +60,11 @@ class Slide(abc.ABC):
                     size: Tuple[int, int]) -> Image:
         pass
 
-    def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
-        dimensions = self.dimensions_at_extraction_level
-        patch_size = patch_size if patch_size else PATCH_SIZE
+    def patches(self, level: int, patch_size: Tuple[int, int]):
+        dimensions = self.level_dimensions[level]
         for y in range(0, dimensions[1], patch_size[1]):
             for x in range(0, dimensions[0], patch_size[0]):
-                yield Patch(self, (x, y), patch_size)
+                yield x, y
 
     @abc.abstractmethod
     def get_best_level_for_downsample(self, downsample: int):
@@ -86,7 +85,7 @@ class SlideIterator:
         self._patch_size = patch_size
 
     def __iter__(self):
-        return self._slide.iterate_by_patch(self._patch_size)
+        return self._slide.patches(self._patch_size)
 
 
 class Patch:
@@ -302,7 +301,7 @@ class PandasPatchCollection(PatchCollection):
 
     def _init_dataframe(self):
         data = defaultdict(lambda: [])
-        for p in self._slide.iterate_by_patch(self._patch_size):
+        for p in self._slide.patches(self._patch_size):
             data['y'].append(p.y)
             data['x'].append(p.x)
         df = pd.DataFrame(data, dtype=int)
