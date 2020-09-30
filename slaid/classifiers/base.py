@@ -61,7 +61,9 @@ class BasicClassifier(Classifier):
         #      self._classify_whole_slide(slide, patch_area, threshold,
         #                                 patch_threshold, include_mask)
         else:
-            mask = self._classify_whole_slide(slide, threshold, level)
+            mask = self.classify_patch(slide, (0, 0), level,
+                                       slide.level_dimensions[level],
+                                       threshold)
 
         slide.masks[self._feature] = Mask(mask, level,
                                           slide.level_downsamples[level])
@@ -81,14 +83,6 @@ class BasicClassifier(Classifier):
         image_array = self._get_image_array(image)
         prediction = self._model.predict(image_array)
         return self._get_mask(prediction, size[::-1], threshold)
-
-    def _classify_whole_slide(self, slide, threshold, level):
-        image = slide.read_region((0, 0), level, slide.level_dimensions[level])
-        image_array = self._get_image_array(image)
-        prediction = self._model.predict(image_array)
-
-        return self._get_mask(prediction, slide.level_dimensions[level][::-1],
-                              threshold)
 
     def _get_image_array(self, image: Image) -> np.ndarray:
         image_array = image.to_array(True)
