@@ -1,8 +1,8 @@
 import unittest
 
-from commons import DummySlide
+import numpy as np
 
-from slaid.commons import PandasPatchCollection, Patch, Slide, round_to_patch
+from slaid.commons import Mask, Patch, Slide, convert_patch, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
 
 IMAGE = 'tests/data/test.tif'
@@ -72,120 +72,32 @@ class TestRoundToPatch(unittest.TestCase):
         self.assertEqual(res, (512, 256))
 
 
-class TestPandasPatchCollection(unittest.TestCase):
-    def setUp(self):
-        self.slide_size = (200, 100)
-        self.slide = DummySlide('slide', self.slide_size)
-        self.patch_size = (10, 10)
-        self.collection = PandasPatchCollection(self.slide, self.patch_size)
+class TestConvertPatch(unittest.TestCase):
+    def test_convert_down(self):
+        slide = EcvlSlide('tests/data/test.tif')
+        level_1_mask = Mask(np.zeros(slide.level_dimensions[1][::-1]), 1,
+                            slide.level_downsamples[1])
+        level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
+                            slide.level_downsamples[0])
+        patch = Patch(100, 100, (100, 100), level_0_mask)
+        converted_patch = convert_patch(patch, slide, level_1_mask)
+        self.assertEqual(converted_patch.x, patch.x // 2)
+        self.assertEqual(converted_patch.y, patch.y // 2)
+        self.assertEqual(converted_patch.size[0], patch.size[0] // 2)
+        self.assertEqual(converted_patch.size[1], patch.size[1] // 2)
 
-    def test_init(self):
-        self.assertEqual(
-            len(self.collection), self.slide_size[0] * self.slide_size[1] /
-            (self.patch_size[0] * self.patch_size[1]))
-
-    def test_iteration(self):
-        x = y = counter = 0
-        for patch in self.collection:
-            self.assertEqual(patch.x, x)
-            self.assertEqual(patch.y, y)
-            x = (x + self.patch_size[0]) % self.slide_size[0]
-            if x == 0:
-                y += self.patch_size[1]
-            counter += 1
-
-        self.assertEqual(
-            counter, self.slide_size[0] * self.slide_size[1] /
-            (self.patch_size[0] * self.patch_size[1]))
-
-    def test_get_item(self):
-        coordinates = (190, 90)
-        patch = self.collection.get_patch(coordinates)
-        self.assertTrue(isinstance(patch, Patch))
-        self.assertEqual(patch.x, coordinates[0])
-        self.assertEqual(patch.y, coordinates[1])
-
-    def test_update_patch(self):
-        coordinates = (190, 90)
-        self.collection.update_patch(coordinates=coordinates,
-                                     features={
-                                         'test': 1,
-                                         'test2': 2
-                                     })
-        self.assertEqual(len(self.collection), 200)
-        patch = self.collection.get_patch(coordinates)
-        self.assertEqual(patch.x, coordinates[0])
-        self.assertEqual(patch.y, coordinates[1])
-        self.assertEqual(patch.features['test'], 1)
-        self.assertEqual(patch.features['test2'], 2)
-
-    def test_merge(self):
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p, features={'feature': i})
-        filtered_collection = self.collection.filter(
-            self.collection['feature'] > 0)
-        self.assertEqual(len(filtered_collection), len(self.collection) - 1)
-
-        filtered_collection.update_patch(coordinates=(10, 10),
-                                         features={
-                                             'feature2': -1,
-                                         })
-        #  self.collection.update(filtered_collection)
-        #  self.assertEqual(
-        #      self.collection.get_patch((10, 10)).features['feature'], -1)
-
-        self.collection.merge(filtered_collection)
-        self.assertEqual(
-            self.collection.get_patch((10, 10)).features['feature2'], -1)
-
-    def test_filter(self):
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p, features={
-                'feature': i,
-            })
-        filtered_collection = self.collection.filter(
-            self.collection['feature'] > 0)
-
-        for p in filtered_collection:
-            self.assertTrue(p.features['feature'] > 0)
-
-    def test_filter_textual(self):
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p, features={
-                'feature': i,
-            })
-        filtered_collection = self.collection.filter('feature > 0')
-
-        for p in filtered_collection:
-            self.assertTrue(p.features['feature'] > 0)
-
-    def test_filter_and_condition(self):
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p,
-                                         features={
-                                             'feature': i,
-                                             'feature2': i
-                                         })
-        filtered_collection = self.collection.filter(
-            (self.collection['feature'] > 0)
-            & (self.collection['feature2'] > 1))
-
-        for p in filtered_collection:
-            self.assertTrue(p.features['feature'] > 0)
-            self.assertTrue(p.features['feature2'] > 1)
-
-    def test_features(self):
-        self.assertEqual(self.slide.patches.features, [])
-        for i, p in enumerate(self.collection):
-            self.collection.update_patch(patch=p,
-                                         features={
-                                             'feature': i,
-                                             'feature2': i
-                                         })
-
-        features = list(self.collection.features)
-        features.sort()
-        self.assertEqual(features, ['feature', 'feature2'])
+    def test_convert_up(self):
+        slide = EcvlSlide('tests/data/test.tif')
+        level_1_mask = Mask(np.zeros(slide.level_dimensions[1][::-1]), 1,
+                            slide.level_downsamples[1])
+        level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
+                            slide.level_downsamples[0])
+        patch = Patch(100, 100, (100, 100), level_1_mask)
+        converted_patch = convert_patch(patch, slide, level_0_mask)
+        self.assertEqual(converted_patch.x, patch.x * 2)
+        self.assertEqual(converted_patch.y, patch.y * 2)
+        self.assertEqual(converted_patch.size[0], patch.size[0] * 2)
+        self.assertEqual(converted_patch.size[1], patch.size[1] * 2)
 
 
 if __name__ == '__main__':
