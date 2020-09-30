@@ -106,10 +106,8 @@ def round_to_patch(coordinates, patch_size):
     return tuple(res)
 
 
-def convert_patch(patch: Patch, slide: Slide, origin_mask,
-                  dest_mask: Mask) -> Patch:
-    origin_downsample = slide.level_downsamples[origin_mask.extraction_level]
-    dest_downsample = slide.level_downsamples[dest_mask.extraction_level]
+def convert_patch(patch: Patch, slide: Slide, origin_downsample: float,
+                  dest_downsample: float) -> Patch:
     factor = origin_downsample / dest_downsample
     size = (int(patch.size[0] * factor), int(patch.size[1] * factor))
     return Patch(int(patch.x * factor), int(patch.y * factor), size)

@@ -75,13 +75,10 @@ class TestRoundToPatch(unittest.TestCase):
 class TestConvertPatch(unittest.TestCase):
     def test_convert_down(self):
         slide = EcvlSlide('tests/data/test.tif')
-        level_1_mask = Mask(np.zeros(slide.level_dimensions[1][::-1]), 1,
-                            slide.level_downsamples[1])
-        level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
-                            slide.level_downsamples[0])
         patch = Patch(100, 100, (100, 100))
-        converted_patch = convert_patch(patch, slide, level_0_mask,
-                                        level_1_mask)
+        converted_patch = convert_patch(patch, slide,
+                                        slide.level_downsamples[0],
+                                        slide.level_downsamples[1])
         self.assertEqual(converted_patch.x, patch.x // 2)
         self.assertEqual(converted_patch.y, patch.y // 2)
         self.assertEqual(converted_patch.size[0], patch.size[0] // 2)
@@ -89,13 +86,10 @@ class TestConvertPatch(unittest.TestCase):
 
     def test_convert_up(self):
         slide = EcvlSlide('tests/data/test.tif')
-        level_1_mask = Mask(np.zeros(slide.level_dimensions[1][::-1]), 1,
-                            slide.level_downsamples[1])
-        level_0_mask = Mask(np.zeros(slide.level_dimensions[0][::-1]), 0,
-                            slide.level_downsamples[0])
         patch = Patch(100, 100, (100, 100))
-        converted_patch = convert_patch(patch, slide, level_1_mask,
-                                        level_0_mask)
+        converted_patch = convert_patch(patch, slide,
+                                        slide.level_downsamples[1],
+                                        slide.level_downsamples[0])
         self.assertEqual(converted_patch.x, patch.x * 2)
         self.assertEqual(converted_patch.y, patch.y * 2)
         self.assertEqual(converted_patch.size[0], patch.size[0] * 2)
