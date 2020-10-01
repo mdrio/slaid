@@ -8,7 +8,6 @@ from dask.distributed import Client
 
 from slaid.classifiers.base import BasicClassifier, PatchFilter
 from slaid.commons import Mask, Slide
-from slaid.models import Model
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('dask')
@@ -19,10 +18,6 @@ def init_client(*args, **kwargs):
 
 
 class Classifier(BasicClassifier):
-    def __init__(self, model: Model, feature: str, row_size: int):
-        super().__init__(model, feature)
-        self._row_size = row_size
-
     def classify(self,
                  slide: Slide,
                  patch_filter=None,
