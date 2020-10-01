@@ -1,3 +1,4 @@
+import PIL
 import abc
 import inspect
 import sys
@@ -54,6 +55,15 @@ class Mask:
     def ratio(self, patch: Patch) -> float:
         return np.sum(self.array[patch.y:patch.y + patch.size[1],
                                  patch.x:patch.x + patch.size[0]]) / patch.area
+
+    def to_image(self):
+        return PIL.Image.fromarray(255 * self.array, 'L')
+
+    def show(self):
+        self.to_image().show()
+
+    def save(self, path):
+        self.to_image().save(path)
 
 
 class Slide(abc.ABC):
