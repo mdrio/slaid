@@ -4,6 +4,7 @@ import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
 from slaid.classifiers import BasicClassifier
+from slaid.commons import Mask, Patch, convert_patch
 from slaid.commons.ecvl import create_slide
 
 #  from slaid.classifiers.eddl import TissueMaskPredictor as\
@@ -14,7 +15,7 @@ class TestTissueClassifierTest:
     LEVEL = 1
 
     @staticmethod
-    def get_classifier(model):
+    def get_classifier(model, feature='tissue'):
         pass
 
     @staticmethod
@@ -60,33 +61,127 @@ class TestTissueClassifierTest:
         self.assertEqual(mask[:300, :].all(), 1)
         self.assertEqual(mask[300:, :].all(), 0)
 
+    def test_classify_with_filter_same_level(self):
+        tissue_level = 0
+        cancer_level = 0
+        patch_size = (100, 100)
+        slide = create_slide('tests/data/test.tif')
+        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+        mask = Mask(mask_array, tissue_level,
+                    slide.level_downsamples[tissue_level])
+        tissue_patch = Patch(100, 100, patch_size,
+                             slide.level_downsamples[tissue_level])
+        cancer_patch = convert_patch(tissue_patch, slide,
+                                     slide.level_downsamples[cancer_level])
+        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
+                   tissue_patch.x:tissue_patch.x +
+                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+
+        slide.masks['tissue'] = mask
+        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+        tissue_detector.classify(slide,
+                                 level=cancer_level,
+                                 patch_size=patch_size,
+                                 patch_filter='tissue >= 1')
+
+        mask = slide.masks['cancer']
+        self.assertEqual(mask.array.shape[::-1],
+                         slide.level_dimensions[cancer_level])
+        self.assertEqual(mask.ratio(cancer_patch), 1)
+        self.assertEqual(np.sum(mask.array), cancer_patch.area)
+
+    def test_classify_with_filter_different_level_proportional_patch_size(
+            self):
+        tissue_level = 0
+        cancer_level = 2
+        patch_size = (100, 100)
+        slide = create_slide('tests/data/test.tif')
+        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+        mask = Mask(mask_array, tissue_level,
+                    slide.level_downsamples[tissue_level])
+        tissue_patch = Patch(100, 100, patch_size,
+                             slide.level_downsamples[tissue_level])
+        cancer_patch = convert_patch(tissue_patch, slide,
+                                     slide.level_downsamples[cancer_level])
+        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
+                   tissue_patch.x:tissue_patch.x +
+                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+
+        slide.masks['tissue'] = mask
+        downsample = slide.level_downsamples[cancer_level]
+        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+        tissue_detector.classify(slide,
+                                 level=cancer_level,
+                                 patch_size=(int(patch_size[0] // downsample),
+                                             int(patch_size[1] // downsample)),
+                                 patch_filter='tissue >= 1')
+
+        mask = slide.masks['cancer']
+        self.assertEqual(mask.array.shape[::-1],
+                         slide.level_dimensions[cancer_level])
+        self.assertEqual(mask.ratio(cancer_patch), 1)
+        self.assertEqual(np.sum(mask.array), cancer_patch.area)
+
+    def test_classify_with_filter_different_level_not_proportional_patch_size(
+            self):
+        tissue_level = 0
+        cancer_level = 2
+        patch_size = (75, 75)
+        slide = create_slide('tests/data/test.tif')
+        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+        mask = Mask(mask_array, tissue_level,
+                    slide.level_downsamples[tissue_level])
+        tissue_patch = Patch(100, 100, patch_size,
+                             slide.level_downsamples[tissue_level])
+
+        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
+                   tissue_patch.x:tissue_patch.x +
+                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+
+        slide.masks['tissue'] = mask
+
+        downsample = slide.level_downsamples[cancer_level]
+        expected_ratio = patch_size[0]**2 / (downsample * patch_size[0])**2
+        print(expected_ratio)
+
+        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+        tissue_detector.classify(slide,
+                                 level=cancer_level,
+                                 patch_size=patch_size,
+                                 patch_filter=f'tissue >= {expected_ratio}')
+
+        mask = slide.masks['cancer']
+        print(np.sum(mask.array))
+        self.assertEqual(mask.array.shape[::-1],
+                         slide.level_dimensions[cancer_level])
+        self.assertEqual(np.sum(mask.array), patch_size[0]**2)
+
 
 class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     @staticmethod
-    def get_classifier(model):
-        return BasicClassifier(model, 'tissue')
+    def get_classifier(model, feature='tissue'):
+        return BasicClassifier(model, feature)
 
     @staticmethod
     def get_model():
         return GreenIsTissueModel()
 
 
-#  class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
-#      @classmethod
-#      def setUpClass(cls):
-#          #  init_client()
-#          import dask
-#          dask.config.set(scheduler='synchronous'
-#                          )  # overwrite default with single-threaded scheduler
-#
-#      @staticmethod
-#      def get_classifier(model):
-#          return RowClassifier(model, 'tissue', 200)
-#
-#      @staticmethod
-#      def get_model():
-#          return GreenIsTissueModel()
-#
+class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        #  init_client()
+        import dask
+        dask.config.set(scheduler='synchronous'
+                        )  # overwrite default with single-threaded scheduler
+
+    #  @staticmethod
+    #  def get_classifier(model):
+    #      return RowClassifier(model, 'tissue', 200)
+    #
+    @staticmethod
+    def get_model():
+        return GreenIsTissueModel()
 
 
 class EddlTissueClassifierTest(BasicTissueClassifierTest):

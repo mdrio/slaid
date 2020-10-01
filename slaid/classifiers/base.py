@@ -1,9 +1,11 @@
 import abc
-from typing import Tuple
+import re
+from dataclasses import dataclass
+from typing import Callable, Tuple
 
 import numpy as np
 
-from slaid.commons import Image, Mask, Slide
+from slaid.commons import Image, Mask, Patch, Slide, convert_patch
 from slaid.models import Model
 
 
@@ -29,6 +31,39 @@ class Classifier(abc.ABC):
         pass
 
 
+@dataclass
+class PatchFilter:
+    slide: Slide
+    mask: Mask
+    operator: str
+    value: float
+
+    @staticmethod
+    def create(slide: Slide, condition: str) -> Tuple[str, Callable, float]:
+        operator_mapping = {
+            '>': '__gt__',
+            '>=': '__ge__',
+            '<': '__lt__',
+            '<=': '__le__',
+            '==': '__eq__',
+            '!=': '__ne__',
+        }
+        parsed = re.match(
+            r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
+            condition).groupdict()
+        mask = slide.masks[parsed['mask']]
+        operator = operator_mapping[parsed['operator']]
+        value = float(parsed['value'])
+        return PatchFilter(slide, mask, operator, value)
+
+    def filter(self, patch: Patch):
+        print('******', patch.x, patch.y, patch.size, self.mask.ratio(patch))
+        patch = convert_patch(patch, self.slide, self.mask.level_downsample)
+        print('******c', patch.x, patch.y, patch.size, self.mask.ratio(patch))
+        filtered = getattr(self.mask.ratio(patch), self.operator)(self.value)
+        return filtered
+
+
 class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self._model = model
@@ -42,25 +77,21 @@ class BasicClassifier(Classifier):
                  patch_size=None):
 
         if patch_filter is not None:
+            patch_filter = PatchFilter.create(slide, patch_filter).filter
             assert patch_size is not None
+        else:
+            patch_filter = (lambda x: True)
 
         if patch_size is not None:
+            print('patch_size', patch_size)
             dimensions = slide.level_dimensions[level]
             mask = np.zeros(dimensions[::-1], dtype='uint8')
             for p in slide.patches(level, patch_size):
-                patch_mask = self.classify_patch(slide, (p.x, p.y), level,
-                                                 p.size)
-                shape = patch_mask.shape[::-1]
-                mask[p.y:p.y + shape[1], p.x:p.x + shape[0]] = patch_mask
-        #  if patch_filter:
-        #      assert patch_size is not None
-        #      patches = slide.patches.filter(patch_filter)
-        #      for patch in patches:
-        #          self._classify_patch(patch, slide, patch_area, threshold,
-        #                               patch_threshold)
-        #  else:
-        #      self._classify_whole_slide(slide, patch_area, threshold,
-        #                                 patch_threshold, include_mask)
+                if patch_filter(p):
+                    patch_mask = self.classify_patch(slide, (p.x, p.y), level,
+                                                     p.size)
+                    shape = patch_mask.shape[::-1]
+                    mask[p.y:p.y + shape[1], p.x:p.x + shape[0]] = patch_mask
         else:
             mask = self.classify_patch(slide, (0, 0), level,
                                        slide.level_dimensions[level],

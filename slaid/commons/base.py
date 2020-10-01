@@ -53,7 +53,7 @@ class Mask:
 
     def ratio(self, patch: Patch) -> float:
         return np.sum(self.array[patch.y:patch.y + patch.size[1],
-                                 patch.x:patch.x + patch.size]) / patch.area
+                                 patch.x:patch.x + patch.size[0]]) / patch.area
 
 
 class Slide(abc.ABC):
@@ -83,7 +83,7 @@ class Slide(abc.ABC):
                     min(patch_size[i], dimensions[i] - location[i])
                     for i in range(2)
                 ])
-                yield Patch(x, y, size)
+                yield Patch(x, y, size, self.level_downsamples[level])
 
     @abc.abstractmethod
     def get_best_level_for_downsample(self, downsample: int):
