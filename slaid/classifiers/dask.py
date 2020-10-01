@@ -43,7 +43,7 @@ class Classifier(BasicClassifier):
                         self.classify_patch(slide, (p.x, p.y), level, p.size),
                         p.size[::-1], 'uint8')
                 else:
-                    patch_mask = da.zeros(p.size[::-1])
+                    patch_mask = da.zeros(p.size[::-1], dtype='uint8')
                 row = p.y // patch_size[1]
                 try:
                     rows[row].append(patch_mask)
