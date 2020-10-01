@@ -83,7 +83,6 @@ class BasicClassifier(Classifier):
             patch_filter = (lambda x: True)
 
         if patch_size is not None:
-            print('patch_size', patch_size)
             dimensions = slide.level_dimensions[level]
             mask = np.zeros(dimensions[::-1], dtype='uint8')
             for p in slide.patches(level, patch_size):
