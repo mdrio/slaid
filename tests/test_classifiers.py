@@ -4,6 +4,7 @@ import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
 from slaid.classifiers import BasicClassifier
+from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask, Patch, convert_patch
 from slaid.commons.ecvl import create_slide
 
@@ -142,7 +143,6 @@ class TestTissueClassifierTest:
 
         downsample = slide.level_downsamples[cancer_level]
         expected_ratio = patch_size[0]**2 / (downsample * patch_size[0])**2
-        print(expected_ratio)
 
         tissue_detector = self.get_classifier(self.get_model(), 'cancer')
         tissue_detector.classify(slide,
@@ -151,7 +151,6 @@ class TestTissueClassifierTest:
                                  patch_filter=f'tissue >= {expected_ratio}')
 
         mask = slide.masks['cancer']
-        print(np.sum(mask.array))
         self.assertEqual(mask.array.shape[::-1],
                          slide.level_dimensions[cancer_level])
         self.assertEqual(np.sum(mask.array), patch_size[0]**2)
@@ -167,7 +166,7 @@ class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
         return GreenIsTissueModel()
 
 
-class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+class DaskClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         #  init_client()
@@ -175,10 +174,10 @@ class RowClassifierTest(TestTissueClassifierTest, unittest.TestCase):
         dask.config.set(scheduler='synchronous'
                         )  # overwrite default with single-threaded scheduler
 
-    #  @staticmethod
-    #  def get_classifier(model):
-    #      return RowClassifier(model, 'tissue', 200)
-    #
+    @staticmethod
+    def get_classifier(model, feature='tissue'):
+        return DaskClassifier(model, feature, 200)
+
     @staticmethod
     def get_model():
         return GreenIsTissueModel()
