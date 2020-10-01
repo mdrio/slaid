@@ -57,9 +57,7 @@ class PatchFilter:
         return PatchFilter(slide, mask, operator, value)
 
     def filter(self, patch: Patch):
-        print('******', patch.x, patch.y, patch.size, self.mask.ratio(patch))
         patch = convert_patch(patch, self.slide, self.mask.level_downsample)
-        print('******c', patch.x, patch.y, patch.size, self.mask.ratio(patch))
         filtered = getattr(self.mask.ratio(patch), self.operator)(self.value)
         return filtered
 
