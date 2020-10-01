@@ -36,11 +36,6 @@ class Model(BaseModel):
         return eddl.predict(self._model, [tensor])
 
     def predict(self, array: np.ndarray) -> np.ndarray:
-        #  np_img = np_img.transpose((1,2,0)) # Convert to channel last
-
-        #  n_px = s[0] * s[1]
-        #  array = array[:, :, :3].reshape(n_px, 3)
-
         predictions = self._predict(array)
         temp_mask = []
         for prob_T in predictions:
@@ -48,5 +43,4 @@ class Model(BaseModel):
             temp_mask.append(output_np[:, 1])
 
         flat_mask = np.vstack(temp_mask)
-        #  return flat_mask.reshape((s[0], s[1]))
         return flat_mask
