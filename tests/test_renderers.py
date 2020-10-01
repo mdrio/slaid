@@ -2,8 +2,8 @@ import json
 import unittest
 
 import numpy as np
-from test_commons import DummySlide
 
+from slaid.commons.ecvl import Slide
 from slaid.commons import Mask
 from slaid.renderers import to_json
 
@@ -30,7 +30,7 @@ class ToJsonTest(unittest.TestCase):
 
     def test_slide(self):
         #  given
-        slide = DummySlide('s', (10, 20))
+        slide = Slide('tests/data/test.tif')
         array = np.ones((10, 10))
         slide.masks['annotation'] = Mask(array, 0, 1)
 

@@ -86,10 +86,12 @@ class TestTissueClassifierTest:
                                  patch_filter='tissue >= 1')
 
         mask = slide.masks['cancer']
+
         self.assertEqual(mask.array.shape[::-1],
                          slide.level_dimensions[cancer_level])
         self.assertEqual(mask.ratio(cancer_patch), 1)
         self.assertEqual(np.sum(mask.array), cancer_patch.area)
+        slide.masks['cancer'].save('mask.png')
 
     def test_classify_with_filter_different_level_proportional_patch_size(
             self):
@@ -156,7 +158,7 @@ class TestTissueClassifierTest:
         self.assertEqual(np.sum(mask.array), patch_size[0]**2)
 
 
-class BasicTissueClassifierTest(TestTissueClassifierTest, unittest.TestCase):
+class BasicClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     @staticmethod
     def get_classifier(model, feature='tissue'):
         return BasicClassifier(model, feature)
@@ -176,14 +178,14 @@ class DaskClassifierTest(TestTissueClassifierTest, unittest.TestCase):
 
     @staticmethod
     def get_classifier(model, feature='tissue'):
-        return DaskClassifier(model, feature, 200)
+        return DaskClassifier(model, feature)
 
     @staticmethod
     def get_model():
         return GreenIsTissueModel()
 
 
-class EddlTissueClassifierTest(BasicTissueClassifierTest):
+class EddlTissueClassifierTest(BasicClassifierTest):
     @staticmethod
     def get_model():
         return EddlGreenIsTissueModel()

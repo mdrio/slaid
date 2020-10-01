@@ -5,7 +5,7 @@ from commons import AllOneModel
 
 import slaid.classifiers as cl
 from slaid.models.eddl import Model
-from slaid.commons.ecvl import create_slide
+from slaid.commons.ecvl import Slide
 from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
                              to_json)
 
@@ -19,9 +19,8 @@ def main():
 
     tissue_model = Model(
         'slaid/resources/models/extract_tissue_eddl-1.0.0.bin', False)
-    patch_size = (256, 256)
     slide_filename = 'tests/data/PH10023-1.thumb.tif'
-    slide = create_slide(slide_filename, 0, patch_size)
+    slide = Slide(slide_filename)
 
     json_filename = '/tmp/test.json'
     mask_filename = 'PH10023-1-mask'
@@ -31,10 +30,12 @@ def main():
     cancer_classifier = cl.BasicClassifier(AllOneModel(), 'cancer')
 
     print('tissue classification')
-    tissue_classifier.classify(slide, include_mask=True)
+    tissue_classifier.classify(slide)
 
     print('cancer classification')
-    cancer_classifier.classify(slide, slide.patches['tissue'] > 0.5)
+    cancer_classifier.classify(slide,
+                               patch_filter='tissue > 0.5',
+                               patch_size=(256, 256))
 
     print('to_json')
     to_json(slide, json_filename)
