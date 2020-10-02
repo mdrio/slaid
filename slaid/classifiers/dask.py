@@ -1,4 +1,3 @@
-from collections import defaultdict
 import logging
 from typing import Tuple
 
@@ -7,8 +6,8 @@ import numpy as np
 from dask import delayed
 from dask.distributed import Client
 
-from slaid.classifiers.base import BasicClassifier, PatchFilter
-from slaid.commons import Mask, Slide
+from slaid.classifiers.base import BasicClassifier
+from slaid.commons import Slide
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('dask')
@@ -25,35 +24,7 @@ class Classifier(BasicClassifier):
                  threshold: float = 0.8,
                  level: int = 2,
                  patch_size=None):
-        if patch_filter is not None:
-            patch_filter = PatchFilter.create(slide, patch_filter).filter
-            assert patch_size is not None
-        else:
-            patch_filter = (lambda x: True)
-
-        if patch_size is not None:
-            patches_by_row = defaultdict(list)
-            for p in slide.patches(level, patch_size):
-                if patch_filter(p):
-                    patch_mask = self.classify_patch(slide, (p.x, p.y), level,
-                                                     p.size)
-                else:
-                    patch_mask = self._get_zeros(p.size[::-1], dtype='uint8')
-                patches_by_row[p.y].append(patch_mask)
-
-            rows = [
-                self._concatenate(patches, axis=1)
-                for _, patches in sorted(patches_by_row.items())
-            ]
-            mask = self._concatenate(rows, axis=0)
-
-        else:
-            mask = self.classify_patch(slide, (0, 0), level,
-                                       slide.level_dimensions[level],
-                                       threshold)
-
-        slide.masks[self._feature] = Mask(mask, level,
-                                          slide.level_downsamples[level])
+        super().classify(slide, patch_filter, threshold, level, patch_size)
         slide.masks[self._feature].array = slide.masks[
             self._feature].array.compute()
 

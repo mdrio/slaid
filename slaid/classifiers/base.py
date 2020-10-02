@@ -1,3 +1,4 @@
+from collections import defaultdict
 import abc
 import re
 from dataclasses import dataclass
@@ -73,7 +74,6 @@ class BasicClassifier(Classifier):
                  threshold: float = 0.8,
                  level: int = 2,
                  patch_size=None):
-
         if patch_filter is not None:
             patch_filter = PatchFilter.create(slide, patch_filter).filter
             assert patch_size is not None
@@ -81,14 +81,21 @@ class BasicClassifier(Classifier):
             patch_filter = (lambda x: True)
 
         if patch_size is not None:
-            dimensions = slide.level_dimensions[level]
-            mask = np.zeros(dimensions[::-1], dtype='uint8')
+            patches_by_row = defaultdict(list)
             for p in slide.patches(level, patch_size):
                 if patch_filter(p):
                     patch_mask = self.classify_patch(slide, (p.x, p.y), level,
                                                      p.size)
-                    shape = patch_mask.shape[::-1]
-                    mask[p.y:p.y + shape[1], p.x:p.x + shape[0]] = patch_mask
+                else:
+                    patch_mask = self._get_zeros(p.size[::-1], dtype='uint8')
+                patches_by_row[p.y].append(patch_mask)
+
+            rows = [
+                self._concatenate(patches, axis=1)
+                for _, patches in sorted(patches_by_row.items())
+            ]
+            mask = self._concatenate(rows, axis=0)
+
         else:
             mask = self.classify_patch(slide, (0, 0), level,
                                        slide.level_dimensions[level],
@@ -109,6 +116,14 @@ class BasicClassifier(Classifier):
         image_array = self._get_image_array(image)
         prediction = self._model.predict(image_array)
         return self._get_mask(prediction, size[::-1], threshold)
+
+    @staticmethod
+    def _get_zeros(size, dtype):
+        return np.zeros(size, dtype)
+
+    @staticmethod
+    def _concatenate(seq, axis):
+        return np.concatenate(seq, axis)
 
     def _get_image_array(self, image: Image) -> np.ndarray:
         image_array = image.to_array(True)
