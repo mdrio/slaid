@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 from typing import Tuple
 
@@ -31,7 +32,7 @@ class Classifier(BasicClassifier):
             patch_filter = (lambda x: True)
 
         if patch_size is not None:
-            rows = []
+            patches_by_row = defaultdict(list)
             for p in slide.patches(level, patch_size):
                 if patch_filter(p):
                     patch_mask = da.from_delayed(
@@ -39,15 +40,12 @@ class Classifier(BasicClassifier):
                         p.size[::-1], 'uint8')
                 else:
                     patch_mask = da.zeros(p.size[::-1], dtype='uint8')
-                row = round(p.y // slide.level_downsamples[level] //
-                            patch_size[1])
-                print(row, p)
-                try:
-                    rows[row].append(patch_mask)
-                except IndexError:
-                    rows.append([patch_mask])
-            for i, r in enumerate(rows):
-                rows[i] = da.concatenate(r, axis=1)
+                patches_by_row[p.y].append(patch_mask)
+
+            rows = [
+                da.concatenate(patches, axis=1)
+                for _, patches in sorted(patches_by_row.items())
+            ]
             mask = da.concatenate(rows, axis=0)
 
         else:
