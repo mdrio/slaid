@@ -51,7 +51,7 @@ class TestTissueClassifierTest:
         self.assertEqual(mask[:300, :].all(), 1)
         self.assertEqual(mask[300:, :].all(), 0)
 
-    def test_classify_by_patch(self):
+    def test_classify_by_patch_level_0(self):
         level = 0
         slide = create_slide('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())
@@ -61,6 +61,19 @@ class TestTissueClassifierTest:
         self.assertEqual(mask.shape[::-1], slide.level_dimensions[level])
         self.assertEqual(mask[:300, :].all(), 1)
         self.assertEqual(mask[300:, :].all(), 0)
+        slide.masks['tissue'].save('mask-tissue.png')
+
+    def test_classify_by_patch_level_2(self):
+        level = 2
+        slide = create_slide('tests/data/test.tif')
+        downsample = slide.level_downsamples[level]
+        tissue_detector = self.get_classifier(self.get_model())
+        tissue_detector.classify(slide, level=level, patch_size=(200, 200))
+
+        mask = slide.masks['tissue'].array
+        self.assertEqual(mask.shape[::-1], slide.level_dimensions[level])
+        self.assertEqual(mask[:round(300 // downsample), :].all(), 1)
+        self.assertEqual(mask[round(300 // downsample):, :].all(), 0)
 
     def test_classify_with_filter_same_level(self):
         tissue_level = 0
@@ -80,6 +93,8 @@ class TestTissueClassifierTest:
 
         slide.masks['tissue'] = mask
         tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+        #  import pudb
+        #  pudb.set_trace()
         tissue_detector.classify(slide,
                                  level=cancer_level,
                                  patch_size=patch_size,
@@ -122,7 +137,7 @@ class TestTissueClassifierTest:
         mask = slide.masks['cancer']
         self.assertEqual(mask.array.shape[::-1],
                          slide.level_dimensions[cancer_level])
-        self.assertEqual(mask.ratio(cancer_patch), 1)
+        self.assertEqual(mask.ratio(tissue_patch), 1)
         self.assertEqual(np.sum(mask.array), cancer_patch.area)
 
     def test_classify_with_filter_different_level_not_proportional_patch_size(

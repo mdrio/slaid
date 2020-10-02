@@ -76,8 +76,8 @@ class TestConvertPatch(unittest.TestCase):
         patch = Patch(100, 100, (100, 100), slide.level_downsamples[0])
         converted_patch = convert_patch(patch, slide,
                                         slide.level_downsamples[1])
-        self.assertEqual(converted_patch.x, patch.x // 2)
-        self.assertEqual(converted_patch.y, patch.y // 2)
+        self.assertEqual(converted_patch.x, patch.x)
+        self.assertEqual(converted_patch.y, patch.y)
         self.assertEqual(converted_patch.size[0], patch.size[0] // 2)
         self.assertEqual(converted_patch.size[1], patch.size[1] // 2)
 
@@ -86,8 +86,8 @@ class TestConvertPatch(unittest.TestCase):
         patch = Patch(100, 100, (100, 100), slide.level_downsamples[1])
         converted_patch = convert_patch(patch, slide,
                                         slide.level_downsamples[0])
-        self.assertEqual(converted_patch.x, patch.x * 2)
-        self.assertEqual(converted_patch.y, patch.y * 2)
+        self.assertEqual(converted_patch.x, patch.x)
+        self.assertEqual(converted_patch.y, patch.y)
         self.assertEqual(converted_patch.size[0], patch.size[0] * 2)
         self.assertEqual(converted_patch.size[1], patch.size[1] * 2)
 

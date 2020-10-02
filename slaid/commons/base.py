@@ -1,4 +1,3 @@
-import PIL
 import abc
 import inspect
 import sys
@@ -6,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, Tuple
 
 import numpy as np
+import PIL
 
 PATCH_SIZE = (256, 256)
 
@@ -53,8 +53,15 @@ class Mask:
     level_downsample: int
 
     def ratio(self, patch: Patch) -> float:
-        return np.sum(self.array[patch.y:patch.y + patch.size[1],
-                                 patch.x:patch.x + patch.size[0]]) / patch.area
+        area = self._convert_patch_to_area(patch)
+        return np.sum(self.array[area[1]:area[1] + area[3], area[0]:area[0] +
+                                 area[3]]) / (area[2] * area[3])
+
+    def _convert_patch_to_area(self,
+                               patch: Patch) -> Tuple[int, int, int, int]:
+        return tuple(
+            round(_ * patch.level_downsample / self.level_downsample)
+            for _ in (patch.x, patch.y) + patch.size)
 
     def to_image(self):
         return PIL.Image.fromarray(255 * self.array, 'L')
@@ -92,7 +99,8 @@ class Slide(abc.ABC):
             for x in range(0, dimensions[0], step[0]):
                 location = (x, y)
                 size = tuple(
-                    min(patch_size[i], dimensions[i] - location[i])
+                    min(patch_size[i],
+                        round((dimensions[i] - location[i]) // downsample))
                     for i in range(2))
                 yield Patch(x, y, size, self.level_downsamples[level])
 
@@ -122,5 +130,4 @@ def convert_patch(patch: Patch, slide: Slide, dest_downsample: float) -> Patch:
     origin_downsample = patch.level_downsample
     factor = origin_downsample / dest_downsample
     size = (int(patch.size[0] * factor), int(patch.size[1] * factor))
-    return Patch(int(patch.x * factor), int(patch.y * factor), size,
-                 dest_downsample)
+    return Patch(patch.x, patch.y, size, dest_downsample)
