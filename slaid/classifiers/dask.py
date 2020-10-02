@@ -39,7 +39,9 @@ class Classifier(BasicClassifier):
                         p.size[::-1], 'uint8')
                 else:
                     patch_mask = da.zeros(p.size[::-1], dtype='uint8')
-                row = p.y // patch_size[1]
+                row = round(p.y // slide.level_downsamples[level] //
+                            patch_size[1])
+                print(row, p)
                 try:
                     rows[row].append(patch_mask)
                 except IndexError:

@@ -85,14 +85,16 @@ class Slide(abc.ABC):
         pass
 
     def patches(self, level: int, patch_size: Tuple[int, int]) -> Patch:
-        dimensions = self.level_dimensions[level]
-        for y in range(0, dimensions[1], patch_size[1]):
-            for x in range(0, dimensions[0], patch_size[0]):
+        dimensions = self.dimensions
+        downsample = self.level_downsamples[level]
+        step = tuple(round(_ * downsample) for _ in patch_size)
+        print('step', step, 'dimensions', dimensions)
+        for y in range(0, dimensions[1], step[1]):
+            for x in range(0, dimensions[0], step[0]):
                 location = (x, y)
-                size = tuple([
+                size = tuple(
                     min(patch_size[i], dimensions[i] - location[i])
-                    for i in range(2)
-                ])
+                    for i in range(2))
                 yield Patch(x, y, size, self.level_downsamples[level])
 
     @abc.abstractmethod
