@@ -35,29 +35,42 @@ class Classifier(BasicClassifier):
             patches_by_row = defaultdict(list)
             for p in slide.patches(level, patch_size):
                 if patch_filter(p):
-                    patch_mask = da.from_delayed(
-                        self.classify_patch(slide, (p.x, p.y), level, p.size),
-                        p.size[::-1], 'uint8')
+                    patch_mask = self.classify_patch(slide, (p.x, p.y), level,
+                                                     p.size)
                 else:
-                    patch_mask = da.zeros(p.size[::-1], dtype='uint8')
+                    patch_mask = self._get_zeros(p.size[::-1], dtype='uint8')
                 patches_by_row[p.y].append(patch_mask)
 
             rows = [
-                da.concatenate(patches, axis=1)
+                self._concatenate(patches, axis=1)
                 for _, patches in sorted(patches_by_row.items())
             ]
-            mask = da.concatenate(rows, axis=0)
+            mask = self._concatenate(rows, axis=0)
 
         else:
             mask = self.classify_patch(slide, (0, 0), level,
                                        slide.level_dimensions[level],
                                        threshold)
 
-        slide.masks[self._feature] = Mask(mask.compute(), level,
+        slide.masks[self._feature] = Mask(mask, level,
                                           slide.level_downsamples[level])
+        slide.masks[self._feature].array = slide.masks[
+            self._feature].array.compute()
+
+    def classify_patch(
+        self,
+        slide,
+        location: Tuple[int, int],
+        level: int,
+        size: Tuple[int, int],
+        threshold: float = 0.8,
+    ) -> np.ndarray:
+        return da.from_delayed(
+            self._classify_patch(slide, location, level, size), size[::-1],
+            'uint8')
 
     @delayed
-    def classify_patch(
+    def _classify_patch(
         self,
         slide,
         location: Tuple[int, int],
@@ -69,3 +82,11 @@ class Classifier(BasicClassifier):
         image_array = self._get_image_array(image)
         prediction = self._model.predict(image_array)
         return self._get_mask(prediction, size[::-1], threshold)
+
+    @staticmethod
+    def _get_zeros(size, dtype):
+        return da.zeros(size, dtype)
+
+    @staticmethod
+    def _concatenate(seq, axis):
+        return da.concatenate(seq, axis)
