@@ -56,7 +56,7 @@ class Classifier(BasicClassifier):
 
     @staticmethod
     def _get_zeros(size, dtype):
-        return da.zeros(size, dtype)
+        return da.zeros(size, dtype=dtype)
 
     @staticmethod
     def _concatenate(seq, axis):
