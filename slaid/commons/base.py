@@ -88,7 +88,6 @@ class Slide(abc.ABC):
         dimensions = self.dimensions
         downsample = self.level_downsamples[level]
         step = tuple(round(_ * downsample) for _ in patch_size)
-        print('step', step, 'dimensions', dimensions)
         for y in range(0, dimensions[1], step[1]):
             for x in range(0, dimensions[0], step[0]):
                 location = (x, y)
