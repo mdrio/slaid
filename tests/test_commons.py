@@ -1,5 +1,7 @@
 import unittest
 
+from commons import DummySlide
+
 from slaid.commons import Patch, Slide, convert_patch, round_to_patch
 from slaid.commons.ecvl import Slide as EcvlSlide
 
@@ -28,8 +30,25 @@ class TestSlide:
             self.slide_cls('path/to/file')
 
 
-#  class TestOpenSlide(unittest.TestCase, TestSlide):
-#      slide = OpenSlide(IMAGE, extraction_level=0)
+class TestSlidePatches(unittest.TestCase):
+    def test_iterate_default(self):
+        slide = DummySlide([(20, 20)], [1])
+        patch_size = (10, 10)
+        expected_patches_coord = [(0, 0), (10, 0), (0, 10), (10, 10)]
+
+        patches_coord = [(p.x, p.y) for p in slide.patches(0, patch_size)]
+        self.assertEqual(patches_coord, expected_patches_coord)
+
+    def test_iterate_custom(self):
+        slide = DummySlide([(20, 20)], [1])
+        patch_size = (10, 10)
+        start = (0, 10)
+        end = slide.dimensions
+        expected_patches_coord = [(0, 10), (10, 10)]
+
+        patches_coord = [(p.x, p.y)
+                         for p in slide.patches(0, patch_size, start, end)]
+        self.assertEqual(patches_coord, expected_patches_coord)
 
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
