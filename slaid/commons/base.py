@@ -100,13 +100,13 @@ class Slide(abc.ABC):
         downsample = self.level_downsamples[level]
         start = start or (0, 0)
         end = end or dimensions
-        step = tuple(round(_ * downsample) for _ in patch_size)
+        step = tuple(round(_ * round(downsample)) for _ in patch_size)
         for y in range(start[1], end[1], step[1]):
             for x in range(start[0], end[0], step[0]):
                 location = (x, y)
                 size = tuple(
                     min(patch_size[i],
-                        round((dimensions[i] - location[i]) // downsample))
+                        round((dimensions[i] - location[i]) / downsample))
                     for i in range(2))
                 yield Patch(x, y, size, self.level_downsamples[level])
 

@@ -20,6 +20,16 @@ class TestTissueClassifierTest:
     def get_model():
         pass
 
+    def test_classify_slide(self):
+        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        model = DummyModel(np.zeros)
+        tissue_detector = self.get_classifier(model)
+        #  import pudb
+        #  pudb.set_trace()
+        mask = tissue_detector.classify(slide, level=self.LEVEL)
+        self.assertEqual(mask.array.shape,
+                         slide.level_dimensions[self.LEVEL][::-1])
+
     def test_detector_no_tissue(self):
         slide = create_slide('tests/data/test.tif')
         model = DummyModel(np.zeros)
@@ -47,17 +57,21 @@ class TestTissueClassifierTest:
         self.assertEqual(mask.array[:300, :].all(), 1)
         self.assertEqual(mask.array[300:, :].all(), 0)
 
-    def test_classify_by_patch_level_0(self):
+    def test_classify_by_patch_level_0(self, n_batch=1):
         level = 0
         slide = create_slide('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())
         mask = tissue_detector.classify(slide,
                                         level=level,
-                                        patch_size=(200, 200))
+                                        patch_size=(200, 200),
+                                        n_batch=n_batch)
 
         self.assertEqual(mask.array.shape[::-1], slide.level_dimensions[level])
         self.assertEqual(mask.array[:300, :].all(), 1)
         self.assertEqual(mask.array[300:, :].all(), 0)
+
+    def test_classify_by_patch_level_0_batch_2(self):
+        self.test_classify_by_patch_level_0(2)
 
     def test_classify_by_patch_level_2(self):
         level = 2
