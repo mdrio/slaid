@@ -115,10 +115,11 @@ def classify_slide(slide_filename,
 
     tissue_classifier = BasicClassifier(model, feature)
 
-    tissue_classifier.classify(slide,
-                               patch_filter=filter_,
-                               threshold=threshold,
-                               level=extraction_level)
+    mask = tissue_classifier.classify(slide,
+                                      patch_filter=filter_,
+                                      threshold=threshold,
+                                      level=extraction_level)
+    slide.masks[feature] = mask
     if only_mask:
         data_to_dump = {
             'filename': slide_filename,

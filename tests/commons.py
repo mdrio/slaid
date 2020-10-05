@@ -62,3 +62,11 @@ class DummySlide(Slide):
 
     def get_best_level_for_downsample(self, downsample: int):
         raise NotImplementedError()
+
+
+class AllOneModel:
+    def predict(self, array):
+        return np.ones(array.shape[0], dtype=np.uint8)
+
+    def get_best_level_for_downsample(self, downsample: int):
+        raise NotImplementedError()

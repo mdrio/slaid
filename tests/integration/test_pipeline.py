@@ -24,23 +24,25 @@ def main():
 
     json_filename = '/tmp/test.json'
     mask_filename = 'PH10023-1-mask'
-    tiff_filename = '/tmp/test.tiff'
+    #  tiff_filename = '/tmp/test.tiff'
 
     tissue_classifier = cl.BasicClassifier(tissue_model, 'tissue')
     cancer_classifier = cl.BasicClassifier(AllOneModel(), 'cancer')
 
     print('tissue classification')
-    tissue_classifier.classify(slide)
+    mask = tissue_classifier.classify(slide)
+    slide.masks['tissue'] = mask
 
     print('cancer classification')
-    cancer_classifier.classify(slide,
-                               patch_filter='tissue > 0.5',
-                               patch_size=(256, 256))
+    mask = cancer_classifier.classify(slide,
+                                      patch_filter='tissue > 0.5',
+                                      patch_size=(256, 256))
 
+    slide.masks['cancer'] = mask
     print('to_json')
     to_json(slide, json_filename)
 
-    renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
+    #  renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
 
     print('rendering...')
     #  renderer.render(tiff_filename, slide, 'tissue')

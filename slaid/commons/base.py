@@ -48,7 +48,7 @@ class Patch:
 
 @dataclass
 class Mask:
-    array: np.array
+    array: np.ndarray
     extraction_level: int
     level_downsample: int
 

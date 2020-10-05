@@ -24,9 +24,10 @@ class Classifier(BasicClassifier):
                  threshold: float = 0.8,
                  level: int = 2,
                  patch_size=None):
-        super().classify(slide, patch_filter, threshold, level, patch_size)
-        slide.masks[self._feature].array = slide.masks[
-            self._feature].array.compute()
+        mask = super().classify(slide, patch_filter, threshold, level,
+                                patch_size)
+        mask.array = mask.array.compute()
+        return mask
 
     def classify_patch(
         self,

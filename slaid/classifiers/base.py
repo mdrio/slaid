@@ -12,23 +12,12 @@ from slaid.models import Model
 
 class Classifier(abc.ABC):
     @abc.abstractmethod
-    def classify_patch(
-        self,
-        slide,
-        location: Tuple[int, int],
-        level: int,
-        size: Tuple[int, int],
-        threshold: float = 0.8,
-    ) -> np.ndarray:
-        pass
-
-    @abc.abstractmethod
     def classify(self,
                  slide: Slide,
                  patch_filter=None,
                  threshold: float = 0.8,
                  level: int = 2,
-                 patch_size=None):
+                 patch_size=None) -> Mask:
         pass
 
 
@@ -101,8 +90,7 @@ class BasicClassifier(Classifier):
                                        slide.level_dimensions[level],
                                        threshold)
 
-        slide.masks[self._feature] = Mask(mask, level,
-                                          slide.level_downsamples[level])
+        return Mask(mask, level, slide.level_downsamples[level])
 
     def classify_patch(
         self,
