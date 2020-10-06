@@ -50,6 +50,45 @@ class TestSlidePatches(unittest.TestCase):
                          for p in slide.patches(0, patch_size, start, end)]
         self.assertEqual(patches_coord, expected_patches_coord)
 
+    def test_iterate_patch_greater_than_batch(self):
+        slide = DummySlide([(20, 20)], [1])
+        patch_size = (20, 20)
+        start = (0, 0)
+        end = (10, 10)
+        expected_patches_coord = [(0, 0)]
+        expected_patch_size = (10, 10)
+
+        patches = list(slide.patches(0, patch_size, start, end))
+        patches_coord = [(p.x, p.y) for p in patches]
+        self.assertEqual(patches_coord, expected_patches_coord)
+        self.assertEqual(patches[0].size, expected_patch_size)
+
+    def test_iterate_patch_equal_batch_less_than_slide(self):
+        slide = DummySlide([(30, 30)], [1])
+        patch_size = (20, 20)
+        start = (0, 0)
+        end = (20, 20)
+        expected_patches_coord = [(0, 0)]
+
+        patches = list(slide.patches(0, patch_size, start, end))
+        patches_coord = [(p.x, p.y) for p in patches]
+        self.assertEqual(patches_coord, expected_patches_coord)
+        self.assertEqual(patches[0].size, patch_size)
+
+    def test_iterate_patch_equal_batch_great_than_slide(self):
+        slide = DummySlide([(5, 5)], [1])
+        patch_size = (20, 20)
+        start = (0, 0)
+        end = (20, 20)
+
+        expected_patches_coord = [(0, 0)]
+        expected_patch_size = (5, 5)
+
+        patches = list(slide.patches(0, patch_size, start, end))
+        patches_coord = [(p.x, p.y) for p in patches]
+        self.assertEqual(patches_coord, expected_patches_coord)
+        self.assertEqual(patches[0].size, expected_patch_size)
+
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
     slide = EcvlSlide(IMAGE)

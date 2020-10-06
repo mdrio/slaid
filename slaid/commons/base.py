@@ -106,8 +106,8 @@ class Slide(abc.ABC):
                 location = (x, y)
                 size = tuple(
                     min(patch_size[i],
-                        round((dimensions[i] - location[i]) / downsample))
-                    for i in range(2))
+                        round((dimensions[i] - location[i]) /
+                              downsample), end[i]) for i in range(2))
                 yield Patch(x, y, size, self.level_downsamples[level])
 
     @abc.abstractmethod
