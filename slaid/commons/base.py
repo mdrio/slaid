@@ -1,7 +1,6 @@
 import abc
 import inspect
 import sys
-from dataclasses import dataclass
 from typing import Dict, Tuple
 
 import numpy as np
@@ -34,23 +33,25 @@ class Image(abc.ABC):
         pass
 
 
-@dataclass
 class Patch:
-    x: int
-    y: int
-    size: Tuple[int, int]
-    level_downsample: float
+    def __init__(self, x: int, y: int, size: Tuple[int, int],
+                 level_downsample: float):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.level_downsample = level_downsample
 
     @property
     def area(self):
         return self.size[0] * self.size[1]
 
 
-@dataclass
 class Mask:
-    array: np.ndarray
-    extraction_level: int
-    level_downsample: int
+    def __init__(self, array: np.ndarray, extraction_level: int,
+                 level_downsample: int):
+        self.array = array
+        self.extraction_level = extraction_level
+        self.level_downsample = level_downsample
 
     def ratio(self, patch: Patch) -> float:
         area = self._convert_patch_to_area(patch)

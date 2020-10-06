@@ -1,8 +1,7 @@
-import math
 import abc
+import math
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Callable, Tuple
 
 import numpy as np
@@ -22,12 +21,12 @@ class Classifier(abc.ABC):
         pass
 
 
-@dataclass
 class PatchFilter:
-    slide: Slide
-    mask: Mask
-    operator: str
-    value: float
+    def __init__(self, slide: Slide, mask: Mask, operator: str, value: float):
+        self.slide = slide,
+        self.mask = mask
+        self.operator = operator
+        self.value = value
 
     @staticmethod
     def create(slide: Slide, condition: str) -> Tuple[str, Callable, float]:
@@ -137,8 +136,9 @@ class BasicClassifier(Classifier):
         return mask
 
 
-@dataclass
 class Batch:
-    start: Tuple[int, int]
-    end: Tuple[int, int]
-    array: np.ndarray
+    def __init__(self, start: Tuple[int, int], end: Tuple[int, int],
+                 array: np.ndarray):
+        self.start = start
+        self.end = end
+        self.array = array
