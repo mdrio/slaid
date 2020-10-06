@@ -51,6 +51,7 @@ class SerialRunner:
         output_dir,
         *,
         model: 'm',
+        n_batch: ('b', int) = 1,
         extraction_level: ('l', int) = 2,
         feature: 'f',
         threshold: 't' = 0.8,
@@ -66,20 +67,25 @@ class SerialRunner:
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
-        cls.classify_slides(input_path, output_dir, classifier,
+        cls.classify_slides(input_path, output_dir, classifier, n_batch,
                             extraction_level, threshold, patch_size, only_mask,
                             writer, filter_, overwrite_output_if_exists,
                             skip_output_if_exist)
 
+    @classmethod
+    def get_classifier(cls, model, feature, gpu):
+        model = cls.get_model(model, gpu)
+        return BasicClassifier(model, feature)
+
     @staticmethod
-    def get_classifier(model, feature, gpu):
-        if os.path.splitext(model)[-1] in ('.pkl', '.pickle'):
+    def get_model(filename, gpu):
+        if os.path.splitext(filename)[-1] in ('.pkl', '.pickle'):
             from slaid.models import PickledModel
-            model = PickledModel(model)
+            model = PickledModel(filename)
         else:
             from slaid.models.eddl import Model
-            model = Model(model, gpu)
-        return BasicClassifier(model, feature)
+            model = Model(filename, gpu)
+        return model
 
     @staticmethod
     def parse_patch_size(patch_size: str):
@@ -96,22 +102,33 @@ class SerialRunner:
                 ] if os.path.isdir(input_path) else [input_path]
 
     @classmethod
-    def classify_slides(cls, input_path, output_dir, classifier,
+    def classify_slides(cls, input_path, output_dir, classifier, n_batch,
                         extraction_level, threshold, patch_size, only_mask,
                         writer, filter_, overwrite_output_if_exists,
                         skip_output_if_exist):
 
         for slide in cls.get_slides(input_path):
-            cls.classify_slide(slide, output_dir, classifier, extraction_level,
-                               threshold, patch_size, only_mask, writer,
-                               filter_, overwrite_output_if_exists,
-                               skip_output_if_exist)
+            cls.classify_slide(
+                slide,
+                output_dir,
+                classifier,
+                n_batch,
+                extraction_level,
+                threshold,
+                patch_size,
+                only_mask,
+                writer,
+                filter_,
+                overwrite_output_if_exists,
+                skip_output_if_exist,
+            )
 
     @classmethod
     def classify_slide(cls,
                        slide_filename,
                        output_dir,
                        classifier,
+                       n_batch,
                        extraction_level,
                        threshold=0.8,
                        patch_size=PATCH_SIZE,
@@ -148,6 +165,7 @@ class SerialRunner:
             slide = create_slide(slide_filename)
 
         mask = classifier.classify(slide,
+                                   n_batch=n_batch,
                                    patch_filter=filter_,
                                    threshold=threshold,
                                    level=extraction_level)
