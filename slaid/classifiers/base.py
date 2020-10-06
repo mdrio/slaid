@@ -55,8 +55,8 @@ class PatchFilter:
 
 class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
-        self._model = model
-        self._feature = feature
+        self.model = model
+        self.feature = feature
 
     def classify(self,
                  slide: Slide,
@@ -112,7 +112,7 @@ class BasicClassifier(Classifier):
         x = round(patch.x // patch.level_downsample)
         image_array = batch.array[y:y + patch.size[1], x:x + patch.size[0]]
         image_array = self._flat_array(image_array)
-        prediction = self._model.predict(image_array)
+        prediction = self.model.predict(image_array)
         return self._get_mask(prediction, patch.size[::-1], threshold)
 
     @staticmethod

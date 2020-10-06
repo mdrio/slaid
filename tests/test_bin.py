@@ -131,7 +131,6 @@ class ExtractTissueTest:
     def test_get_tissue_mask_custom_value(self):
         extr_level = 1
         cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7  {input_} {OUTPUT_DIR}'
-        print(cmd)
         subprocess.check_call(cmd.split())
         slide = Slide(input_)
         output = os.path.join(OUTPUT_DIR,
