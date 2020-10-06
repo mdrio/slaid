@@ -47,7 +47,7 @@ def get_parallel_classifier(model, feature):
 
 class SerialRunner:
     @classmethod
-    def serial(
+    def run(
         cls,
         input_path,
         output_dir,
@@ -198,7 +198,7 @@ class SerialRunner:
 
 class ParallelRunner(SerialRunner):
     @classmethod
-    def parallel(
+    def run(
         cls,
         input_path,
         output_dir,
@@ -235,16 +235,16 @@ class ParallelRunner(SerialRunner):
 
 if __name__ == '__main__':
 
-    runners = (SerialRunner.serial, ParallelRunner.parallel)
+    runners = {'serial': SerialRunner.run, 'parallel': ParallelRunner.run}
     model = os.environ.get("SLAID_MODEL")
     if model is not None:
         model = pkg_resources.resource_filename('slaid', f'models/{model}')
-        for r in runners:
-            r = set_model(r, model)
+        for k, v in runners.items():
+            runners[k] = set_model(v, model)
     feature = os.environ.get("SLAID_FEATURE")
 
     if feature is not None:
-        for r in runners:
-            r = set_feature(r, feature)
+        for k, v in runners.items():
+            runners[k] = set_model(v, model)
 
-    run(*runners)
+    run(runners)
