@@ -14,6 +14,7 @@ logger = logging.getLogger('dask')
 
 
 def init_client(*args, **kwargs):
+    logger.debug('init dask client with %s, %s', args, kwargs)
     return Client(*args, **kwargs)
 
 
@@ -27,7 +28,7 @@ class Classifier(BasicClassifier):
                  n_batch: int = 1) -> Mask:
 
         mask = super().classify(slide, patch_filter, threshold, level,
-                                patch_size)
+                                patch_size, n_batch)
         mask.array = mask.array.compute()
         return mask
 

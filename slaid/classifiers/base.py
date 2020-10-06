@@ -1,3 +1,4 @@
+import logging
 import abc
 import math
 import re
@@ -8,6 +9,8 @@ import numpy as np
 
 from slaid.commons import Mask, Patch, Slide, convert_patch
 from slaid.models import Model
+
+logger = logging.getLogger('classify')
 
 
 class Classifier(abc.ABC):
@@ -91,13 +94,19 @@ class BasicClassifier(Classifier):
     def _get_batches(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
         total_patch_rows = dimensions[1] / patch_size[1]
+        logging.debug('total_patch_rows %s', total_patch_rows)
         patch_per_batch = math.ceil(total_patch_rows / n_batch)
 
+        logging.debug('patch_per_batch %s', patch_per_batch)
         batch_size = patch_per_batch * patch_size[1]
+        logger.debug(
+            ' n_batch %s, patch_size %s, batch_size %s, slide dimensions = %s at level %s',
+            n_batch, patch_size, batch_size, dimensions, level)
         step = round(batch_size * slide.level_downsamples[level])
         for i in range(0, slide.dimensions[1], step):
             image = slide.read_region((0, i), level,
                                       (dimensions[0], batch_size))
+            logger.debug('got batch %s', i)
             array = image.to_array(True)
             yield Batch((0, i), (slide.dimensions[0], i + step), array)
 

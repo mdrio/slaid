@@ -14,7 +14,7 @@ from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 def pickle_dump(obj, filename):
@@ -170,7 +170,8 @@ class SerialRunner:
                                    n_batch=n_batch,
                                    patch_filter=filter_,
                                    threshold=threshold,
-                                   level=extraction_level)
+                                   level=extraction_level,
+                                   patch_size=patch_size)
         feature = classifier.feature
         slide.masks[feature] = mask
         if only_mask:
