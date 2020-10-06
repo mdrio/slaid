@@ -8,6 +8,8 @@ import pkg_resources
 from clize import run
 
 from slaid.classifiers import BasicClassifier
+from slaid.classifiers.dask import Classifier as DaskClassifier
+from slaid.classifiers.dask import init_client
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json
@@ -45,7 +47,7 @@ def get_parallel_classifier(model, feature):
 
 class SerialRunner:
     @classmethod
-    def run(
+    def serial(
         cls,
         input_path,
         output_dir,
@@ -194,13 +196,55 @@ class SerialRunner:
         return output_filename
 
 
+class ParallelRunner(SerialRunner):
+    @classmethod
+    def parallel(
+        cls,
+        input_path,
+        output_dir,
+        *,
+        model: 'm',
+        n_batch: ('b', int) = 1,
+        processes: 'p' = False,
+        extraction_level: ('l', int) = 2,
+        feature: 'f',
+        threshold: 't' = 0.8,
+        patch_size=f'{PATCH_SIZE[0]}x{PATCH_SIZE[1]}',
+        gpu=False,
+        only_mask=False,
+        writer: 'w' = 'pkl',
+        filter_: 'F' = None,
+        overwrite_output_if_exists: 'overwrite' = False,
+        skip_output_if_exist=False,
+    ):
+        classifier = cls.get_classifier(model, feature, gpu, processes)
+        patch_size = cls.parse_patch_size(patch_size)
+        cls.prepare_output_dir(output_dir)
+
+        cls.classify_slides(input_path, output_dir, classifier, n_batch,
+                            extraction_level, threshold, patch_size, only_mask,
+                            writer, filter_, overwrite_output_if_exists,
+                            skip_output_if_exist)
+
+    @classmethod
+    def get_classifier(cls, model, feature, gpu, processes):
+        model = cls.get_model(model, gpu)
+        init_client(processes=processes)
+        return DaskClassifier(model, feature)
+
+
 if __name__ == '__main__':
 
+    runners = (SerialRunner.serial, ParallelRunner.parallel)
     model = os.environ.get("SLAID_MODEL")
     if model is not None:
         model = pkg_resources.resource_filename('slaid', f'models/{model}')
-        SerialRunner.run = set_model(SerialRunner.run, model)
+        for r in runners:
+            r = set_model(r, model)
     feature = os.environ.get("SLAID_FEATURE")
+
     if feature is not None:
-        SerialRunner.run = set_feature(SerialRunner.run, feature)
-    run(SerialRunner.run)
+        for r in runners:
+            r = set_feature(r, feature)
+
+    run(*runners)

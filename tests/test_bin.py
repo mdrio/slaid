@@ -21,6 +21,7 @@ slide = Slide(input_)
 
 class ExtractTissueTest:
     model = None
+    cmd = ''
     feature = 'tissue'
 
     @staticmethod
@@ -42,8 +43,8 @@ class ExtractTissueTest:
 
     def test_extract_tissue_default_pkl(self):
         subprocess.check_call([
-            'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
-            input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
+            self.model, input_, OUTPUT_DIR
         ])
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
@@ -53,8 +54,8 @@ class ExtractTissueTest:
 
     def test_extract_tissue_only_mask_pkl(self):
         subprocess.check_call([
-            'classify.py', '--only-mask', '-f', self.feature, '-w', 'pkl',
-            '-m', self.model, input_, OUTPUT_DIR
+            'classify.py', self.cmd, '--only-mask', '-f', self.feature, '-w',
+            'pkl', '-m', self.model, input_, OUTPUT_DIR
         ])
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
@@ -70,8 +71,8 @@ class ExtractTissueTest:
 
     def test_extract_tissue_default_json(self):
         subprocess.check_call([
-            'classify.py', '-f', self.feature, '-w', 'json', '-m', self.model,
-            input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-f', self.feature, '-w', 'json', '-m',
+            self.model, input_, OUTPUT_DIR
         ])
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.json')
@@ -84,7 +85,7 @@ class ExtractTissueTest:
 
     def test_extract_tissue_custom(self):
         extr_level = 1
-        cmd = f'classify.py -m {self.model} -f {self.feature} -w pkl -l {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
+        cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature} -w pkl -l {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
@@ -98,7 +99,7 @@ class ExtractTissueTest:
         with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
             pickle.dump(slide, f)
         extr_level = 1
-        cmd = f'classify.py -m {self.model} -f {self.feature} -l {extr_level} {f.name} {OUTPUT_DIR}'
+        cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature} -l {extr_level} {f.name} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         output = os.path.join(
             OUTPUT_DIR,
@@ -111,8 +112,8 @@ class ExtractTissueTest:
 
     def test_get_tissue_mask_default_value(self):
         subprocess.check_call([
-            'classify.py', '-m', self.model, '-w', 'pkl', '-f', self.feature,
-            '--only-mask', input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-m', self.model, '-w', 'pkl', '-f',
+            self.feature, '--only-mask', input_, OUTPUT_DIR
         ])
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
@@ -130,7 +131,7 @@ class ExtractTissueTest:
 
     def test_get_tissue_mask_custom_value(self):
         extr_level = 1
-        cmd = f'classify.py -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7  {input_} {OUTPUT_DIR}'
+        cmd = f'classify.py {self.cmd} -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         slide = Slide(input_)
         output = os.path.join(OUTPUT_DIR,
@@ -154,8 +155,8 @@ class ExtractTissueTest:
         os.makedirs(OUTPUT_DIR)
         subprocess.check_call(['touch', output])
         subprocess.check_call([
-            'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
-            '--overwrite', input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
+            self.model, '--overwrite', input_, OUTPUT_DIR
         ])
         stats = os.stat(output)
         self.assertTrue(stats.st_size > 0)
@@ -172,7 +173,7 @@ class ExtractTissueTest:
         with self.assertRaises(subprocess.CalledProcessError):
 
             subprocess.check_call([
-                'classify.py', '-f', self.feature, '-w', 'pkl', '-m',
+                'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
                 self.model, input_, OUTPUT_DIR
             ])
 
@@ -183,8 +184,8 @@ def test_extract_tissue_skip(self):
     os.makedirs(OUTPUT_DIR)
     subprocess.check_call(['touch', output])
     subprocess.check_call([
-        'classify.py', '-f', self.feature, '-w', 'pkl', '-m', self.model,
-        '--skip', input_, OUTPUT_DIR
+        'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
+        self.model, '--skip', input_, OUTPUT_DIR
     ])
     stats = os.stat(output)
     self.assertEqual(stats.st_size, 0)
@@ -194,12 +195,14 @@ def test_extract_tissue_skip(self):
         self._test_pickled(slide_pickled, 2)
 
 
-class SVMExtractTissueTest(ExtractTissueTest, unittest.TestCase):
-    model = 'slaid/resources/models/extract_tissue_LSVM-1.0.pickle'
-
-
-class EddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+class SerialEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
     model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
+    cmd = 'serial'
+
+
+class ParallelEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
+    cmd = 'parallel'
 
 
 if __name__ == '__main__':
