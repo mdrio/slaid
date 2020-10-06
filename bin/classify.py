@@ -238,13 +238,14 @@ if __name__ == '__main__':
     runners = {'serial': SerialRunner.run, 'parallel': ParallelRunner.run}
     model = os.environ.get("SLAID_MODEL")
     if model is not None:
-        model = pkg_resources.resource_filename('slaid', f'models/{model}')
+        model = pkg_resources.resource_filename('slaid',
+                                                f'resources/models/{model}')
         for k, v in runners.items():
             runners[k] = set_model(v, model)
-    feature = os.environ.get("SLAID_FEATURE")
 
+    feature = os.environ.get("SLAID_FEATURE")
     if feature is not None:
         for k, v in runners.items():
-            runners[k] = set_model(v, model)
+            runners[k] = set_feature(v, feature)
 
     run(runners)
