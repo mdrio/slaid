@@ -14,7 +14,10 @@ from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
+                    '[%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%Y-%m-%d:%H:%M:%S',
+                    level=logging.DEBUG)
 
 
 def pickle_dump(obj, filename):
@@ -57,7 +60,7 @@ class SerialRunner:
         extraction_level: ('l', int) = 2,
         feature: 'f',
         threshold: 't' = 0.8,
-        patch_size=f'{PATCH_SIZE[0]}x{PATCH_SIZE[1]}',
+        patch_size=None,
         gpu=False,
         only_mask=False,
         writer: 'w' = 'pkl',
@@ -91,7 +94,8 @@ class SerialRunner:
 
     @staticmethod
     def parse_patch_size(patch_size: str):
-        return tuple([int(e) for e in patch_size.split('x')])
+        return tuple([int(e)
+                      for e in patch_size.split('x')]) if patch_size else None
 
     @staticmethod
     def prepare_output_dir(output_dir):
@@ -210,7 +214,7 @@ class ParallelRunner(SerialRunner):
         extraction_level: ('l', int) = 2,
         feature: 'f',
         threshold: 't' = 0.8,
-        patch_size=f'{PATCH_SIZE[0]}x{PATCH_SIZE[1]}',
+        patch_size=None,
         gpu=False,
         only_mask=False,
         writer: 'w' = 'pkl',

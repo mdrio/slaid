@@ -9,7 +9,6 @@ from dask.distributed import Client
 from slaid.classifiers.base import BasicClassifier, Batch, Mask
 from slaid.commons import Patch, Slide
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('dask')
 
 

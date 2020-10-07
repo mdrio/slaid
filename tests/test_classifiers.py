@@ -1,4 +1,5 @@
 import unittest
+from collections import defaultdict
 
 import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
@@ -212,6 +213,42 @@ class EddlTissueClassifierTest(BasicClassifierTest):
     @staticmethod
     def get_model():
         return EddlGreenIsTissueModel()
+
+
+class BatchTest(unittest.TestCase):
+    def test_shape(self):
+        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
+        n_batch = 1
+        patch_size = (256, 256)
+        level = 0
+        batches = list(
+            classifier._get_batches(slide, level, n_batch, patch_size))
+        batches_array = np.concatenate([b.array for b in batches], axis=0)
+        self.assertEqual(slide.level_dimensions[level],
+                         batches_array.shape[:2][::-1])
+
+    def test_patches(self):
+        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
+        n_batch = 1
+        patch_size = (256, 256)
+        level = 0
+        batches = list(
+            classifier._get_batches(slide, level, n_batch, patch_size))
+
+        rows = []
+        for b in batches:
+            patches_by_row = defaultdict(list)
+            for p in b.get_patches(patch_size):
+                patches_by_row[p.y].append(p)
+            for r in patches_by_row.values():
+                rows.append(np.concatenate([_.array for _ in r], axis=1))
+        mask = np.concatenate(rows, axis=0)
+        self.assertEqual(mask.shape[:2], slide.level_dimensions[level][::-1])
+        from slaid.commons import Mask
+        mask = Mask(mask, 0, 1)
+        mask.save('MASSk.png')
 
 
 if __name__ == '__main__':

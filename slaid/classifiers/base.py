@@ -1,6 +1,5 @@
-import logging
 import abc
-import math
+import logging
 import re
 from collections import defaultdict
 from typing import Callable, Tuple
@@ -67,48 +66,51 @@ class BasicClassifier(Classifier):
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
                  n_batch: int = 1) -> Mask:
-        patch_size = patch_size or slide.level_dimensions[level]
         if patch_filter is not None:
             patch_filter = PatchFilter.create(slide, patch_filter).filter
             assert patch_size is not None
         else:
             patch_filter = (lambda x: True)
 
-        patches_by_row = defaultdict(list)
-        for batch in self._get_batches(slide, level, n_batch, patch_size):
-            for p in slide.patches(level, patch_size, batch.start, batch.end):
+        rows = []
+        for i, batch in enumerate(
+                self._get_batches(slide, level, n_batch, patch_size)):
+            logger.debug('batch %s of %s', i, n_batch)
+            patches_by_row = defaultdict(list)
+            for p in batch.get_patches(patch_size):
                 if patch_filter(p):
                     patch_mask = self._classify_patch(p, batch, threshold)
                 else:
-                    patch_mask = self._get_zeros(p.size[::-1], dtype='uint8')
+                    patch_mask = self._get_zeros(p.array.shape, dtype='uint8')
                 patches_by_row[p.y].append(patch_mask)
+            #  rows.append([
+            #      self._concatenate(patches, axis=1)
+            #      for _, patches in sorted(patches_by_row.items())
+            #  ])
 
-        rows = [
-            self._concatenate(patches, axis=1)
-            for _, patches in sorted(patches_by_row.items())
-        ]
+            for _, r in sorted(patches_by_row.items()):
+                rows.append(np.concatenate([_ for _ in r], axis=1))
         mask = self._concatenate(rows, axis=0)
 
         return Mask(mask, level, slide.level_downsamples[level])
 
     def _get_batches(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
-        total_patch_rows = dimensions[1] / patch_size[1]
-        logging.debug('total_patch_rows %s', total_patch_rows)
-        patch_per_batch = math.ceil(total_patch_rows / n_batch)
+        downsample = slide.level_downsamples[level]
 
-        logging.debug('patch_per_batch %s', patch_per_batch)
-        batch_size = patch_per_batch * patch_size[1]
-        logger.debug(
-            ' n_batch %s, patch_size %s, batch_size %s, slide dimensions = %s at level %s',
-            n_batch, patch_size, batch_size, dimensions, level)
-        step = round(batch_size * slide.level_downsamples[level])
+        batch_size = (dimensions[0], dimensions[1] // n_batch)
+        if patch_size is not None:
+            batch_size_1 = batch_size[1] - (batch_size[1] % patch_size[1])
+            batch_size = (batch_size[0], batch_size_1)
+
+        step = round(batch_size[1] * downsample)
         for i in range(0, slide.dimensions[1], step):
-            image = slide.read_region((0, i), level,
-                                      (dimensions[0], batch_size))
-            logger.debug('got batch %s', i)
+            size = (slide.dimensions[0],
+                    min(batch_size[1], slide.dimensions[1] - i))
+            image = slide.read_region((0, i), level, size)
             array = image.to_array(True)
-            yield Batch((0, i), (slide.dimensions[0], i + step), array)
+            yield Batch((0, i), (slide.dimensions[0], i + step), array,
+                        downsample)
 
     def _classify_patch(
         self,
@@ -116,12 +118,11 @@ class BasicClassifier(Classifier):
         batch: "Batch",
         threshold: float = 0.8,
     ) -> np.ndarray:
-        y = round(patch.y // patch.level_downsample) - batch.start[1]
-        x = round(patch.x // patch.level_downsample)
-        image_array = batch.array[y:y + patch.size[1], x:x + patch.size[0]]
+        image_array = patch.array
+        orig_shape = image_array.shape[:2]
         image_array = self._flat_array(image_array)
         prediction = self.model.predict(image_array)
-        return self._get_mask(prediction, patch.size[::-1], threshold)
+        return self._get_mask(prediction, orig_shape, threshold)
 
     @staticmethod
     def _get_zeros(size, dtype):
@@ -147,7 +148,19 @@ class BasicClassifier(Classifier):
 
 class Batch:
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int],
-                 array: np.ndarray):
+                 array: np.ndarray, level_downsample: float):
         self.start = start
         self.end = end
         self.array = array
+        self.level_downsample = level_downsample
+
+    def get_patches(self, patch_size) -> Patch:
+        patch_size = patch_size or self.array.shape[:2]
+
+        for y in range(0, self.array.shape[1], patch_size[1]):
+            for x in range(0, self.array.shape[0], patch_size[0]):
+                patch = self.array[x:x + patch_size[0], y:y + patch_size[1]]
+                logger.debug('x %s, y %s', x, y)
+                yield Patch(self.start[1] + y, self.start[0] + x,
+                            patch.shape[:2][::-1], self.level_downsample,
+                            patch)
