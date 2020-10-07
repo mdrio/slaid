@@ -115,6 +115,10 @@ class ExtractTissueTest:
             'classify.py', self.cmd, '-m', self.model, '-w', 'pkl', '-f',
             self.feature, '--only-mask', input_, OUTPUT_DIR
         ])
+        print(' '.join([
+            'classify.py', self.cmd, '-m', self.model, '-w', 'pkl', '-f',
+            self.feature, '--only-mask', input_, OUTPUT_DIR
+        ]))
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.pkl')
         with open(output, 'rb') as f:

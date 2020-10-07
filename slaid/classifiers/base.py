@@ -105,8 +105,7 @@ class BasicClassifier(Classifier):
 
         step = round(batch_size[1] * downsample)
         for i in range(0, slide.dimensions[1], step):
-            size = (slide.dimensions[0],
-                    min(batch_size[1], slide.dimensions[1] - i))
+            size = (dimensions[0], min(batch_size[1], dimensions[1] - i))
             image = slide.read_region((0, i), level, size)
             array = image.to_array(True)
             yield Batch((0, i), (slide.dimensions[0], i + step), array,
@@ -160,7 +159,6 @@ class Batch:
         for y in range(0, self.array.shape[1], patch_size[1]):
             for x in range(0, self.array.shape[0], patch_size[0]):
                 patch = self.array[x:x + patch_size[0], y:y + patch_size[1]]
-                logger.debug('x %s, y %s', x, y)
                 yield Patch(self.start[1] + y, self.start[0] + x,
                             patch.shape[:2][::-1], self.level_downsample,
                             patch)
