@@ -73,28 +73,35 @@ class BasicClassifier(Classifier):
             patch_filter = (lambda x: True)
 
         rows = []
-        for i, batch in enumerate(
-                self._get_batches(slide, level, n_batch, patch_size)):
+        for i, (start, size) in enumerate(
+                self._get_batch_coordinates(slide, level, n_batch,
+                                            patch_size)):
             logger.debug('batch %s of %s', i, n_batch)
-            patches_by_row = defaultdict(list)
-            for p in batch.get_patches(patch_size):
-                if patch_filter(p):
-                    patch_mask = self._classify_patch(p, batch, threshold)
-                else:
-                    patch_mask = self._get_zeros(p.array.shape, dtype='uint8')
-                patches_by_row[p.y].append(patch_mask)
-            #  rows.append([
-            #      self._concatenate(patches, axis=1)
-            #      for _, patches in sorted(patches_by_row.items())
-            #  ])
-
-            for _, r in sorted(patches_by_row.items()):
-                rows.append(np.concatenate([_ for _ in r], axis=1))
+            rows.append(
+                self._classify_batch(slide, start, size, level, patch_size,
+                                     patch_filter, threshold))
         mask = self._concatenate(rows, axis=0)
 
         return Mask(mask, level, slide.level_downsamples[level])
 
-    def _get_batches(self, slide, level, n_batch, patch_size):
+    def _classify_batch(self, slide, start, size, level, patch_size,
+                        patch_filter, threshold):
+        rows = []
+        batch = self._get_batch(slide, start, size, level)
+        patches_by_row = defaultdict(list)
+        for p in batch.get_patches(patch_size):
+            if patch_filter(p):
+                patch_mask = self._classify_patch(p, batch, threshold)
+            else:
+                patch_mask = self._get_zeros(p.array.shape, dtype='uint8')
+            patches_by_row[p.y].append(patch_mask)
+
+        for _, r in sorted(patches_by_row.items()):
+            rows.append(np.concatenate([_ for _ in r], axis=1))
+
+        return np.concatenate(rows, axis=0)
+
+    def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
         downsample = slide.level_downsamples[level]
 
@@ -107,10 +114,13 @@ class BasicClassifier(Classifier):
         for i in range(0, slide.dimensions[1], step):
             size = (dimensions[0],
                     min(batch_size[1], dimensions[1] - int(i // downsample)))
-            image = slide.read_region((0, i), level, size)
-            array = image.to_array(True)
-            yield Batch((0, i), (slide.dimensions[0], i + step), array,
-                        downsample)
+            yield ((0, i), size)
+
+    @staticmethod
+    def _get_batch(slide, start, size, level):
+        image = slide.read_region(start, level, size)
+        array = image.to_array(True)
+        return Batch(start, size, array, slide.level_downsamples[level])
 
     def _classify_patch(
         self,
@@ -121,7 +131,10 @@ class BasicClassifier(Classifier):
         image_array = patch.array
         orig_shape = image_array.shape[:2]
         image_array = self._flat_array(image_array)
+        #  from slaid.models.eddl import Model
+        #  model = Model(self.model._filename, False)
         prediction = self.model.predict(image_array)
+        print(f'{batch.start}, {batch.size}, {orig_shape}, {prediction.shape}')
         return self._get_mask(prediction, orig_shape, threshold)
 
     @staticmethod
@@ -139,6 +152,7 @@ class BasicClassifier(Classifier):
 
     def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
                   threshold: float) -> np.ndarray:
+        print('prediction.shape %s, shape %s', prediction.shape, shape)
         mask = prediction.reshape(shape)
         mask[mask < threshold] = 0
         mask[mask > threshold] = 1
@@ -147,10 +161,10 @@ class BasicClassifier(Classifier):
 
 
 class Batch:
-    def __init__(self, start: Tuple[int, int], end: Tuple[int, int],
+    def __init__(self, start: Tuple[int, int], size: Tuple[int, int],
                  array: np.ndarray, level_downsample: float):
         self.start = start
-        self.end = end
+        self.size = size
         self.array = array
         self.level_downsample = level_downsample
 
