@@ -66,9 +66,5 @@ class Classifier(BasicClassifier):
         batch: "Batch",
         threshold: float = 0.8,
     ) -> np.ndarray:
-        image_array = patch.array
-        orig_shape = image_array.shape[:2]
-        image_array = self._flat_array(image_array)
         with self.lock:
-            prediction = self.model.predict(image_array)
-        return self._get_mask(prediction, orig_shape, threshold)
+            return super()._classify_patch(patch, batch, threshold)

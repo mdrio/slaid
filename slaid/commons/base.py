@@ -34,17 +34,17 @@ class Image(abc.ABC):
 
 
 class Patch:
-    def __init__(self, x: int, y: int, size: Tuple[int, int],
-                 level_downsample: float, array: np.ndarray):
+    def __init__(self,
+                 x: int,
+                 y: int,
+                 size: Tuple[int, int],
+                 level_downsample: float,
+                 array: np.ndarray = None):
         self.x = x
         self.y = y
         self.size = size
         self.level_downsample = level_downsample
         self.array = array
-
-    @property
-    def area(self):
-        return self.array.size
 
 
 class Mask:

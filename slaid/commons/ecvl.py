@@ -8,7 +8,6 @@ from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
 from pyeddl.tensor import Tensor as EddlTensor
 
-from slaid.commons import PATCH_SIZE
 from slaid.commons import Image as BaseImage
 from slaid.commons import Slide as BaseSlide
 from slaid.commons import Tensor as BaseTensor

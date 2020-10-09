@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
-from slaid.classifiers import BasicClassifier
+from slaid.classifiers import BasicClassifier, Batch
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask, Patch, convert_patch
 from slaid.commons.ecvl import create_slide
@@ -76,6 +76,8 @@ class TestTissueClassifierTest:
 
     def test_classify_by_patch_level_2(self):
         level = 2
+        #  import pudb
+        #  pudb.set_trace()
         slide = create_slide('tests/data/test.tif')
         downsample = slide.level_downsamples[level]
         tissue_detector = self.get_classifier(self.get_model())
@@ -87,6 +89,7 @@ class TestTissueClassifierTest:
         self.assertEqual(mask.array[:round(300 // downsample), :].all(), 1)
         self.assertEqual(mask.array[round(300 // downsample):, :].all(), 0)
 
+    @unittest.skip('filter disabled')
     def test_classify_with_filter_same_level(self):
         tissue_level = 0
         cancer_level = 0
@@ -105,8 +108,6 @@ class TestTissueClassifierTest:
 
         slide.masks['tissue'] = mask
         tissue_detector = self.get_classifier(self.get_model(), 'cancer')
-        #  import pudb
-        #  pudb.set_trace()
         mask = tissue_detector.classify(slide,
                                         level=cancer_level,
                                         patch_size=patch_size,
@@ -117,6 +118,7 @@ class TestTissueClassifierTest:
         self.assertEqual(mask.ratio(cancer_patch), 1)
         self.assertEqual(np.sum(mask.array), cancer_patch.area)
 
+    @unittest.skip('filter disabled')
     def test_classify_with_filter_different_level_proportional_patch_size(
             self):
         tissue_level = 0
@@ -149,6 +151,7 @@ class TestTissueClassifierTest:
         self.assertEqual(mask.ratio(tissue_patch), 1)
         self.assertEqual(np.sum(mask.array), cancer_patch.area)
 
+    @unittest.skip('filter disabled')
     def test_classify_with_filter_different_level_not_proportional_patch_size(
             self):
         tissue_level = 0
@@ -197,8 +200,7 @@ class DaskClassifierTest(TestTissueClassifierTest, unittest.TestCase):
     def setUpClass(cls):
         #  init_client()
         import dask
-        dask.config.set(scheduler='synchronous'
-                        )  # overwrite default with single-threaded scheduler
+        dask.config.set(scheduler='synchronous')
 
     @staticmethod
     def get_classifier(model, feature='tissue'):
@@ -223,7 +225,9 @@ class BatchTest(unittest.TestCase):
         patch_size = (256, 256)
         level = 0
         batches = list(
-            classifier._get_batches(slide, level, n_batch, patch_size))
+            Batch(start, size, np.zeros(size[::-1]), 1)
+            for start, size in classifier._get_batch_coordinates(
+                slide, level, n_batch, patch_size))
         batches_array = np.concatenate([b.array for b in batches], axis=0)
         self.assertEqual(slide.level_dimensions[level],
                          batches_array.shape[:2][::-1])
@@ -235,7 +239,9 @@ class BatchTest(unittest.TestCase):
         patch_size = (256, 256)
         level = 0
         batches = list(
-            classifier._get_batches(slide, level, n_batch, patch_size))
+            Batch(start, size, np.zeros(size[::-1]), 1)
+            for start, size in classifier._get_batch_coordinates(
+                slide, level, n_batch, patch_size))
 
         rows = []
         for b in batches:

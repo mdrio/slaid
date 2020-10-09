@@ -176,6 +176,8 @@ class SerialRunner:
                                    threshold=threshold,
                                    level=extraction_level,
                                    patch_size=patch_size)
+        print('saving mask')
+        mask.save('MASK.png')
         feature = classifier.feature
         slide.masks[feature] = mask
         if only_mask:
