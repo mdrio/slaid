@@ -1,12 +1,13 @@
 import logging
+import threading
 from typing import Tuple
-
+import numpy as np
 import dask.array as da
 from dask import delayed
 from dask.distributed import Client
 
-from slaid.classifiers.base import BasicClassifier, Mask, PatchFilter
-from slaid.commons import Slide
+from slaid.classifiers.base import BasicClassifier, Mask, PatchFilter, Batch
+from slaid.commons import Slide, Patch
 
 logger = logging.getLogger('dask')
 
@@ -19,6 +20,8 @@ def init_client(*args, **kwargs):
 
 
 class Classifier(BasicClassifier):
+    lock = threading.Lock()
+
     def classify(self,
                  slide: Slide,
                  patch_filter=None,
@@ -37,10 +40,6 @@ class Classifier(BasicClassifier):
                 self._get_batch_coordinates(slide, level, n_batch,
                                             patch_size)):
             logger.debug('batch %s of %s', i, n_batch)
-            #  rows.append(
-            #      da.from_array(
-            #          self._classify_batch(slide, start, size, level, patch_size,
-            #                               patch_filter, threshold)))
             rows.append(
                 da.from_delayed(delayed(self._classify_batch)(slide, start,
                                                               size, level,
@@ -49,7 +48,6 @@ class Classifier(BasicClassifier):
                                                               threshold),
                                 shape=size[::-1],
                                 dtype='uint8'))
-        print(rows)
         mask = self._concatenate(rows, axis=0)
         return Mask(mask.compute(rerun_exceptions_locally=True), level,
                     slide.level_downsamples[level])
@@ -61,3 +59,16 @@ class Classifier(BasicClassifier):
     @staticmethod
     def _concatenate(seq, axis):
         return da.concatenate(seq, axis)
+
+    def _classify_patch(
+        self,
+        patch: Patch,
+        batch: "Batch",
+        threshold: float = 0.8,
+    ) -> np.ndarray:
+        image_array = patch.array
+        orig_shape = image_array.shape[:2]
+        image_array = self._flat_array(image_array)
+        with self.lock:
+            prediction = self.model.predict(image_array)
+        return self._get_mask(prediction, orig_shape, threshold)

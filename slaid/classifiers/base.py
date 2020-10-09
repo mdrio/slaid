@@ -131,10 +131,7 @@ class BasicClassifier(Classifier):
         image_array = patch.array
         orig_shape = image_array.shape[:2]
         image_array = self._flat_array(image_array)
-        #  from slaid.models.eddl import Model
-        #  model = Model(self.model._filename, False)
         prediction = self.model.predict(image_array)
-        print(f'{batch.start}, {batch.size}, {orig_shape}, {prediction.shape}')
         return self._get_mask(prediction, orig_shape, threshold)
 
     @staticmethod
@@ -152,7 +149,7 @@ class BasicClassifier(Classifier):
 
     def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
                   threshold: float) -> np.ndarray:
-        print('prediction.shape %s, shape %s', prediction.shape, shape)
+        logger.debug('prediction.shape %s, shape %s', prediction.shape, shape)
         mask = prediction.reshape(shape)
         mask[mask < threshold] = 0
         mask[mask > threshold] = 1
