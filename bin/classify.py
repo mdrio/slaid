@@ -5,12 +5,13 @@ import os
 import pickle
 
 import pkg_resources
+import zarr
 from clize import run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.classifiers.dask import init_client
-from slaid.commons import PATCH_SIZE
+from slaid.commons import PATCH_SIZE, Slide
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import to_json
 
@@ -25,7 +26,17 @@ def pickle_dump(obj, filename):
         pickle.dump(obj, f)
 
 
-WRITERS = {'json': to_json, 'pkl': pickle_dump}
+def to_zarr(slide: Slide, path: str):
+    group = zarr.open_group(path)
+    if 'slide' not in group.attrs:
+        group.attrs['slide'] = slide.ID
+    for name, mask in slide.masks.items():
+        array = group.array(name, mask.array)
+        array.attrs['extraction_level'] = mask.extraction_level
+        array.attrs['level_downsample'] = mask.level_downsample
+
+
+WRITERS = {'json': to_json, 'pkl': pickle_dump, 'zarr': to_zarr}
 
 
 def set_model(func, model):
@@ -176,8 +187,6 @@ class SerialRunner:
                                    threshold=threshold,
                                    level=extraction_level,
                                    patch_size=patch_size)
-        print('saving mask')
-        mask.save('MASK.png')
         feature = classifier.feature
         slide.masks[feature] = mask
         if only_mask:
