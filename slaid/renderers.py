@@ -3,6 +3,7 @@ import json
 from typing import Any, Callable, Dict, List, Union
 
 import numpy as np
+import zarr
 from tifffile import imwrite
 
 from slaid.commons import Patch, Slide
@@ -194,3 +195,13 @@ def to_json(obj: Any, filename: str = None) -> Union[str, None]:
             json.dump(obj, f, cls=JSONEncoder)
     else:
         return json.dumps(obj, cls=JSONEncoder)
+
+
+def to_zarr(slide: Slide, path: str):
+    group = zarr.open_group(path)
+    if 'slide' not in group.attrs:
+        group.attrs['slide'] = slide.ID
+    for name, mask in slide.masks.items():
+        array = group.array(name, mask.array)
+        array.attrs['level'] = mask.extraction_level
+        array.attrs['downsample'] = mask.level_downsample

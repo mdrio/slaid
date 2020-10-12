@@ -6,14 +6,14 @@ import pickle
 
 import pkg_resources
 import zarr
-from clize import run
+from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.classifiers.dask import init_client
 from slaid.commons import PATCH_SIZE, Slide
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import to_json
+from slaid.renderers import to_zarr
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -26,17 +26,7 @@ def pickle_dump(obj, filename):
         pickle.dump(obj, f)
 
 
-def to_zarr(slide: Slide, path: str):
-    group = zarr.open_group(path)
-    if 'slide' not in group.attrs:
-        group.attrs['slide'] = slide.ID
-    for name, mask in slide.masks.items():
-        array = group.array(name, mask.array)
-        array.attrs['extraction_level'] = mask.extraction_level
-        array.attrs['level_downsample'] = mask.level_downsample
-
-
-WRITERS = {'json': to_json, 'pkl': pickle_dump, 'zarr': to_zarr}
+WRITERS = {'zarr': to_zarr}
 
 
 def set_model(func, model):
@@ -73,20 +63,19 @@ class SerialRunner:
         threshold: 't' = 0.8,
         patch_size=None,
         gpu=False,
-        only_mask=False,
-        writer: 'w' = 'pkl',
+        writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
+            WRITERS.keys())[0],
         filter_: 'F' = None,
         overwrite_output_if_exists: 'overwrite' = False,
-        skip_output_if_exist=False,
+        skip=False,
     ):
         classifier = cls.get_classifier(model, feature, gpu)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
-                            extraction_level, threshold, patch_size, only_mask,
-                            writer, filter_, overwrite_output_if_exists,
-                            skip_output_if_exist)
+                            extraction_level, threshold, patch_size, writer,
+                            filter_, overwrite_output_if_exists, skip)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
@@ -120,8 +109,8 @@ class SerialRunner:
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
-                        extraction_level, threshold, patch_size, only_mask,
-                        writer, filter_, overwrite_output_if_exists,
+                        extraction_level, threshold, patch_size, writer,
+                        filter_, overwrite_output_if_exists,
                         skip_output_if_exist):
 
         for slide in cls.get_slides(input_path):
@@ -133,7 +122,6 @@ class SerialRunner:
                 extraction_level,
                 threshold,
                 patch_size,
-                only_mask,
                 writer,
                 filter_,
                 overwrite_output_if_exists,
@@ -149,8 +137,7 @@ class SerialRunner:
                        extraction_level,
                        threshold=0.8,
                        patch_size=PATCH_SIZE,
-                       only_mask=False,
-                       writer='pkl',
+                       writer=list(WRITERS.keys())[0],
                        filter_=None,
                        overwrite_output_if_exists=True,
                        skip_output_if_exist=False):
@@ -189,18 +176,7 @@ class SerialRunner:
                                    patch_size=patch_size)
         feature = classifier.feature
         slide.masks[feature] = mask
-        if only_mask:
-            data_to_dump = {
-                'filename': slide_filename,
-                'dimensions': slide.dimensions,
-                'extraction_level': slide.masks[feature].extraction_level,
-                'mask': slide.masks[feature].array
-            }
-
-        else:
-            data_to_dump = slide
-
-        WRITERS[writer](data_to_dump, output_filename)
+        WRITERS[writer](slide, output_filename)
         logging.info(output_filename)
 
     @staticmethod
@@ -227,20 +203,19 @@ class ParallelRunner(SerialRunner):
         threshold: 't' = 0.8,
         patch_size=None,
         gpu=False,
-        only_mask=False,
-        writer: 'w' = 'pkl',
+        writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
+            WRITERS.keys())[0],
         filter_: 'F' = None,
         overwrite_output_if_exists: 'overwrite' = False,
-        skip_output_if_exist=False,
+        skip=False,
     ):
         classifier = cls.get_classifier(model, feature, gpu, processes)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
-                            extraction_level, threshold, patch_size, only_mask,
-                            writer, filter_, overwrite_output_if_exists,
-                            skip_output_if_exist)
+                            extraction_level, threshold, patch_size, writer,
+                            filter_, overwrite_output_if_exists, skip)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu, processes):

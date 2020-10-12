@@ -1,16 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import json
 import os
-import pickle
 import shutil
 import subprocess
 import unittest
-from tempfile import NamedTemporaryFile
 
-import numpy as np
+import zarr
 
-from slaid.commons.ecvl import Slide, create_slide
+from slaid.commons.ecvl import Slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -37,166 +34,85 @@ class ExtractTissueTest:
     def teardown(self):
         self._clean_output_dir()
 
-    def _test_pickled(self, slide_pickled, extraction_level):
-        self.assertTrue(isinstance(slide_pickled, Slide))
-        self.assertEqual(slide_pickled.ID, os.path.basename(input_))
+    def _get_input_output(self, output):
+        slide = Slide(input_)
+        zarr_group = zarr.open_group(output)
+        return slide, zarr_group
 
-    def test_extract_tissue_default_pkl(self):
+    def _test_output(self, output, slide, level):
+        self.assertEqual(output.attrs['slide'], slide.ID)
+        self.assertEqual(output[self.feature].shape,
+                         slide.level_dimensions[level][::-1])
+        self.assertEqual(output[self.feature].attrs['level'], level)
+        self.assertEqual(output[self.feature].attrs['downsample'],
+                         slide.level_downsamples[level])
+
+    def test_extract_tissue_default(self):
         subprocess.check_call([
-            'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
-            self.model, input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            input_, OUTPUT_DIR
         ])
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        with open(output, 'rb') as f:
-            slide_pickled = pickle.load(f)
-            self._test_pickled(slide_pickled, 2)
+        output_path = os.path.join(
+            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        slide, output = self._get_input_output(output_path)
 
-    def test_extract_tissue_only_mask_pkl(self):
-        subprocess.check_call([
-            'classify.py', self.cmd, '--only-mask', '-f', self.feature, '-w',
-            'pkl', '-m', self.model, input_, OUTPUT_DIR
-        ])
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        with open(output, 'rb') as f:
-            data = pickle.load(f)
-
-        self.assertTrue('filename' in data)
-        self.assertTrue('mask' in data)
-        self.assertTrue('dimensions' in data)
-
-        self.assertTrue('extraction_level' in data)
-        self.assertEqual(data['extraction_level'], 2)
-
-    def test_extract_tissue_default_json(self):
-        subprocess.check_call([
-            'classify.py', self.cmd, '-f', self.feature, '-w', 'json', '-m',
-            self.model, input_, OUTPUT_DIR
-        ])
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.json')
-        with open(output, 'rb') as f:
-            data = json.load(f)
-            self.assertTrue('filename' in data)
-            self.assertTrue('extraction_level' in data['masks'][self.feature])
-            self.assertTrue('array' in data['masks'][self.feature])
-            self.assertTrue('level_downsample' in data['masks'][self.feature])
+        self._test_output(output, slide, 2)
 
     def test_extract_tissue_custom(self):
         extr_level = 1
-        cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature} -w pkl -l {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
+        cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature}  -l '\
+            f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        with open(output, 'rb') as f:
-            slide_pickled = pickle.load(f)
-            self._test_pickled(slide_pickled, 1)
-        os.remove(output)
+        output_path = os.path.join(
+            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        slide, output = self._get_input_output(output_path)
 
-    def test_input_as_pickle(self):
-        slide = create_slide(input_)
-        with NamedTemporaryFile(suffix='.pkl', delete=False) as f:
-            pickle.dump(slide, f)
-        extr_level = 1
-        cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature} -l {extr_level} {f.name} {OUTPUT_DIR}'
-        subprocess.check_call(cmd.split())
-        output = os.path.join(
-            OUTPUT_DIR,
-            f'{os.path.splitext(os.path.basename(f.name))[0]}.{self.feature}.pkl'
-        )
-
-        with open(output, 'rb') as f:
-            pickle.load(f)
-        os.remove(f.name)
-
-    def test_get_tissue_mask_default_value(self):
-        subprocess.check_call([
-            'classify.py', self.cmd, '-m', self.model, '-w', 'pkl', '-f',
-            self.feature, '--only-mask', input_, OUTPUT_DIR
-        ])
-        print(' '.join([
-            'classify.py', self.cmd, '-m', self.model, '-w', 'pkl', '-f',
-            self.feature, '--only-mask', input_, OUTPUT_DIR
-        ]))
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        with open(output, 'rb') as f:
-            data = pickle.load(f)
-        self.assertTrue('filename' in data)
-        self.assertTrue('extraction_level' in data)
-        self.assertTrue('mask' in data)
-
-        self.assertEqual(data['filename'], input_)
-        self.assertEqual(data['extraction_level'], 2)
-        self.assertEqual(data['mask'].transpose().shape,
-                         slide.level_dimensions[data['extraction_level']])
-        self.assertTrue(sum(sum(data['mask'])) > 0)
-
-    def test_get_tissue_mask_custom_value(self):
-        extr_level = 1
-        cmd = f'classify.py {self.cmd} -f {self.feature} --only-mask -m {self.model} -l {extr_level} -w pkl -t 0.7  {input_} {OUTPUT_DIR}'
-        subprocess.check_call(cmd.split())
-        slide = Slide(input_)
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        with open(output, 'rb') as f:
-            data = pickle.load(f)
-        self.assertTrue('filename' in data)
-        self.assertTrue('extraction_level' in data)
-        self.assertTrue('mask' in data)
-
-        self.assertEqual(data['filename'], input_)
-        self.assertEqual(data['dimensions'], slide.dimensions)
-        self.assertEqual(data['extraction_level'], extr_level)
-        self.assertEqual(data['mask'].transpose().shape,
-                         slide.level_dimensions[extr_level])
-        self.assertTrue(np.sum(data['mask']) > 0)
+        self._test_output(output, slide, extr_level)
 
     def test_extract_tissue_overwrite(self):
         output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        os.makedirs(OUTPUT_DIR)
-        subprocess.check_call(['touch', output])
+                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        print(output)
+        os.makedirs(output)
         subprocess.check_call([
-            'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
-            self.model, '--overwrite', input_, OUTPUT_DIR
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '--overwrite', input_, OUTPUT_DIR
         ])
         stats = os.stat(output)
         self.assertTrue(stats.st_size > 0)
+        output_path = os.path.join(
+            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        slide, output = self._get_input_output(output_path)
 
-        with open(output, 'rb') as f:
-            slide_pickled = pickle.load(f)
-            self._test_pickled(slide_pickled, 2)
+        self._test_output(output, slide, 2)
 
     def test_extract_tissue_no_overwrite(self):
         output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.pkl')
-        os.makedirs(OUTPUT_DIR)
-        subprocess.check_call(['touch', output])
-        with self.assertRaises(subprocess.CalledProcessError):
+                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        os.makedirs(output)
+        subprocess.check_call([
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '--overwrite', input_, OUTPUT_DIR
+        ])
 
+        with self.assertRaises(subprocess.CalledProcessError):
             subprocess.check_call([
-                'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
-                self.model, input_, OUTPUT_DIR
+                'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+                input_, OUTPUT_DIR
             ])
 
+    def test_extract_tissue_skip(self):
+        output = os.path.join(OUTPUT_DIR,
+                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        os.makedirs(output)
+        subprocess.check_call(['touch', output])
+        subprocess.check_call([
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '--skip', input_, OUTPUT_DIR
+        ])
 
-def test_extract_tissue_skip(self):
-    output = os.path.join(OUTPUT_DIR,
-                          f'{input_basename_no_ext}.{self.feature}.pkl')
-    os.makedirs(OUTPUT_DIR)
-    subprocess.check_call(['touch', output])
-    subprocess.check_call([
-        'classify.py', self.cmd, '-f', self.feature, '-w', 'pkl', '-m',
-        self.model, '--skip', input_, OUTPUT_DIR
-    ])
-    stats = os.stat(output)
-    self.assertEqual(stats.st_size, 0)
-
-    with open(output, 'rb') as f:
-        slide_pickled = pickle.load(f)
-        self._test_pickled(slide_pickled, 2)
+        slide, output = self._get_input_output(output)
+        self.assertEqual(len(list(output.arrays())), 0)
 
 
 class SerialEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
