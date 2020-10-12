@@ -221,16 +221,17 @@ class BatchTest(unittest.TestCase):
     def test_shape(self):
         slide = create_slide('tests/data/PH10023-1.thumb.tif')
         classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
-        n_batch = 1
-        patch_size = (256, 256)
+        n_batches = [1, 2, 3, 5, 10, 100]
+        patch_sizes = [(256, 256), (256, 256), None, None, None, None]
         level = 0
-        batches = list(
-            Batch(start, size, np.zeros(size[::-1]), 1)
-            for start, size in classifier._get_batch_coordinates(
-                slide, level, n_batch, patch_size))
-        batches_array = np.concatenate([b.array for b in batches], axis=0)
-        self.assertEqual(slide.level_dimensions[level],
-                         batches_array.shape[:2][::-1])
+        for n_batch, patch_size in zip(n_batches, patch_sizes):
+            batches = list(
+                Batch(start, size, np.zeros(size[::-1]), 1)
+                for start, size in classifier._get_batch_coordinates(
+                    slide, level, n_batch, patch_size))
+            batches_array = np.concatenate([b.array for b in batches], axis=0)
+            self.assertEqual(slide.level_dimensions[level],
+                             batches_array.shape[:2][::-1])
 
     def test_patches(self):
         slide = create_slide('tests/data/PH10023-1.thumb.tif')
