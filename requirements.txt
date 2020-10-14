@@ -9,3 +9,4 @@ pyeddl
 clize
 dask[complete]
 zarr
+scipy

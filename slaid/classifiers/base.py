@@ -2,11 +2,12 @@ import abc
 import logging
 import re
 from collections import defaultdict
-from typing import Callable, Tuple
+from typing import Tuple
 
 import numpy as np
+from scipy import ndimage
 
-from slaid.commons import Mask, Patch, Slide, convert_patch
+from slaid.commons import Mask, Patch, Slide
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
@@ -23,15 +24,14 @@ class Classifier(abc.ABC):
         pass
 
 
-class PatchFilter:
-    def __init__(self, slide: Slide, mask: Mask, operator: str, value: float):
-        self.slide = slide,
-        self.mask = mask
+class Filter:
+    def __init__(self, mask: Mask, operator: str, value: float):
         self.operator = operator
         self.value = value
+        self.mask = mask
 
     @staticmethod
-    def create(slide: Slide, condition: str) -> Tuple[str, Callable, float]:
+    def create(slide: Slide, condition: str) -> "Filter":
         operator_mapping = {
             '>': '__gt__',
             '>=': '__ge__',
@@ -46,12 +46,20 @@ class PatchFilter:
         mask = slide.masks[parsed['mask']]
         operator = operator_mapping[parsed['operator']]
         value = float(parsed['value'])
-        return PatchFilter(slide, mask, operator, value)
+        return Filter(mask, operator, value)
 
-    def filter(self, patch: Patch):
-        patch = convert_patch(patch, self.slide, self.mask.level_downsample)
-        filtered = getattr(self.mask.ratio(patch), self.operator)(self.value)
-        return filtered
+    def filter(self, batch: "Batch") -> np.ndarray:
+        if self.mask.level_downsample != batch.level_downsample:
+            mask = ndimage.zoom(
+                self.mask.array,
+                self.mask.level_downsample / batch.level_downsample)
+        else:
+            mask = self.mask.array
+
+        return getattr(
+            mask[batch.start[0]:batch.start[0] + batch.array.shape[0],
+                 batch.start[1]:batch.start[1] + batch.array.shape[1]],
+            self.operator)(self.value)
 
 
 class BasicClassifier(Classifier):
@@ -61,16 +69,11 @@ class BasicClassifier(Classifier):
 
     def classify(self,
                  slide: Slide,
-                 patch_filter=None,
+                 filter_=None,
                  threshold: float = 0.8,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
                  n_batch: int = 1) -> Mask:
-        if patch_filter is not None:
-            patch_filter = PatchFilter.create(slide, patch_filter).filter
-            assert patch_size is not None
-        else:
-            patch_filter = (lambda x: True)
 
         rows = []
         for i, (start, size) in enumerate(
@@ -79,27 +82,39 @@ class BasicClassifier(Classifier):
             logger.debug('batch %s of %s', i, n_batch)
             rows.append(
                 self._classify_batch(slide, start, size, level, patch_size,
-                                     patch_filter, threshold))
+                                     filter_, threshold))
         mask = self._concatenate(rows, axis=0)
 
         return Mask(mask, level, slide.level_downsamples[level])
 
-    def _classify_batch(self, slide, start, size, level, patch_size,
-                        patch_filter, threshold):
-        rows = []
+    def _classify_batch(self, slide, start, size, level, patch_size, filter_,
+                        threshold):
         batch = self._get_batch(slide, start, size, level)
-        patches_by_row = defaultdict(list)
-        for p in batch.get_patches(patch_size):
-            if patch_filter(p):
-                patch_mask = self._classify_patch(p, batch, threshold)
-            else:
-                patch_mask = self._get_zeros(p.array.shape, dtype='uint8')
-            patches_by_row[p.y].append(patch_mask)
+        #  if patch_size is None:
+        #      pass
+        #  patches_by_row = defaultdict(list)
+        #  for p in batch.get_patches(patch_size, filter_):
+        #      patch_mask = self._classify_patch(p, batch, threshold)
+        #      patches_by_row[p.y].append(patch_mask)
+        #
+        #  for _, r in sorted(patches_by_row.items()):
+        #      rows.append(np.concatenate([_ for _ in r], axis=1))
+        #  return np.concatenate(rows, axis=0)
+        #  else:
+        #  import pudb
+        #  pudb.set_trace()
+        array = batch.array
+        indexes_pixel_to_process = filter_.filter(
+            batch) if filter_ is not None else np.ones(shape=array.shape[:2],
+                                                       dtype='bool')
 
-        for _, r in sorted(patches_by_row.items()):
-            rows.append(np.concatenate([_ for _ in r], axis=1))
+        filtered_array = array[indexes_pixel_to_process]
 
-        return np.concatenate(rows, axis=0)
+        prediction = self.model.predict(filtered_array)
+        prediction[prediction > threshold] = 1
+        res = np.zeros(array.shape[:2], dtype='uint8')
+        res[indexes_pixel_to_process] = prediction
+        return res
 
     def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
@@ -165,7 +180,8 @@ class Batch:
         self.array = array
         self.level_downsample = level_downsample
 
-    def get_patches(self, patch_size) -> Patch:
+    def get_patches(self, patch_size: Tuple[int, int],
+                    filter: Filter) -> Patch:
         patch_size = patch_size or self.array.shape[:2]
 
         for y in range(0, self.array.shape[1], patch_size[1]):
