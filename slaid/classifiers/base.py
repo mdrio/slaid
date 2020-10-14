@@ -48,18 +48,30 @@ class Filter:
         value = float(parsed['value'])
         return Filter(mask, operator, value)
 
-    def filter(self, batch: "Batch") -> np.ndarray:
+    def filter(self,
+               batch: "Batch",
+               patch_size: Tuple[int, int] = None) -> np.ndarray:
+        mask = self.mask.array
         if self.mask.level_downsample != batch.level_downsample:
             mask = ndimage.zoom(
-                self.mask.array,
-                self.mask.level_downsample / batch.level_downsample)
-        else:
-            mask = self.mask.array
+                mask, self.mask.level_downsample / batch.level_downsample)
 
-        return getattr(
-            mask[batch.start[0]:batch.start[0] + batch.array.shape[0],
-                 batch.start[1]:batch.start[1] + batch.array.shape[1]],
-            self.operator)(self.value)
+        mask = mask[batch.start[0]:batch.start[0] + batch.array.shape[0],
+                    batch.start[1]:batch.start[1] + batch.array.shape[1]]
+
+        if patch_size is not None:
+            mask = self._compute_mean_patch(mask, patch_size)
+        return getattr(mask, self.operator)(self.value)
+
+    def _compute_mean_patch(self, array, patch_size):
+        sum_ = np.add.reduceat(np.add.reduceat(array,
+                                               np.arange(
+                                                   0, array.shape[0],
+                                                   patch_size[0]),
+                                               axis=0),
+                               np.arange(0, array.shape[1], patch_size[1]),
+                               axis=1)
+        return sum_ / (patch_size[0] * patch_size[1])
 
 
 class BasicClassifier(Classifier):
@@ -90,30 +102,21 @@ class BasicClassifier(Classifier):
     def _classify_batch(self, slide, start, size, level, patch_size, filter_,
                         threshold):
         batch = self._get_batch(slide, start, size, level)
-        #  if patch_size is None:
-        #      pass
-        #  patches_by_row = defaultdict(list)
-        #  for p in batch.get_patches(patch_size, filter_):
-        #      patch_mask = self._classify_patch(p, batch, threshold)
-        #      patches_by_row[p.y].append(patch_mask)
-        #
-        #  for _, r in sorted(patches_by_row.items()):
-        #      rows.append(np.concatenate([_ for _ in r], axis=1))
-        #  return np.concatenate(rows, axis=0)
-        #  else:
-        #  import pudb
-        #  pudb.set_trace()
         array = batch.array
-        indexes_pixel_to_process = filter_.filter(
-            batch) if filter_ is not None else np.ones(shape=array.shape[:2],
-                                                       dtype='bool')
+        orig_shape = array.shape
+        if filter_ is not None:
+            indexes_pixel_to_process = filter_.filter(batch)
+            array = array[indexes_pixel_to_process]
+        else:
+            array = self._flat_array(array)
 
-        filtered_array = array[indexes_pixel_to_process]
-
-        prediction = self.model.predict(filtered_array)
+        prediction = self.model.predict(array)
         prediction[prediction > threshold] = 1
-        res = np.zeros(array.shape[:2], dtype='uint8')
-        res[indexes_pixel_to_process] = prediction
+        if filter_ is not None:
+            res = np.zeros(orig_shape[:2], dtype='uint8')
+            res[indexes_pixel_to_process] = prediction
+        else:
+            res = prediction.reshape(orig_shape[:2])
         return res
 
     def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
