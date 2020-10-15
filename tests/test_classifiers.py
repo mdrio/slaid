@@ -4,9 +4,9 @@ from collections import defaultdict
 import numpy as np
 from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 
-from slaid.classifiers import BasicClassifier, Batch, Filter
+from slaid.classifiers import BasicClassifier, Batch, Filter, Patch
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons import Mask, Patch, convert_patch
+from slaid.commons import Mask
 from slaid.commons.ecvl import create_slide
 
 
@@ -74,13 +74,12 @@ class TestTissueClassifierTest:
     def test_classify_by_patch_level_0_batch_2(self):
         self.test_classify_by_patch_level_0(2)
 
-    def test_classify_by_patch_level_2(self):
-        level = 2
-        #  import pudb
-        #  pudb.set_trace()
+    def test_classify_by_patch_level_1(self):
+        level = 1
         slide = create_slide('tests/data/test.tif')
         downsample = slide.level_downsamples[level]
         tissue_detector = self.get_classifier(self.get_model())
+
         mask = tissue_detector.classify(slide,
                                         level=level,
                                         patch_size=(200, 200))
@@ -99,11 +98,9 @@ class TestTissueClassifierTest:
                     slide.level_downsamples[tissue_level])
         tissue_patch = Patch(100, 100, patch_size,
                              slide.level_downsamples[tissue_level])
-        cancer_patch = convert_patch(tissue_patch, slide,
-                                     slide.level_downsamples[cancer_level])
-        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
-                   tissue_patch.x:tissue_patch.x +
-                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+                   tissue_patch.col:tissue_patch.col +
+                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
 
         slide.masks['tissue'] = mask
         tissue_detector = self.get_classifier(self.get_model(), 'cancer')
@@ -115,8 +112,7 @@ class TestTissueClassifierTest:
 
         self.assertEqual(mask.array.shape[::-1],
                          slide.level_dimensions[cancer_level])
-        self.assertEqual(mask.ratio(cancer_patch), 1)
-        #  self.assertEqual(np.sum(mask.array), cancer_patch.area)
+        self.assertEqual(np.sum(mask.array), 10000)
 
     def test_classify_with_filter_different_level_proportional_patch_size(
             self):
@@ -129,9 +125,9 @@ class TestTissueClassifierTest:
                     slide.level_downsamples[tissue_level])
         tissue_patch = Patch(100, 100, patch_size,
                              slide.level_downsamples[tissue_level])
-        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
-                   tissue_patch.x:tissue_patch.x +
-                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+                   tissue_patch.col:tissue_patch.col +
+                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
 
         slide.masks['tissue'] = mask
         downsample = slide.level_downsamples[cancer_level]
@@ -159,9 +155,9 @@ class TestTissueClassifierTest:
         tissue_patch = Patch(100, 100, patch_size,
                              slide.level_downsamples[tissue_level])
 
-        mask_array[tissue_patch.y:tissue_patch.y + tissue_patch.size[1],
-                   tissue_patch.x:tissue_patch.x +
-                   tissue_patch.size[0]] = np.ones(tissue_patch.size)
+        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+                   tissue_patch.col:tissue_patch.col +
+                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
 
         slide.masks['tissue'] = mask
 
@@ -249,9 +245,6 @@ class BatchTest(unittest.TestCase):
                 rows.append(np.concatenate([_.array for _ in r], axis=1))
         mask = np.concatenate(rows, axis=0)
         self.assertEqual(mask.shape[:2], slide.level_dimensions[level][::-1])
-        from slaid.commons import Mask
-        mask = Mask(mask, 0, 1)
-        mask.save('MASSk.png')
 
 
 class FilterTest(unittest.TestCase):
