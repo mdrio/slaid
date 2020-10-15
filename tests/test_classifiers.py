@@ -240,7 +240,7 @@ class BatchTest(unittest.TestCase):
         for b in batches:
             patches_by_row = defaultdict(list)
             for p in b.get_patches(patch_size):
-                patches_by_row[p.y].append(p)
+                patches_by_row[p.row].append(p)
             for r in patches_by_row.values():
                 rows.append(np.concatenate([_.array for _ in r], axis=1))
         mask = np.concatenate(rows, axis=0)

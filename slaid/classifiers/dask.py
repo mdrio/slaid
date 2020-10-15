@@ -1,13 +1,14 @@
 import logging
 import threading
 from typing import Tuple
-import numpy as np
+
 import dask.array as da
+import numpy as np
 from dask import delayed
 from dask.distributed import Client
 
-from slaid.classifiers.base import BasicClassifier, Mask, PatchFilter, Batch
-from slaid.commons import Slide, Patch
+from slaid.classifiers.base import BasicClassifier, Batch, Filter, Mask, Patch
+from slaid.commons import Slide
 
 logger = logging.getLogger('dask')
 
@@ -24,17 +25,11 @@ class Classifier(BasicClassifier):
 
     def classify(self,
                  slide: Slide,
-                 patch_filter=None,
+                 filter_=None,
                  threshold: float = 0.8,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
                  n_batch: int = 1) -> Mask:
-        if patch_filter is not None:
-            patch_filter = PatchFilter.create(slide, patch_filter).filter
-            assert patch_size is not None
-        else:
-            patch_filter = (lambda x: True)
-
         rows = []
         for i, (start, size) in enumerate(
                 self._get_batch_coordinates(slide, level, n_batch,
@@ -44,7 +39,7 @@ class Classifier(BasicClassifier):
                 da.from_delayed(delayed(self._classify_batch)(slide, start,
                                                               size, level,
                                                               patch_size,
-                                                              patch_filter,
+                                                              filter_,
                                                               threshold),
                                 shape=size[::-1],
                                 dtype='uint8'))
