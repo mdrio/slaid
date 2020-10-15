@@ -47,7 +47,7 @@ class ExtractTissueTest:
         self.assertEqual(output[self.feature].attrs['downsample'],
                          slide.level_downsamples[level])
 
-    def test_extract_tissue_default(self):
+    def test_classify_default(self):
         subprocess.check_call([
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             input_, OUTPUT_DIR
@@ -58,7 +58,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, 2)
 
-    def test_extract_tissue_custom(self):
+    def test_classify_custom(self):
         extr_level = 1
         cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature}  -l '\
             f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
@@ -69,7 +69,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, extr_level)
 
-    def test_extract_tissue_overwrite(self):
+    def test_classify_overwrite(self):
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.zarr')
         print(output)
@@ -86,7 +86,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, 2)
 
-    def test_extract_tissue_no_overwrite(self):
+    def test_classify_no_overwrite(self):
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.zarr')
         os.makedirs(output)
@@ -101,7 +101,7 @@ class ExtractTissueTest:
                 input_, OUTPUT_DIR
             ])
 
-    def test_extract_tissue_skip(self):
+    def test_classify_skip(self):
         output = os.path.join(OUTPUT_DIR,
                               f'{input_basename_no_ext}.{self.feature}.zarr')
         os.makedirs(output)
