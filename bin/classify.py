@@ -170,7 +170,7 @@ class SerialRunner:
 
         mask = classifier.classify(slide,
                                    n_batch=n_batch,
-                                   patch_filter=filter_,
+                                   filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
                                    patch_size=patch_size)
