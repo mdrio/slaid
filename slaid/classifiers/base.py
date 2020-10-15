@@ -113,8 +113,7 @@ class BasicClassifier(Classifier):
         else:
             array = self._flat_array(array)
 
-        prediction = self.model.predict(array)
-        prediction[prediction > threshold] = 1
+        prediction = self._classify_array(array, threshold)
         if filter_ is not None:
             res = np.zeros(orig_shape[:2], dtype='uint8')
             res[indexes_pixel_to_process] = prediction
@@ -130,14 +129,20 @@ class BasicClassifier(Classifier):
         res = np.zeros(batch_shape[:2], dtype='uint8')
         for patch in batch.get_patches(patch_size, filter_):
             orig_shape = patch.array.shape
-            patch_array = self._flat_array(patch.array)
-            prediction = self.model.predict(patch_array)
-            prediction[prediction > threshold] = 1
+            flatten_array = self._flat_array(patch.array)
+            prediction = self._classify_array(flatten_array, threshold)
             prediction = prediction.reshape(orig_shape[:2])
             res[patch.row:patch.row + patch.size[0],
                 patch.col:patch.col + patch.size[1]] = prediction
 
         return res
+
+    def _classify_array(self, array, threshold) -> np.ndarray:
+        prediction = self.model.predict(array)
+        prediction[prediction >= threshold] = 1
+        prediction[prediction < threshold] = 0
+        prediction = np.array(prediction, dtype='uint8')
+        return prediction
 
     def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
