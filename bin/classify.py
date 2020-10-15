@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import shutil
 import logging
 import os
 import pickle
@@ -176,6 +177,11 @@ class SerialRunner:
                                    patch_size=patch_size)
         feature = classifier.feature
         slide.masks[feature] = mask
+        if overwrite_output_if_exists:
+            try:
+                shutil.rmtree(output_filename)
+            except FileNotFoundError:
+                pass
         WRITERS[writer](slide, output_filename)
         logging.info(output_filename)
 
