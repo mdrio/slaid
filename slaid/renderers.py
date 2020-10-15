@@ -6,7 +6,8 @@ import numpy as np
 import zarr
 from tifffile import imwrite
 
-from slaid.commons import Patch, Slide
+from slaid.commons import Slide
+from slaid.classifiers.base import Patch
 
 
 class Renderer(abc.ABC):
@@ -15,14 +16,6 @@ class Renderer(abc.ABC):
         self,
         filename: str,
         slide: Slide,
-    ):
-        pass
-
-    @abc.abstractmethod
-    def render_patch(
-        self,
-        patch: Patch,
-        filename: str,
     ):
         pass
 
