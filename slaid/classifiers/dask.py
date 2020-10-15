@@ -55,11 +55,6 @@ class Classifier(BasicClassifier):
     def _concatenate(seq, axis):
         return da.concatenate(seq, axis)
 
-    def _classify_patch(
-        self,
-        patch: Patch,
-        batch: "Batch",
-        threshold: float = 0.8,
-    ) -> np.ndarray:
+    def _classify_array(self, array, threshold) -> np.ndarray:
         with self.lock:
-            return super()._classify_patch(patch, batch, threshold)
+            return super()._classify_array(array, threshold)
