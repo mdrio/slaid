@@ -3,9 +3,12 @@ import json
 from typing import Any, Callable, Dict, List, Union
 
 import numpy as np
+import zarr
 from tifffile import imwrite
 
-from slaid.commons import Patch, Slide
+from slaid.classifiers.base import Patch
+from slaid.commons import Mask, Slide
+from slaid.commons.ecvl import Slide as EcvlSlide
 
 
 class Renderer(abc.ABC):
@@ -14,14 +17,6 @@ class Renderer(abc.ABC):
         self,
         filename: str,
         slide: Slide,
-    ):
-        pass
-
-    @abc.abstractmethod
-    def render_patch(
-        self,
-        patch: Patch,
-        filename: str,
     ):
         pass
 
@@ -151,24 +146,17 @@ class SlideJSONEncoder(BaseJSONEncoder):
         self,
         slide: Slide,
     ) -> Union[List, Dict]:
-        dct = dict(filename=slide.ID,
-                   patch_size=slide.patches.patch_size,
-                   extraction_level=slide.patches.extraction_level,
-                   downsample_factor=slide.level_downsamples[
-                       slide.patches.extraction_level],
-                   features=[])
+        dct = dict(filename=slide.filename, masks={})
 
-        for p in slide.patches:
-            patch_info = dict(x=p.x, y=p.y)
-            for f, v in p.features.items():
-                patch_info[f] = convert_numpy_types(v)
-            dct['features'].append(patch_info)
+        for k, v in slide.masks.items():
+            dct['masks'][k] = dict(array=v.array.tolist(),
+                                   extraction_level=v.extraction_level,
+                                   level_downsample=v.level_downsample)
         return dct
 
 
 class JSONEncoder(json.JSONEncoder):
     encoders = [
-        PatchJSONEncoder(),
         NumpyArrayJSONEncoder(),
         SlideJSONEncoder(),
     ]
@@ -201,3 +189,22 @@ def to_json(obj: Any, filename: str = None) -> Union[str, None]:
             json.dump(obj, f, cls=JSONEncoder)
     else:
         return json.dumps(obj, cls=JSONEncoder)
+
+
+def to_zarr(slide: Slide, path: str):
+    group = zarr.open_group(path)
+    if 'slide' not in group.attrs:
+        group.attrs['slide'] = slide.filename
+    for name, mask in slide.masks.items():
+        array = group.array(name, mask.array)
+        array.attrs['level'] = mask.extraction_level
+        array.attrs['downsample'] = mask.level_downsample
+
+
+def from_zarr(path: str) -> Slide:
+    group = zarr.open_group(path)
+    slide = EcvlSlide(group.attrs['slide'])
+    for name, value in group.arrays():
+        slide.masks[name] = Mask(np.array(value), value.attrs['level'],
+                                 value.attrs['downsample'])
+    return slide

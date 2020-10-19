@@ -117,7 +117,7 @@ def get_models():
     for dockerfile in dockerfiles:
         model_type = os.path.splitext(dockerfile)[1][1:]
         feature = model_type.split('_')[1]
-        models = glob.glob(f'../slaid/models/{model_type}*')
+        models = glob.glob(f'../slaid/resources/models/{model_type}*')
         for model in models:
             model_path = os.path.basename(model)
             model_name = os.path.splitext(model_path)[0]

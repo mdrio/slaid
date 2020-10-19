@@ -7,3 +7,6 @@ pandas
 pyecvl
 pyeddl
 clize
+dask[complete]
+zarr
+scipy

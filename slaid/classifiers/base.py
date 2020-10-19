@@ -1,225 +1,243 @@
 import abc
-import pickle
-from typing import Dict, Tuple
+import logging
+import re
+from typing import Tuple
 
 import numpy as np
+from scipy import ndimage
 
-from slaid.commons import Image, Patch, Slide
+from slaid.commons import Mask, Slide
+from slaid.models import Model
+
+logger = logging.getLogger('classify')
 
 
 class Classifier(abc.ABC):
-    @abc.abstractclassmethod
-    def create(cls, *args):
-        pass
-
     @abc.abstractmethod
-    def classify_patch(self, patch: Patch, *args, **kwargs) -> Dict:
-        pass
-
-    @abc.abstractmethod
-    def classify(
-        self,
-        slide: Slide,
-        patch_filter=None,
-        mask_threshold: float = 0.8,
-        patch_threshold: float = 0.8,
-        include_mask: bool = False,
-    ):
+    def classify(self,
+                 slide: Slide,
+                 patch_filter=None,
+                 threshold: float = 0.8,
+                 level: int = 2,
+                 patch_size=None) -> Mask:
         pass
 
 
-class BasicClassifier:
+class Filter:
+    def __init__(self, mask: Mask, operator: str, value: float):
+        self.operator = operator
+        self.value = value
+        self.mask = mask
+
+    @staticmethod
+    def create(slide: Slide, condition: str) -> "Filter":
+        operator_mapping = {
+            '>': '__gt__',
+            '>=': '__ge__',
+            '<': '__lt__',
+            '<=': '__le__',
+            '==': '__eq__',
+            '!=': '__ne__',
+        }
+        parsed = re.match(
+            r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
+            condition).groupdict()
+        mask = slide.masks[parsed['mask']]
+        operator = operator_mapping[parsed['operator']]
+        value = float(parsed['value'])
+        return Filter(mask, operator, value)
+
+    def filter(self,
+               batch: "Batch",
+               patch_size: Tuple[int, int] = None) -> np.ndarray:
+        mask = self.mask.array
+        if self.mask.level_downsample != batch.downsample:
+            mask = ndimage.zoom(mask,
+                                self.mask.level_downsample / batch.downsample)
+
+        mask = mask[batch.location[0]:batch.location[0] + batch.array.shape[0],
+                    batch.location[1]:batch.location[1] + batch.array.shape[1]]
+
+        if patch_size is not None:
+            mask = self._compute_mean_patch(mask, patch_size)
+        return getattr(mask, self.operator)(self.value)
+
+    def _compute_mean_patch(self, array, patch_size):
+        sum_ = np.add.reduceat(np.add.reduceat(array,
+                                               np.arange(
+                                                   0, array.shape[0],
+                                                   patch_size[0]),
+                                               axis=0),
+                               np.arange(0, array.shape[1], patch_size[1]),
+                               axis=1)
+        return sum_ / (patch_size[0] * patch_size[1])
+
+
+class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
-        self._model = model
-        self._feature = feature
+        self.model = model
+        self.feature = feature
 
-    def classify(
-        self,
-        slide: Slide,
-        patch_filter=None,
-        mask_threshold: float = 0.8,
-        patch_threshold: float = 0.8,
-        include_mask: bool = False,
-    ):
-        slide.patches.add_feature(self._feature, 0)
-        patch_area = slide.patches.patch_size[0] * slide.patches.patch_size[1]
+    def classify(self,
+                 slide: Slide,
+                 filter_=None,
+                 threshold: float = 0.8,
+                 level: int = 2,
+                 patch_size: Tuple[int, int] = None,
+                 n_batch: int = 1) -> Mask:
 
-        if patch_filter:
-            patches = slide.patches.filter(patch_filter)
-            for patch in patches:
-                self._classify_patch(patch, slide, patch_area, mask_threshold,
-                                     patch_threshold)
+        rows = []
+        for i, (start, size) in enumerate(
+                self._get_batch_coordinates(slide, level, n_batch,
+                                            patch_size)):
+            logger.debug('batch %s of %s', i, n_batch)
+            rows.append(
+                self._classify_batch(slide, start, size, level, patch_size,
+                                     filter_, threshold))
+        mask = self._concatenate(rows, axis=0)
+
+        return Mask(mask, level, slide.level_downsamples[level])
+
+    def _classify_batch(self, slide, start, size, level, patch_size, filter_,
+                        threshold):
+        if patch_size:
+            return self._classify_batch_by_patch(slide, start, size, level,
+                                                 patch_size, filter_,
+                                                 threshold)
+        batch = self._get_batch(slide, start, size, level)
+        array = batch.array
+        orig_shape = array.shape
+        if filter_ is not None:
+            indexes_pixel_to_process = filter_.filter(batch)
+            array = array[indexes_pixel_to_process]
         else:
-            self._classify_whole_slide(slide, patch_area, mask_threshold,
-                                       patch_threshold, include_mask)
+            array = self._flat_array(array)
 
-    def _classify_patch(self, patch, slide, patch_area, mask_threshold,
-                        patch_threshold):
-        image = slide.read_region((patch.x, patch.y), patch.size)
-        image_array = self._get_image_array(image)
-        prediction = self._model.predict(image_array)
-        patch_mask = self._get_mask(prediction, patch.size, mask_threshold)
-        self._update_patch(slide, patch, patch_mask, patch_area,
-                           patch_threshold)
+        prediction = self._classify_array(array, threshold)
+        if filter_ is not None:
+            res = np.zeros(orig_shape[:2], dtype='uint8')
+            res[indexes_pixel_to_process] = prediction
+        else:
+            res = prediction.reshape(orig_shape[:2])
+        return res
 
-    def _classify_whole_slide(self, slide, patch_area, mask_threshold,
-                              patch_threshold, include_mask):
-        image = slide.read_region((0, 0), slide.dimensions_at_extraction_level)
-        image_array = self._get_image_array(image)
-        prediction = self._model.predict(image_array)
+    def _classify_batch_by_patch(self, slide, start, size, level, patch_size,
+                                 filter_, threshold):
+        batch = self._get_batch(slide, start, size, level)
+        array = batch.array
+        batch_shape = array.shape
+        res = np.zeros(batch_shape[:2], dtype='uint8')
+        for patch in batch.get_patches(patch_size, filter_):
+            orig_shape = patch.array.shape
+            flatten_array = self._flat_array(patch.array)
+            prediction = self._classify_array(flatten_array, threshold)
+            prediction = prediction.reshape(orig_shape[:2])
+            res[patch.row:patch.row + patch.size[0],
+                patch.col:patch.col + patch.size[1]] = prediction
 
-        mask = self._get_mask(prediction,
-                              slide.dimensions_at_extraction_level[::-1],
-                              mask_threshold)
+        return res
 
-        for patch in slide.patches:
-            patch_mask = mask[patch.y:patch.y + patch.size[1],
-                              patch.x:patch.x + patch.size[0]]
-            self._update_patch(slide, patch, patch_mask, patch_area,
-                               patch_threshold)
+    def _classify_array(self, array, threshold) -> np.ndarray:
+        prediction = self.model.predict(array)
+        prediction[prediction >= threshold] = 1
+        prediction[prediction < threshold] = 0
+        prediction = np.array(prediction, dtype='uint8')
+        return prediction
 
-        if include_mask:
-            slide.masks[self._feature] = mask
+    def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
+        dimensions = slide.level_dimensions[level]
+        downsample = slide.level_downsamples[level]
 
-    def _get_image_array(self, image: Image) -> np.ndarray:
-        image_array = image.to_array(True)
-        n_px = image_array.shape[0] * image_array.shape[1]
-        image_array = image_array[:, :, :3].reshape(n_px, 3)
-        return image_array
+        batch_size = (dimensions[0], dimensions[1] // n_batch)
+        if patch_size is not None:
+            batch_size_1 = batch_size[1] - (batch_size[1] % patch_size[1])
+            batch_size = (batch_size[0], batch_size_1)
+
+        step = round(batch_size[1] * downsample)
+        for i in range(0, slide.dimensions[1], step):
+            size = (dimensions[0],
+                    min(batch_size[1], dimensions[1] - int(i // downsample)))
+            yield ((0, i), size)
+
+    @staticmethod
+    def _get_batch(slide, start, size, level):
+        image = slide.read_region(start, level, size)
+        array = image.to_array(True)
+        return Batch(start, size, array, slide.level_downsamples[level])
+
+    def _classify_patch(
+        self,
+        patch: "Patch",
+        batch: "Batch",
+        threshold: float = 0.8,
+    ) -> np.ndarray:
+        image_array = patch.array
+        orig_shape = image_array.shape[:2]
+        image_array = self._flat_array(image_array)
+        prediction = self.model.predict(image_array)
+        return self._get_mask(prediction, orig_shape, threshold)
+
+    @staticmethod
+    def _get_zeros(size, dtype):
+        return np.zeros(size, dtype)
+
+    @staticmethod
+    def _concatenate(seq, axis):
+        return np.concatenate(seq, axis)
+
+    def _flat_array(self, array: np.ndarray) -> np.ndarray:
+        n_px = array.shape[0] * array.shape[1]
+        array = array[:, :, :3].reshape(n_px, 3)
+        return array
 
     def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
                   threshold: float) -> np.ndarray:
+        logger.debug('prediction.shape %s, shape %s', prediction.shape, shape)
         mask = prediction.reshape(shape)
         mask[mask < threshold] = 0
         mask[mask > threshold] = 1
         mask = np.array(mask, dtype=np.uint8)
         return mask
 
-    def _update_patch(
-        self,
-        slide,
-        patch: Patch,
-        patch_mask: np.ndarray,
-        patch_area: float,
-        threshold: float,
-    ):
-        tissue_area = np.sum(patch_mask)
-        tissue_ratio = tissue_area / patch_area
-        if tissue_ratio > threshold:
-            features = {self._feature: tissue_ratio}
-            slide.patches.update_patch(patch=patch, features=features)
+
+class Patch:
+    def __init__(self,
+                 row: int,
+                 column: int,
+                 size: Tuple[int, int],
+                 downsample: float,
+                 array: np.ndarray = None):
+        self.row = row
+        self.col = column
+        self.size = size
+        self.downsample = downsample
+        self.array = array
 
 
-class Model:
-    def __init__(self, filename: str):
-        with open(filename, 'rb') as f:
-            self._model = pickle.load(f)
+class Batch:
+    def __init__(self, location: Tuple[int, int], size: Tuple[int, int],
+                 array: np.ndarray, downsample: float):
+        self.location = location
+        self.size = size
+        self.array = array
+        self.downsample = downsample
 
-    def predict(self, array: np.array) -> np.array:
-        return self._model.predict(array)
+    def get_patches(self,
+                    patch_size: Tuple[int, int],
+                    filter_: Filter = None) -> Patch:
+        patch_size = patch_size or self.array.shape[:2]
 
+        if filter_ is None:
+            for row in range(0, self.array.shape[0], patch_size[0]):
+                for col in range(0, self.array.shape[1], patch_size[1]):
+                    array = self.array[row:row + patch_size[0],
+                                       col:col + patch_size[1]]
+                    yield Patch(row, col, array.shape, self.downsample, array)
 
-class RandomModel:
-    def predict(self, array):
-        return np.random.uniform(0, 1, array.shape[0])
-
-
-#  class InterpolatedTissueClassifier(TissueClassifier):
-#      def _get_mask_tissue_from_slide(self, slide, threshold):
-#
-#          dims = slide.level_dimensions
-#          ds = [int(i) for i in slide.level_downsamples]
-#
-#          x0 = 0
-#          y0 = 0
-#          x1 = dims[0][0]
-#          y1 = dims[0][1]
-#
-#          delta_x = x1 - x0
-#          delta_y = y1 - y0
-#
-#          pil_img = slide.read_region(
-#              location=(x0, y0),
-#              size=(delta_x // ds[slide.extraction_level],
-#                    delta_y // ds[slide.extraction_level]))
-#          return self._predictor.get_tissue_mask(pil_img, threshold)
-#
-#      def _get_tissue_patches_coordinates(
-#          self,
-#          slide,
-#          tissue_mask,
-#          patch_size=PATCH_SIZE,
-#      ):
-#
-#          tissue_mask *= 255
-#          # resize and use to extract patches
-#          lev = slide.get_best_level_for_downsample(16)
-#          lev_dim = slide.level_dimensions[lev]
-#
-#          big_x = slide.level_dimensions[slide.patches.extraction_level][0]
-#          big_y = slide.level_dimensions[slide.patches.extraction_level][1]
-#
-#          # downsampling factor of level0 with respect  patch size
-#          dim_x, dim_y = patch_size
-#          xx = round(big_x / dim_x)
-#          yy = round(big_y / dim_y)
-#
-#          mask = PIL_Image.new('L', lev_dim)
-#          mask.putdata(tissue_mask.flatten())
-#          mask = mask.resize((xx, yy), resample=PIL_Image.BILINEAR)
-#          tissue = [(x, y) for x in range(xx) for y in range(yy)
-#                    if mask.getpixel((x, y)) > 0]
-#
-#          ext_lev_ds = slide.level_downsamples[slide.patches.extraction_level]
-#          return [
-#              round_to_patch((round(x * big_x / xx * ext_lev_ds),
-#                              round(y * big_y / yy * ext_lev_ds)), patch_size)
-#              for (x, y) in tissue
-#          ]
-#
-#      def classify_patch(self, patch: Patch) -> Patch:
-#          raise NotImplementedError
-#
-#      def classify(self,
-#                   slide: Slide,
-#                   pixel_threshold: float = 0.8,
-#                   minimum_tissue_ratio: float = 0.01,
-#                   downsampling: int = 16,
-#                   include_mask_feature=False) -> Slide:
-#
-#          lev = slide.get_best_level_for_downsample(downsampling)
-#          lev_dim = slide.level_dimensions[lev]
-#          thumb = slide.read_region(location=(0, 0), size=lev_dim)
-#          tissue_mask = self._predictor.get_tissue_mask(thumb, pixel_threshold)
-#
-#          dim_x, dim_y = slide.patches.patch_size
-#          patch_area = dim_x * dim_y
-#          #  patch_area_th = patch_area * self._patch_threshold
-#
-#          patch_coordinates = self._get_tissue_patches_coordinates(
-#              slide,
-#              tissue_mask,
-#              slide.patches.patch_size,
-#          )
-#
-#          slide.patches.add_feature(TissueFeature.TISSUE_PERCENTAGE, 0.0)
-#          if include_mask_feature:
-#              slide.patches.add_feature(TissueFeature.TISSUE_MASK)
-#
-#          for (coor_x, coor_y) in patch_coordinates:
-#              patch = slide.read_region(location=(coor_x, coor_y),
-#                                        size=(dim_x, dim_y))
-#
-#              tissue_mask = self._predictor.get_tissue_mask(
-#                  patch, pixel_threshold)
-#
-#              tissue_area = np.sum(tissue_mask)
-#              tissue_ratio = tissue_area / patch_area
-#              if tissue_ratio > minimum_tissue_ratio:
-#                  features = {TissueFeature.TISSUE_PERCENTAGE: tissue_ratio}
-#                  if include_mask_feature:
-#                      features[TissueFeature.TISSUE_MASK] = np.array(tissue_mask,
-#                                                                     dtype=bool)
-#                  slide.patches.update_patch((coor_x, coor_y), features=features)
-#
-#          return slide
+        else:
+            index_patches = filter_.filter(self, patch_size)
+            for p in np.argwhere(index_patches):
+                p = p * patch_size
+                array = self.array[p[0]:p[0] + patch_size[0],
+                                   p[1]:p[1] + patch_size[1]]
+                yield Patch(p[0], p[1], array.shape, self.downsample, array)
