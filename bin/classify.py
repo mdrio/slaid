@@ -67,7 +67,6 @@ class SerialRunner:
             WRITERS.keys())[0],
         filter_: 'F' = None,
         overwrite_output_if_exists: 'overwrite' = False,
-        skip=False,
     ):
         classifier = cls.get_classifier(model, feature, gpu)
         patch_size = cls.parse_patch_size(patch_size)
@@ -75,7 +74,7 @@ class SerialRunner:
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
                             extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists, skip)
+                            filter_, overwrite_output_if_exists)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
@@ -110,10 +109,19 @@ class SerialRunner:
                     input_path)[-1] != '.zarr' else [input_path]
 
     @classmethod
-    def classify_slides(cls, input_path, output_dir, classifier, n_batch,
-                        extraction_level, threshold, patch_size, writer,
-                        filter_, overwrite_output_if_exists,
-                        skip_output_if_exist):
+    def classify_slides(
+        cls,
+        input_path,
+        output_dir,
+        classifier,
+        n_batch,
+        extraction_level,
+        threshold,
+        patch_size,
+        writer,
+        filter_,
+        overwrite_output_if_exists,
+    ):
 
         for slide in cls.get_slides(input_path):
             cls.classify_slide(
@@ -127,32 +135,24 @@ class SerialRunner:
                 writer,
                 filter_,
                 overwrite_output_if_exists,
-                skip_output_if_exist,
             )
 
     @classmethod
-    def classify_slide(cls,
-                       slide_filename,
-                       output_dir,
-                       classifier,
-                       n_batch,
-                       extraction_level,
-                       threshold=0.8,
-                       patch_size=PATCH_SIZE,
-                       writer=list(WRITERS.keys())[0],
-                       filter_=None,
-                       overwrite_output_if_exists=True,
-                       skip_output_if_exist=False):
+    def classify_slide(
+        cls,
+        slide_filename,
+        output_dir,
+        classifier,
+        n_batch,
+        extraction_level,
+        threshold=0.8,
+        patch_size=PATCH_SIZE,
+        writer=list(WRITERS.keys())[0],
+        filter_=None,
+        overwrite_output_if_exists=True,
+    ):
 
         output_filename = cls.get_output_filename(slide_filename, output_dir)
-
-        if os.path.exists(output_filename):
-            if skip_output_if_exist:
-                logging.debug(f"""
-                    Skipping classification of slide {slide_filename},
-                    already exists.
-                    """)
-                return
 
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
@@ -160,6 +160,13 @@ class SerialRunner:
             slide = from_zarr(slide_filename)
         else:
             slide = create_slide(slide_filename)
+
+        if classifier.feature in slide.masks:
+            if not overwrite_output_if_exists:
+                logging.info(
+                    'skipping slide %s, feature %s already exists. See flag overwrite',
+                    slide.filename, classifier.feature)
+                return
 
         mask = classifier.classify(slide,
                                    n_batch=n_batch,
@@ -200,7 +207,6 @@ class ParallelRunner(SerialRunner):
             WRITERS.keys())[0],
         filter_: 'F' = None,
         overwrite_output_if_exists: 'overwrite' = False,
-        skip=False,
     ):
         classifier = cls.get_classifier(model, feature, gpu, processes)
         patch_size = cls.parse_patch_size(patch_size)
@@ -208,7 +214,7 @@ class ParallelRunner(SerialRunner):
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
                             extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists, skip)
+                            filter_, overwrite_output_if_exists)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu, processes):

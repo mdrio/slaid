@@ -115,18 +115,6 @@ class ExtractTissueTest:
                 input_, OUTPUT_DIR
             ])
 
-    def test_classify_skip(self):
-        output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
-        os.makedirs(output)
-        subprocess.check_call(['touch', output])
-        subprocess.check_call([
-            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '--skip', input_, OUTPUT_DIR
-        ])
-
-        slide, output = self._get_input_output(output)
-        self.assertEqual(len(list(output.arrays())), 0)
-
 
 class SerialEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
     model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'

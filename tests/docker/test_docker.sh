@@ -9,12 +9,12 @@ MODEL_DIR=$DIR/../../slaid/resources/models
 model=extract_tissue_eddl-1.0.0.bin
 for mode in serial parallel; do 
   docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models  slaid  classify.py $mode  -m /models/$model -l 0 /data/$IMAGE --overwrite  -f tissue /data
-  ls -l $OUTDIR/${IMAGE_NO_EXT}.tissue.zarr
-  rm -r $OUTDIR/${IMAGE_NO_EXT}.tissue.zarr
+  ls -l $OUTDIR/${IMAGE_NO_EXT}.zarr
+  rm -r $OUTDIR/${IMAGE_NO_EXT}.zarr
 
 
   docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models  slaid classify.py $mode --patch-size 256x256 -m /models/$model -l 0 /data/$IMAGE  --overwrite  -f tissue /data
-  ls -l $DIR/../data/${IMAGE_NO_EXT}.tissue.zarr 
-  rm -r $OUTDIR/${IMAGE_NO_EXT}.tissue.zarr 
+  ls -l $DIR/../data/${IMAGE_NO_EXT}.zarr 
+  rm -r $OUTDIR/${IMAGE_NO_EXT}.zarr 
  
 done
