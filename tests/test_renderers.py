@@ -37,7 +37,7 @@ class ToJsonTest(unittest.TestCase):
         #  when
         jsoned = json.loads(to_json(slide))
         #  then
-        self.assertEqual(jsoned['filename'], slide.ID)
+        self.assertEqual(jsoned['filename'], slide.filename)
         self.assertEqual(len(jsoned['masks']), 1)
         self.assertEqual(jsoned['masks'].keys(), {'annotation'})
         self.assertEqual(set(jsoned['masks']['annotation'].keys()),

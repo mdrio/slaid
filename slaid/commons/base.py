@@ -1,5 +1,6 @@
 import abc
 import inspect
+import os
 import sys
 from typing import Dict, Tuple
 
@@ -46,16 +47,18 @@ class Mask:
 
 class Slide(abc.ABC):
     def __init__(self, filename: str):
-        self._filename = filename
+        if not os.path.exists(filename) or not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
+        self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
 
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
 
-    @abc.abstractproperty
-    def ID(self):
-        pass
+    @property
+    def filename(self):
+        return self._filename
 
     @abc.abstractmethod
     def read_region(self, location: Tuple[int, int],

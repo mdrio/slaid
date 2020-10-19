@@ -8,6 +8,7 @@ import unittest
 import zarr
 
 from slaid.commons.ecvl import Slide
+from slaid.renderers import to_zarr
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -40,7 +41,7 @@ class ExtractTissueTest:
         return slide, zarr_group
 
     def _test_output(self, output, slide, level):
-        self.assertEqual(output.attrs['slide'], slide.ID)
+        self.assertEqual(output.attrs['slide'], slide.filename)
         self.assertEqual(output[self.feature].shape,
                          slide.level_dimensions[level][::-1])
         self.assertEqual(output[self.feature].attrs['level'], level)
@@ -52,26 +53,41 @@ class ExtractTissueTest:
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             input_, OUTPUT_DIR
         ])
-        output_path = os.path.join(
-            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         slide, output = self._get_input_output(output_path)
 
         self._test_output(output, slide, 2)
+
+    def test_classify_input_zarr(self):
+        slide = Slide(input_)
+        zarr_path = '/tmp/test-slaid/slide.zarr'
+        to_zarr(slide, zarr_path)
+
+        subprocess.check_call([
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            zarr_path, OUTPUT_DIR
+        ])
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
+
+        slide, output = self._get_input_output(output_path)
+        print(slide, output_path)
+        import zarr
+        g = zarr.open_group(output_path)
+        print(g.attrs.asdict())
+        #  self._test_output(output, slide, 2)
 
     def test_classify_custom(self):
         extr_level = 1
         cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature}  -l '\
             f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
-        output_path = os.path.join(
-            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         slide, output = self._get_input_output(output_path)
 
         self._test_output(output, slide, extr_level)
 
     def test_classify_overwrite(self):
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         print(output)
         os.makedirs(output)
         subprocess.check_call([
@@ -80,15 +96,13 @@ class ExtractTissueTest:
         ])
         stats = os.stat(output)
         self.assertTrue(stats.st_size > 0)
-        output_path = os.path.join(
-            OUTPUT_DIR, f'{input_basename_no_ext}.{self.feature}.zarr')
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         slide, output = self._get_input_output(output_path)
 
         self._test_output(output, slide, 2)
 
     def test_classify_no_overwrite(self):
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         os.makedirs(output)
         subprocess.check_call([
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
@@ -102,8 +116,7 @@ class ExtractTissueTest:
             ])
 
     def test_classify_skip(self):
-        output = os.path.join(OUTPUT_DIR,
-                              f'{input_basename_no_ext}.{self.feature}.zarr')
+        output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         os.makedirs(output)
         subprocess.check_call(['touch', output])
         subprocess.check_call([

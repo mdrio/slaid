@@ -46,18 +46,12 @@ class Image(BaseImage):
 
 class Slide(BaseSlide):
     def __init__(self, filename: str):
-        if not os.path.exists(filename) or not os.path.isfile(filename):
-            raise FileNotFoundError(filename)
         self._level_dimensions = OpenSlideGetLevels(filename)
         super().__init__(filename)
 
     @property
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._level_dimensions[0])
-
-    @property
-    def ID(self):
-        return os.path.basename(self._filename)
 
     def read_region(self, location: Tuple[int, int], level,
                     size: Tuple[int, int]) -> Image:
