@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import shutil
 import logging
 import os
 import pickle
+import shutil
 
 import pkg_resources
-import zarr
 from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.classifiers.dask import init_client
-from slaid.commons import PATCH_SIZE, Slide
+from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import to_zarr
+from slaid.renderers import from_zarr, to_zarr
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -105,8 +104,10 @@ class SerialRunner:
 
     @staticmethod
     def get_slides(input_path):
+
         return [os.path.join(input_path, f) for f in os.listdir(input_path)
-                ] if os.path.isdir(input_path) else [input_path]
+                ] if os.path.isdir(input_path) and os.path.splitext(
+                    input_path)[-1] != '.zarr' else [input_path]
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -143,8 +144,8 @@ class SerialRunner:
                        overwrite_output_if_exists=True,
                        skip_output_if_exist=False):
 
-        output_filename = cls.get_output_filename(slide_filename, output_dir,
-                                                  writer, classifier.feature)
+        output_filename = cls.get_output_filename(slide_filename, output_dir)
+
         if os.path.exists(output_filename):
             if skip_output_if_exist:
                 logging.debug(f"""
@@ -153,19 +154,10 @@ class SerialRunner:
                     """)
                 return
 
-            elif not overwrite_output_if_exists:
-                raise RuntimeError(f"""
-                    output for slide {slide_filename} already exists.
-                    Set parameter skip_output_if_exist to skip
-                    this slide classification or
-                    overwrite_output_if_exists to overwrite.
-                    """)
-
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
-        if slide_ext == 'pkl' or slide_ext == 'pickle':
-            with open(slide_filename, 'rb') as f:
-                slide = pickle.load(f)
+        if slide_ext == 'zarr':
+            slide = from_zarr(slide_filename)
         else:
             slide = create_slide(slide_filename)
 
@@ -177,19 +169,14 @@ class SerialRunner:
                                    patch_size=patch_size)
         feature = classifier.feature
         slide.masks[feature] = mask
-        if overwrite_output_if_exists:
-            try:
-                shutil.rmtree(output_filename)
-            except FileNotFoundError:
-                pass
         WRITERS[writer](slide, output_filename)
         logging.info(output_filename)
 
     @staticmethod
-    def get_output_filename(slide_filename, output_dir, ext, feature):
+    def get_output_filename(slide_filename, output_dir):
         slide_basename = os.path.basename(slide_filename)
         slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-        output_filename = f'{slide_basename_no_ext}.{feature}.{ext}'
+        output_filename = f'{slide_basename_no_ext}.zarr'
         output_filename = os.path.join(output_dir, output_filename)
         return output_filename
 
