@@ -1,10 +1,10 @@
 import abc
 import json
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
+import tifffile
 import zarr
-from tifffile import imwrite
 
 from slaid.classifiers.base import Patch
 from slaid.commons import Mask, Slide
@@ -15,60 +15,41 @@ class Renderer(abc.ABC):
     @abc.abstractmethod
     def render(
         self,
+        array: np.ndarray,
         filename: str,
-        slide: Slide,
     ):
         pass
 
 
-def convert_to_heatmap(patches: List[Patch], feature: str) -> np.array:
-    def _rgb_convert(patch: Patch) -> np.array:
-        cancer_percentage = patch.features[feature]
-        cancer_percentage = 0 if cancer_percentage is None\
-             else cancer_percentage
-        mask_value = int(round(cancer_percentage * 255))
-        return (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
-                                                                      0)
+class TIFFRenderer(Renderer):
+    def __init__(self, tile_size: Tuple[int, int] = (256, 256)):
+        self.tile_size = tile_size
 
-    for patch in patches:
-        data = _rgb_convert(patch)
-        yield np.full(patch.size + (4, ), data, 'uint8')
+    def tiles(self, data: np.ndarray) -> np.ndarray:
+        for y in range(0, data.shape[0], self.tile_size[0]):
+            for x in range(0, data.shape[1], self.tile_size[1]):
+                tile = data[y:y + self.tile_size[0], x:x + self.tile_size[1]]
+                if tile.shape[:2] != self.tile_size:
+                    pad = (
+                        (0, self.tile_size[0] - tile.shape[0]),
+                        (0, self.tile_size[1] - tile.shape[1]),
+                    )
+                    tile = np.pad(tile, pad, 'constant')
+                final_tile = np.zeros((tile.shape[0], tile.shape[1], 2),
+                                      dtype='uint8')
 
+                final_tile[:, :, 0] = tile * 255
+                final_tile[final_tile[:, :, 0] > 0, 1] = 255
+                yield final_tile
 
-class BasicFeatureTIFFRenderer(Renderer):
-    def __init__(
-        self,
-        rgb_convert: Callable = None,
-    ):
-        self._rgb_convert = rgb_convert or convert_to_heatmap
-
-    def render(self,
-               filename: str,
-               slide: Slide,
-               feature: str,
-               one_file_per_patch: bool = False):
-        if one_file_per_patch:
-            raise NotImplementedError()
-        shape = slide.dimensions_at_extraction_level
-        imwrite(filename,
-                self._rgb_convert(slide.patches, feature),
-                dtype='uint8',
-                shape=(shape[1], shape[0], 4),
-                photometric='rgb',
-                tile=slide.patches.patch_size,
-                extrasamples=('ASSOCALPHA', ))
-
-    def render_patch(
-        self,
-        filename: str,
-        patch: Patch,
-        feature: str,
-    ):
-        data = list(self._rgb_convert([patch], feature))[0]
-        imwrite(filename,
-                data,
-                photometric='rgb',
-                extrasamples=('ASSOCALPHA', ))
+    def render(self, array: np.ndarray, filename: str):
+        with tifffile.TiffWriter(filename, bigtiff=True) as tif:
+            tif.save(self.tiles(array),
+                     dtype='uint8',
+                     shape=(array.shape[0], array.shape[1], 2),
+                     tile=self.tile_size,
+                     photometric='minisblack',
+                     extrasamples=('ASSOCALPHA', ))
 
 
 class BaseJSONEncoder(abc.ABC):
