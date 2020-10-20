@@ -21,9 +21,13 @@ class Renderer(abc.ABC):
         pass
 
 
-class TIFFRenderer(Renderer):
-    def __init__(self, tile_size: Tuple[int, int] = (256, 256)):
+class TiffRenderer(Renderer):
+    def __init__(self,
+                 tile_size: Tuple[int, int] = (256, 256),
+                 rgb: bool = True):
         self.tile_size = tile_size
+        self.channels = 4 if rgb else 2
+        self.rgb = rgb
 
     def tiles(self, data: np.ndarray) -> np.ndarray:
         for y in range(0, data.shape[0], self.tile_size[0]):
@@ -35,20 +39,21 @@ class TIFFRenderer(Renderer):
                         (0, self.tile_size[1] - tile.shape[1]),
                     )
                     tile = np.pad(tile, pad, 'constant')
-                final_tile = np.zeros((tile.shape[0], tile.shape[1], 2),
-                                      dtype='uint8')
+                final_tile = np.zeros(
+                    (tile.shape[0], tile.shape[1], self.channels),
+                    dtype='uint8')
 
                 final_tile[:, :, 0] = tile * 255
-                final_tile[final_tile[:, :, 0] > 0, 1] = 255
+                final_tile[final_tile[:, :, 0] > 0, self.channels - 1] = 255
                 yield final_tile
 
     def render(self, array: np.ndarray, filename: str):
         with tifffile.TiffWriter(filename, bigtiff=True) as tif:
             tif.save(self.tiles(array),
                      dtype='uint8',
-                     shape=(array.shape[0], array.shape[1], 2),
+                     shape=(array.shape[0], array.shape[1], self.channels),
                      tile=self.tile_size,
-                     photometric='minisblack',
+                     photometric='rgb' if self.rgb else 'minisblack',
                      extrasamples=('ASSOCALPHA', ))
 
 
