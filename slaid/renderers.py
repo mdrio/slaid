@@ -31,7 +31,7 @@ class TiffRenderer(Renderer):
         self.rgb = rgb
         self.bigtiff = bigtiff
 
-    def tiles(self, data: np.ndarray) -> np.ndarray:
+    def _tiles(self, data: np.ndarray) -> np.ndarray:
         for y in range(0, data.shape[0], self.tile_size[0]):
             for x in range(0, data.shape[1], self.tile_size[1]):
                 tile = data[y:y + self.tile_size[0], x:x + self.tile_size[1]]
@@ -52,7 +52,7 @@ class TiffRenderer(Renderer):
 
     def render(self, array: np.ndarray, filename: str):
         with tifffile.TiffWriter(filename, bigtiff=self.bigtiff) as tif:
-            tif.save(self.tiles(array),
+            tif.save(self._tiles(array),
                      dtype='uint8',
                      shape=(array.shape[0], array.shape[1], self.channels),
                      tile=self.tile_size,
