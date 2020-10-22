@@ -60,7 +60,7 @@ class SerialRunner:
         n_batch: ('b', int) = 1,
         extraction_level: ('l', int) = 2,
         feature: 'f',
-        threshold: 't' = 0.8,
+        threshold: ('t', float) = None,
         patch_size=None,
         gpu=False,
         writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
@@ -145,7 +145,7 @@ class SerialRunner:
         classifier,
         n_batch,
         extraction_level,
-        threshold=0.8,
+        threshold=None,
         patch_size=PATCH_SIZE,
         writer=list(WRITERS.keys())[0],
         filter_=None,
@@ -200,7 +200,7 @@ class ParallelRunner(SerialRunner):
         processes: 'p' = False,
         extraction_level: ('l', int) = 2,
         feature: 'f',
-        threshold: 't' = 0.8,
+        threshold: ('t', float) = None,
         patch_size=None,
         gpu=False,
         writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(

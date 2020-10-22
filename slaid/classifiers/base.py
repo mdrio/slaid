@@ -17,7 +17,6 @@ class Classifier(abc.ABC):
     def classify(self,
                  slide: Slide,
                  patch_filter=None,
-                 threshold: float = 0.8,
                  level: int = 2,
                  patch_size=None) -> Mask:
         pass
@@ -81,7 +80,7 @@ class BasicClassifier(Classifier):
     def classify(self,
                  slide: Slide,
                  filter_=None,
-                 threshold: float = 0.8,
+                 threshold: float = None,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
                  n_batch: int = 1) -> Mask:
@@ -115,7 +114,7 @@ class BasicClassifier(Classifier):
 
         prediction = self._classify_array(array, threshold)
         if filter_ is not None:
-            res = np.zeros(orig_shape[:2], dtype='uint8')
+            res = np.zeros(orig_shape[:2], dtype=prediction.dtype)
             res[indexes_pixel_to_process] = prediction
         else:
             res = prediction.reshape(orig_shape[:2])
@@ -126,7 +125,8 @@ class BasicClassifier(Classifier):
         batch = self._get_batch(slide, start, size, level)
         array = batch.array
         batch_shape = array.shape
-        res = np.zeros(batch_shape[:2], dtype='uint8')
+        res = np.zeros(batch_shape[:2],
+                       dtype='uint8' if threshold else 'float32')
         for patch in batch.get_patches(patch_size, filter_):
             orig_shape = patch.array.shape
             flatten_array = self._flat_array(patch.array)
@@ -139,10 +139,11 @@ class BasicClassifier(Classifier):
 
     def _classify_array(self, array, threshold) -> np.ndarray:
         prediction = self.model.predict(array)
-        prediction[prediction >= threshold] = 1
-        prediction[prediction < threshold] = 0
-        prediction = np.array(prediction, dtype='uint8')
-        return prediction
+        if threshold:
+            prediction[prediction >= threshold] = 1
+            prediction[prediction < threshold] = 0
+            prediction = prediction.astype('uint8')
+        return prediction.astype('float32')
 
     def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]
@@ -165,18 +166,6 @@ class BasicClassifier(Classifier):
         array = image.to_array(True)
         return Batch(start, size, array, slide.level_downsamples[level])
 
-    def _classify_patch(
-        self,
-        patch: "Patch",
-        batch: "Batch",
-        threshold: float = 0.8,
-    ) -> np.ndarray:
-        image_array = patch.array
-        orig_shape = image_array.shape[:2]
-        image_array = self._flat_array(image_array)
-        prediction = self.model.predict(image_array)
-        return self._get_mask(prediction, orig_shape, threshold)
-
     @staticmethod
     def _get_zeros(size, dtype):
         return np.zeros(size, dtype)
@@ -189,15 +178,6 @@ class BasicClassifier(Classifier):
         n_px = array.shape[0] * array.shape[1]
         array = array[:, :, :3].reshape(n_px, 3)
         return array
-
-    def _get_mask(self, prediction: np.ndarray, shape: Tuple[int, int],
-                  threshold: float) -> np.ndarray:
-        logger.debug('prediction.shape %s, shape %s', prediction.shape, shape)
-        mask = prediction.reshape(shape)
-        mask[mask < threshold] = 0
-        mask[mask > threshold] = 1
-        mask = np.array(mask, dtype=np.uint8)
-        return mask
 
 
 class Patch:
