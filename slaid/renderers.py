@@ -24,10 +24,12 @@ class Renderer(abc.ABC):
 class TiffRenderer(Renderer):
     def __init__(self,
                  tile_size: Tuple[int, int] = (256, 256),
-                 rgb: bool = True):
+                 rgb: bool = True,
+                 bigtiff=True):
         self.tile_size = tile_size
         self.channels = 4 if rgb else 2
         self.rgb = rgb
+        self.bigtiff = bigtiff
 
     def tiles(self, data: np.ndarray) -> np.ndarray:
         for y in range(0, data.shape[0], self.tile_size[0]):
@@ -44,11 +46,12 @@ class TiffRenderer(Renderer):
                     dtype='uint8')
 
                 final_tile[:, :, 0] = tile * 255
-                final_tile[final_tile[:, :, 0] > 0, self.channels - 1] = 255
+                final_tile[final_tile[:, :, 0] > 255 / 10,
+                           self.channels - 1] = 255
                 yield final_tile
 
     def render(self, array: np.ndarray, filename: str):
-        with tifffile.TiffWriter(filename, bigtiff=True) as tif:
+        with tifffile.TiffWriter(filename, bigtiff=self.bigtiff) as tif:
             tif.save(self.tiles(array),
                      dtype='uint8',
                      shape=(array.shape[0], array.shape[1], self.channels),

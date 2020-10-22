@@ -1,13 +1,10 @@
 import os
 
-import numpy as np
 from commons import AllOneModel
 
 import slaid.classifiers as cl
 from slaid.models.eddl import Model
 from slaid.commons.ecvl import Slide
-from slaid.renderers import (BasicFeatureTIFFRenderer, convert_to_heatmap,
-                             to_json)
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -22,10 +19,6 @@ def main():
     slide_filename = 'tests/data/PH10023-1.thumb.tif'
     slide = Slide(slide_filename)
 
-    json_filename = '/tmp/test.json'
-    mask_filename = 'PH10023-1-mask'
-    #  tiff_filename = '/tmp/test.tiff'
-
     tissue_classifier = cl.BasicClassifier(tissue_model, 'tissue')
     cancer_classifier = cl.BasicClassifier(AllOneModel(), 'cancer')
 
@@ -39,15 +32,6 @@ def main():
                                       patch_size=(256, 256))
 
     slide.masks['cancer'] = mask
-    print('to_json')
-    to_json(slide, json_filename)
-
-    #  renderer = BasicFeatureTIFFRenderer(convert_to_heatmap)
-
-    print('rendering...')
-    #  renderer.render(tiff_filename, slide, 'tissue')
-
-    np.save(mask_filename, slide.masks['tissue'])
 
 
 if __name__ == '__main__':
