@@ -7,7 +7,7 @@ import numpy as np
 from dask import delayed
 from dask.distributed import Client
 
-from slaid.classifiers.base import BasicClassifier, Batch, Filter, Mask, Patch
+from slaid.classifiers.base import BasicClassifier, Mask
 from slaid.commons import Slide
 
 logger = logging.getLogger('dask')
@@ -26,7 +26,7 @@ class Classifier(BasicClassifier):
     def classify(self,
                  slide: Slide,
                  filter_=None,
-                 threshold: float = 0.8,
+                 threshold: float = None,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
                  n_batch: int = 1) -> Mask:
@@ -42,7 +42,7 @@ class Classifier(BasicClassifier):
                                                               filter_,
                                                               threshold),
                                 shape=size[::-1],
-                                dtype='uint8'))
+                                dtype='uint8' if threshold else 'float32'))
         mask = self._concatenate(rows, axis=0)
         return Mask(mask.compute(rerun_exceptions_locally=True), level,
                     slide.level_downsamples[level])
