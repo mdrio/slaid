@@ -2,6 +2,7 @@ import abc
 import inspect
 import os
 import sys
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import cv2
@@ -37,7 +38,9 @@ class Image(abc.ABC):
         pass
 
 
-Polygon = List[Tuple[int, int]]
+@dataclass
+class Polygon:
+    coords: List[Tuple[int, int]]
 
 
 class Mask:
@@ -76,7 +79,9 @@ class Mask:
                        filter(lambda x: len(x) > 2, contours))
             polygons.append(cascaded_union(list(pols)))
 
-        return cascaded_union(polygons)
+        return [
+            Polygon(list(p.exterior.coords)) for p in cascaded_union(polygons)
+        ]
 
 
 class Slide(abc.ABC):
