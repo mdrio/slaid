@@ -1,13 +1,13 @@
 import abc
 import json
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 import tifffile
 import zarr
 
-from slaid.classifiers.base import Patch
 from slaid.commons import Mask, Slide
+from slaid.commons.base import Polygon
 from slaid.commons.ecvl import Slide as EcvlSlide
 
 
@@ -69,21 +69,6 @@ class BaseJSONEncoder(abc.ABC):
         pass
 
 
-class PatchJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Patch
-
-    def encode(self, patch: Patch):
-        return {
-            'slide': patch.slide.ID,
-            'x': patch.x,
-            'y': patch.y,
-            'size': patch.size,
-            'features': patch.features
-        }
-
-
 class NumpyArrayJSONEncoder(BaseJSONEncoder):
     @property
     def target(self):
@@ -91,6 +76,15 @@ class NumpyArrayJSONEncoder(BaseJSONEncoder):
 
     def encode(self, array: np.ndarray):
         return array.tolist()
+
+
+class PolygonJSONEncoder(BaseJSONEncoder):
+    @property
+    def target(self):
+        return Polygon
+
+    def encode(self, obj: Polygon):
+        return obj.coords
 
 
 class Int64JSONEncoder(BaseJSONEncoder):
@@ -126,29 +120,8 @@ def convert_numpy_types(obj):
     return obj
 
 
-class SlideJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Slide
-
-    def encode(
-        self,
-        slide: Slide,
-    ) -> Union[List, Dict]:
-        dct = dict(filename=slide.filename, masks={})
-
-        for k, v in slide.masks.items():
-            dct['masks'][k] = dict(array=v.array.tolist(),
-                                   extraction_level=v.extraction_level,
-                                   level_downsample=v.level_downsample)
-        return dct
-
-
 class JSONEncoder(json.JSONEncoder):
-    encoders = [
-        NumpyArrayJSONEncoder(),
-        SlideJSONEncoder(),
-    ]
+    encoders = [NumpyArrayJSONEncoder(), PolygonJSONEncoder()]
 
     def default(self, obj):
         encoded = None
