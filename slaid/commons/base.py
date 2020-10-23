@@ -2,10 +2,13 @@ import abc
 import inspect
 import os
 import sys
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
+import cv2
 import numpy as np
 import PIL
+import shapely
+from shapely.ops import cascaded_union
 
 PATCH_SIZE = (256, 256)
 
@@ -34,15 +37,46 @@ class Image(abc.ABC):
         pass
 
 
+Polygon = List[Tuple[int, int]]
+
+
 class Mask:
-    def __init__(self, array: np.ndarray, extraction_level: int,
-                 level_downsample: int):
+    def __init__(self,
+                 array: np.ndarray,
+                 extraction_level: int,
+                 level_downsample: int,
+                 threshold: float = None):
         self.array = array
         self.extraction_level = extraction_level
         self.level_downsample = level_downsample
+        self.threshold = threshold
 
     def to_image(self):
         return PIL.Image.fromarray(255 * self.array, 'L')
+
+    def to_polygons(self,
+                    threshold: float = None,
+                    n_batch: int = 1) -> List[Polygon]:
+        batch_size = self.array.shape[1] // n_batch
+        polygons = []
+        for batch_idx in range(n_batch):
+            pos = batch_idx * batch_size
+            array = self.array[:, pos:pos + batch_size]
+            if threshold:
+                array[array > threshold] = 1
+                array[array <= threshold] = 0
+                array = array.astype('uint8')
+
+            contours, _ = cv2.findContours(array,
+                                           mode=cv2.RETR_EXTERNAL,
+                                           method=cv2.CHAIN_APPROX_SIMPLE)
+            contours = map(np.squeeze, contours)
+            contours = map(lambda x: x + (pos, 0), contours)
+            pols = map(shapely.geometry.Polygon,
+                       filter(lambda x: len(x) > 2, contours))
+            polygons.append(cascaded_union(list(pols)))
+
+        return cascaded_union(polygons)
 
 
 class Slide(abc.ABC):
