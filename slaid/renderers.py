@@ -188,6 +188,7 @@ def to_zarr(slide: Slide, path: str):
         array = group.array(name, mask.array)
         array.attrs['level'] = mask.extraction_level
         array.attrs['downsample'] = mask.level_downsample
+        array.attrs['threshold'] = mask.threshold
 
 
 def from_zarr(path: str) -> Slide:
@@ -195,5 +196,6 @@ def from_zarr(path: str) -> Slide:
     slide = EcvlSlide(group.attrs['slide'])
     for name, value in group.arrays():
         slide.masks[name] = Mask(np.array(value), value.attrs['level'],
-                                 value.attrs['downsample'])
+                                 value.attrs['downsample'],
+                                 value.attrs.get('threshold'))
     return slide
