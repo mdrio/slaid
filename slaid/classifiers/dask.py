@@ -5,19 +5,11 @@ from typing import Tuple
 import dask.array as da
 import numpy as np
 from dask import delayed
-from dask.distributed import Client
 
 from slaid.classifiers.base import BasicClassifier, Mask
 from slaid.commons import Slide
 
 logger = logging.getLogger('dask')
-
-
-def init_client(*args, **kwargs):
-    logger.debug('init dask client with %s, %s', args, kwargs)
-    return Client(*args, **kwargs)
-    #  import dask
-    #  dask.config.set(scheduler='synchronous')
 
 
 class Classifier(BasicClassifier):

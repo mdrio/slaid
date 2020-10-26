@@ -3,14 +3,13 @@
 import logging
 import os
 import pickle
-import shutil
 
 import pkg_resources
 from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.classifiers.dask import init_client
+from slaid.commons.dask import init_client
 from slaid.commons import PATCH_SIZE
 from slaid.commons.ecvl import create_slide
 from slaid.renderers import from_zarr, to_zarr
