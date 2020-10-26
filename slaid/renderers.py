@@ -168,7 +168,7 @@ def from_zarr(path: str) -> Slide:
     group = zarr.open_group(path)
     slide = EcvlSlide(group.attrs['slide'])
     for name, value in group.arrays():
-        slide.masks[name] = Mask(np.array(value), value.attrs['level'],
+        slide.masks[name] = Mask(value, value.attrs['level'],
                                  value.attrs['downsample'],
                                  value.attrs.get('threshold'))
     return slide
