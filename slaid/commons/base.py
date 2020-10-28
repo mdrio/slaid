@@ -63,28 +63,30 @@ class Mask:
 
     def to_polygons(self,
                     threshold: float = None,
+                    downsample: int = 1,
                     n_batch: int = 1) -> List[Polygon]:
         batch_size = self._get_batch_size(n_batch)
-        logging.debug('to_polygons')
         polygons = self._collect_polygons_from_batches(n_batch, batch_size,
-                                                       threshold)
-        return self._get_merged_polygons(polygons)
+                                                       threshold, downsample)
+        return self._get_merged_polygons(polygons, downsample)
 
     def _get_batch_size(self, n_batch):
         return self.array.shape[1] // n_batch
 
-    def _collect_polygons_from_batches(self, n_batch, batch_size, threshold):
+    def _collect_polygons_from_batches(self, n_batch, batch_size, threshold,
+                                       downsample):
         polygons = []
         for batch_idx in range(n_batch):
             logger.debug('batch %s of %s', batch_idx, n_batch)
             polygons.append(
                 self._collect_polygons_from_batch(batch_idx, batch_size,
-                                                  threshold))
+                                                  threshold, downsample))
         return polygons
 
-    def _collect_polygons_from_batch(self, batch_idx, batch_size, threshold):
+    def _collect_polygons_from_batch(self, batch_idx, batch_size, threshold,
+                                     downsample):
         pos = batch_idx * batch_size
-        array = self.array[:, pos:pos + batch_size]
+        array = self.array[::downsample, pos:pos + batch_size:downsample]
         if threshold:
             array[array > threshold] = 1
             array[array <= threshold] = 0
@@ -99,9 +101,16 @@ class Mask:
                    filter(lambda x: len(x) > 2, contours))
         return cascaded_union(list(pols))
 
-    def _get_merged_polygons(self, polygons):
+    def _get_merged_polygons(self, polygons, downsample):
+
         return [
-            Polygon(list(p.exterior.coords)) for p in cascaded_union(polygons)
+            Polygon(
+                list(
+                    shapely.affinity.scale(p,
+                                           downsample,
+                                           downsample,
+                                           origin=(0, 0)).exterior.coords))
+            for p in cascaded_union(polygons)
         ]
 
     def to(self, backend: str) -> "Mask":
