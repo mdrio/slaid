@@ -1,27 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from PIL import Image
-import pickle
+import json
+import os
+
+from clize import run
+
+from slaid.renderers import JSONEncoder, from_zarr
 
 
-def main(slide_filename, feature, save_to=None):
+def main(zarr_archive,
+         mask_name,
+         output,
+         *,
+         n_batch: (int, 'b') = 1,
+         downsample: ('d', int) = 1,
+         threshold: (float, 't') = None):
 
-    with open(slide_filename, 'rb') as f:
-        slide = pickle.load(f)
-    mask = slide.masks[feature]
-    image = Image.fromarray(mask * 255)
+    s = from_zarr(zarr_archive)
+    mask = s.masks[mask_name]
+    ext = os.path.splitext(output)[-1]
 
-    image.show()
-    if save_to:
-        image.save(save_to)
+    if ext == '.json':
+        pols = mask.to_polygons(0.8, n_batch=n_batch, downsample=downsample)
+        json.dump(pols, open(output, 'w'), cls=JSONEncoder)
+    else:
+        mask.to_image(downsample, threshold).save(output)
 
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('slide')
-    parser.add_argument('-f', dest='feature', default='tissue')
-    parser.add_argument('-s', dest='save_to', default=None)
-    args = parser.parse_args()
-    main(args.slide, args.feature, args.save_to)
+    run(main)
