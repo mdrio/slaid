@@ -47,6 +47,14 @@ class Polygon:
     coords: List[Tuple[int, int]]
 
 
+def apply_threshold(array, threshold: float) -> np.ndarray:
+    array = np.array(array)
+    array[array > threshold] = 1
+    array[array <= threshold] = 0
+    array = array.astype('uint8')
+    return array
+
+
 class Mask:
     def __init__(self,
                  array: np.ndarray,
@@ -58,8 +66,11 @@ class Mask:
         self.level_downsample = level_downsample
         self.threshold = threshold
 
-    def to_image(self):
-        return PIL.Image.fromarray(255 * self.array, 'L')
+    def to_image(self, downsample: int = 1, threshold: float = None):
+        array = self.array[::downsample, ::downsample]
+        if threshold:
+            array = apply_threshold(threshold)
+        return PIL.Image.fromarray(255 * array, 'L')
 
     def to_polygons(self,
                     threshold: float = None,
@@ -88,9 +99,7 @@ class Mask:
         pos = batch_idx * batch_size
         array = self.array[::downsample, pos:pos + batch_size:downsample]
         if threshold:
-            array[array > threshold] = 1
-            array[array <= threshold] = 0
-            array = array.astype('uint8')
+            array = apply_threshold(array, threshold)
 
         contours, _ = cv2.findContours(array,
                                        mode=cv2.RETR_EXTERNAL,
