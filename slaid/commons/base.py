@@ -112,8 +112,6 @@ class Mask:
 
 class Slide(abc.ABC):
     def __init__(self, filename: str):
-        if not os.path.exists(filename) or not os.path.isfile(filename):
-            raise FileNotFoundError(filename)
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
 

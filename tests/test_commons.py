@@ -23,10 +23,6 @@ class TestSlide:
         array = region.to_array(True)
         self.assertEqual(array.shape, (256, 256, 3))
 
-    def test_file_not_exists(self):
-        with self.assertRaises(FileNotFoundError):
-            self.slide_cls('path/to/file')
-
 
 class TestEcvlSlide(unittest.TestCase, TestSlide):
     slide = EcvlSlide(IMAGE)
