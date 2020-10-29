@@ -3,15 +3,16 @@ import inspect
 import logging
 import os
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
-from importlib import import_module
 from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
 import PIL
 import shapely
-from shapely.ops import cascaded_union
+from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
+from shapely.geometry import Polygon as ShapelyPolygon
 
 PATCH_SIZE = (256, 256)
 logger = logging.getLogger()
@@ -55,6 +56,45 @@ def apply_threshold(array, threshold: float) -> np.ndarray:
     return array
 
 
+def mask_to_polygons(mask, epsilon=10., min_area=10.):
+    """
+    https://stackoverflow.com/questions/60971260/how-to-transform-contours-obtained-from-opencv-to-shp-file-polygons
+
+    the original source of these helpers was a Kaggle
+    post by Konstantin Lopuhin here - you'll need
+    to be logged into Kaggle to see it
+    """
+    # first, find contours with cv2: it's much faster than shapely
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP,
+                                           cv2.CHAIN_APPROX_NONE)
+    if not contours:
+        return ShapelyMultiPolygon()
+    # now messy stuff to associate parent and child contours
+    cnt_children = defaultdict(list)
+    child_contours = set()
+    assert hierarchy.shape[0] == 1
+    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
+    for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
+        if parent_idx != -1:
+            child_contours.add(idx)
+            cnt_children[parent_idx].append(contours[idx])
+    # create actual polygons filtering by area (removes artifacts)
+    all_polygons = []
+    for idx, cnt in enumerate(contours):
+        if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
+            assert cnt.shape[1] == 1
+            poly = ShapelyPolygon(shell=cnt[:, 0, :],
+                                  holes=[
+                                      c[:, 0, :]
+                                      for c in cnt_children.get(idx, [])
+                                      if cv2.contourArea(c) >= min_area
+                                  ])
+            all_polygons.append(poly)
+    all_polygons = ShapelyMultiPolygon(all_polygons)
+
+    return all_polygons
+
+
 class Mask:
     def __init__(self,
                  array: np.ndarray,
@@ -76,42 +116,12 @@ class Mask:
                     threshold: float = None,
                     downsample: int = 1,
                     n_batch: int = 1) -> List[Polygon]:
-        batch_size = self._get_batch_size(n_batch)
-        polygons = self._collect_polygons_from_batches(n_batch, batch_size,
-                                                       threshold, downsample)
-        return self._get_merged_polygons(polygons, downsample)
-
-    def _get_batch_size(self, n_batch):
-        return self.array.shape[1] // n_batch
-
-    def _collect_polygons_from_batches(self, n_batch, batch_size, threshold,
-                                       downsample):
-        polygons = []
-        for batch_idx in range(n_batch):
-            logger.debug('batch %s of %s', batch_idx, n_batch)
-            polygons.append(
-                self._collect_polygons_from_batch(batch_idx, batch_size,
-                                                  threshold, downsample))
-        return polygons
-
-    def _collect_polygons_from_batch(self, batch_idx, batch_size, threshold,
-                                     downsample):
-        pos = batch_idx * batch_size
-        array = self.array[::downsample, pos:pos + batch_size:downsample]
+        array = np.array(self.array[::downsample, ::downsample])
         if threshold:
-            array = apply_threshold(array, threshold)
-
-        contours, _ = cv2.findContours(array,
-                                       mode=cv2.RETR_EXTERNAL,
-                                       method=cv2.CHAIN_APPROX_SIMPLE)
-        contours = map(np.squeeze, contours)
-        contours = map(lambda x: x + (pos, 0), contours)
-        pols = map(shapely.geometry.Polygon,
-                   filter(lambda x: len(x) > 2, contours))
-        return cascaded_union(list(pols))
-
-    def _get_merged_polygons(self, polygons, downsample):
-
+            array[array > threshold] = 1
+            array[array <= threshold] = 0
+            array = array.astype('uint8')
+            polygons = mask_to_polygons(array)
         return [
             Polygon(
                 list(
@@ -119,13 +129,8 @@ class Mask:
                                            downsample,
                                            downsample,
                                            origin=(0, 0)).exterior.coords))
-            for p in cascaded_union(polygons)
+            for p in polygons
         ]
-
-    def to(self, backend: str) -> "Mask":
-        module = import_module(f'slaid.commons.{backend}')
-        return getattr(module, 'Mask')(self.array, self.extraction_level,
-                                       self.level_downsample, self.threshold)
 
 
 class Slide(abc.ABC):
