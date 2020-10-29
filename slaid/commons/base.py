@@ -69,7 +69,7 @@ class Mask:
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
         if threshold:
-            array = apply_threshold(threshold)
+            array = apply_threshold(array, threshold)
         return PIL.Image.fromarray(255 * array, 'L')
 
     def to_polygons(self,
