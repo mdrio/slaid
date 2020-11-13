@@ -83,7 +83,8 @@ class BasicClassifier(Classifier):
                  threshold: float = None,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
-                 n_batch: int = 1) -> Mask:
+                 n_batch: int = 1,
+                 round_to_zero: float = 0.01) -> Mask:
 
         rows = []
         for i, (start, size) in enumerate(
@@ -95,7 +96,13 @@ class BasicClassifier(Classifier):
                                      filter_, threshold))
         mask = self._concatenate(rows, axis=0)
 
+        mask = self._round_to_zero(mask, round_to_zero)
         return Mask(mask, level, slide.level_downsamples[level])
+
+    def _round_to_zero(self, mask, threshold):
+        if threshold > 0:
+            mask[mask <= threshold] = 0
+        return mask
 
     def _classify_batch(self, slide, start, size, level, patch_size, filter_,
                         threshold):

@@ -50,30 +50,29 @@ def get_parallel_classifier(model, feature):
 
 class SerialRunner:
     @classmethod
-    def run(
-        cls,
-        input_path,
-        output_dir,
-        *,
-        model: 'm',
-        n_batch: ('b', int) = 1,
-        extraction_level: ('l', int) = 2,
-        feature: 'f',
-        threshold: ('t', float) = None,
-        patch_size=None,
-        gpu=False,
-        writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
-            WRITERS.keys())[0],
-        filter_: 'F' = None,
-        overwrite_output_if_exists: 'overwrite' = False,
-    ):
+    def run(cls,
+            input_path,
+            output_dir,
+            *,
+            model: 'm',
+            n_batch: ('b', int) = 1,
+            extraction_level: ('l', int) = 2,
+            feature: 'f',
+            threshold: ('t', float) = None,
+            patch_size=None,
+            gpu=False,
+            writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
+                WRITERS.keys())[0],
+            filter_: 'F' = None,
+            overwrite_output_if_exists: 'overwrite' = False,
+            round_to_zero: ('z', float) = 0.01):
         classifier = cls.get_classifier(model, feature, gpu)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
                             extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists)
+                            filter_, overwrite_output_if_exists, round_to_zero)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
@@ -108,48 +107,29 @@ class SerialRunner:
                     input_path)[-1] != '.zarr' else [input_path]
 
     @classmethod
-    def classify_slides(
-        cls,
-        input_path,
-        output_dir,
-        classifier,
-        n_batch,
-        extraction_level,
-        threshold,
-        patch_size,
-        writer,
-        filter_,
-        overwrite_output_if_exists,
-    ):
+    def classify_slides(cls, input_path, output_dir, classifier, n_batch,
+                        extraction_level, threshold, patch_size, writer,
+                        filter_, overwrite_output_if_exists, round_to_zero):
 
         for slide in cls.get_slides(input_path):
-            cls.classify_slide(
-                slide,
-                output_dir,
-                classifier,
-                n_batch,
-                extraction_level,
-                threshold,
-                patch_size,
-                writer,
-                filter_,
-                overwrite_output_if_exists,
-            )
+            cls.classify_slide(slide, output_dir, classifier, n_batch,
+                               extraction_level, threshold, patch_size, writer,
+                               filter_, overwrite_output_if_exists,
+                               round_to_zero)
 
     @classmethod
-    def classify_slide(
-        cls,
-        slide_filename,
-        output_dir,
-        classifier,
-        n_batch,
-        extraction_level,
-        threshold=None,
-        patch_size=PATCH_SIZE,
-        writer=list(WRITERS.keys())[0],
-        filter_=None,
-        overwrite_output_if_exists=True,
-    ):
+    def classify_slide(cls,
+                       slide_filename,
+                       output_dir,
+                       classifier,
+                       n_batch,
+                       extraction_level,
+                       threshold=None,
+                       patch_size=PATCH_SIZE,
+                       writer=list(WRITERS.keys())[0],
+                       filter_=None,
+                       overwrite_output_if_exists=True,
+                       round_to_zero=0.01):
 
         output_filename = cls.get_output_filename(slide_filename, output_dir)
 
@@ -172,7 +152,8 @@ class SerialRunner:
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   patch_size=patch_size)
+                                   patch_size=patch_size,
+                                   round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
         WRITERS[writer](slide, output_filename)
@@ -189,31 +170,30 @@ class SerialRunner:
 
 class ParallelRunner(SerialRunner):
     @classmethod
-    def run(
-        cls,
-        input_path,
-        output_dir,
-        *,
-        model: 'm',
-        n_batch: ('b', int) = 1,
-        processes: 'p' = False,
-        extraction_level: ('l', int) = 2,
-        feature: 'f',
-        threshold: ('t', float) = None,
-        patch_size=None,
-        gpu=False,
-        writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
-            WRITERS.keys())[0],
-        filter_: 'F' = None,
-        overwrite_output_if_exists: 'overwrite' = False,
-    ):
+    def run(cls,
+            input_path,
+            output_dir,
+            *,
+            model: 'm',
+            n_batch: ('b', int) = 1,
+            processes: 'p' = False,
+            extraction_level: ('l', int) = 2,
+            feature: 'f',
+            threshold: ('t', float) = None,
+            patch_size=None,
+            gpu=False,
+            writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
+                WRITERS.keys())[0],
+            filter_: 'F' = None,
+            overwrite_output_if_exists: 'overwrite' = False,
+            round_to_zero: ('z', float) = 0.01):
         classifier = cls.get_classifier(model, feature, gpu, processes)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
                             extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists)
+                            filter_, overwrite_output_if_exists, round_to_zero)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu, processes):
