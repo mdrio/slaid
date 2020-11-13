@@ -10,3 +10,6 @@ clize
 dask[complete]
 zarr
 scipy
+dataclasses
+opencv-python
+shapely

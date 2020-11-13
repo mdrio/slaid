@@ -1,13 +1,22 @@
 import abc
 import inspect
+import logging
 import os
 import sys
-from typing import Dict, Tuple
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
+import cv2
 import numpy as np
 import PIL
+import shapely
+from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
+from shapely.geometry import Polygon as ShapelyPolygon
 
 PATCH_SIZE = (256, 256)
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 
 def get_class(name, module):
@@ -34,21 +43,98 @@ class Image(abc.ABC):
         pass
 
 
+@dataclass
+class Polygon:
+    coords: List[Tuple[int, int]]
+
+
+def apply_threshold(array, threshold: float) -> np.ndarray:
+    array = np.array(array)
+    array[array > threshold] = 1
+    array[array <= threshold] = 0
+    array = array.astype('uint8')
+    return array
+
+
+def mask_to_polygons(mask, epsilon=10., min_area=10.):
+    """
+    https://stackoverflow.com/questions/60971260/how-to-transform-contours-obtained-from-opencv-to-shp-file-polygons
+
+    the original source of these helpers was a Kaggle
+    post by Konstantin Lopuhin here - you'll need
+    to be logged into Kaggle to see it
+    """
+    # first, find contours with cv2: it's much faster than shapely
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP,
+                                           cv2.CHAIN_APPROX_NONE)
+    if not contours:
+        return ShapelyMultiPolygon()
+    # now messy stuff to associate parent and child contours
+    cnt_children = defaultdict(list)
+    child_contours = set()
+    assert hierarchy.shape[0] == 1
+    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
+    for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
+        if parent_idx != -1:
+            child_contours.add(idx)
+            cnt_children[parent_idx].append(contours[idx])
+    # create actual polygons filtering by area (removes artifacts)
+    all_polygons = []
+    for idx, cnt in enumerate(contours):
+        if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
+            assert cnt.shape[1] == 1
+            poly = ShapelyPolygon(shell=cnt[:, 0, :],
+                                  holes=[
+                                      c[:, 0, :]
+                                      for c in cnt_children.get(idx, [])
+                                      if cv2.contourArea(c) >= min_area
+                                  ])
+            all_polygons.append(poly)
+    all_polygons = ShapelyMultiPolygon(all_polygons)
+
+    return all_polygons
+
+
 class Mask:
-    def __init__(self, array: np.ndarray, extraction_level: int,
-                 level_downsample: int):
+    def __init__(self,
+                 array: np.ndarray,
+                 extraction_level: int,
+                 level_downsample: int,
+                 threshold: float = None):
         self.array = array
         self.extraction_level = extraction_level
         self.level_downsample = level_downsample
+        self.threshold = threshold
 
-    def to_image(self):
-        return PIL.Image.fromarray(255 * self.array, 'L')
+    def to_image(self, downsample: int = 1, threshold: float = None):
+        array = self.array[::downsample, ::downsample]
+        if threshold:
+            array = apply_threshold(array, threshold)
+        return PIL.Image.fromarray(255 * array, 'L')
+
+    def to_polygons(self,
+                    threshold: float = None,
+                    downsample: int = 1,
+                    n_batch: int = 1) -> List[Polygon]:
+        array = np.array(self.array[::downsample, ::downsample])
+        if threshold:
+            array[array > threshold] = 1
+            array[array <= threshold] = 0
+            array = array.astype('uint8')
+            polygons = mask_to_polygons(array)
+        return [
+            Polygon(
+                list(
+                    shapely.affinity.scale(p,
+                                           downsample,
+                                           downsample,
+                                           origin=(0, 0)).exterior.coords))
+            for p in polygons
+        ]
 
 
 class Slide(abc.ABC):
     def __init__(self, filename: str):
-        if not os.path.exists(filename) or not os.path.isfile(filename):
-            raise FileNotFoundError(filename)
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
 

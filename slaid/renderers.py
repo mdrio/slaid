@@ -1,13 +1,13 @@
 import abc
 import json
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 import tifffile
 import zarr
 
-from slaid.classifiers.base import Patch
 from slaid.commons import Mask, Slide
+from slaid.commons.base import Polygon
 from slaid.commons.ecvl import Slide as EcvlSlide
 
 
@@ -31,7 +31,7 @@ class TiffRenderer(Renderer):
         self.rgb = rgb
         self.bigtiff = bigtiff
 
-    def tiles(self, data: np.ndarray) -> np.ndarray:
+    def _tiles(self, data: np.ndarray) -> np.ndarray:
         for y in range(0, data.shape[0], self.tile_size[0]):
             for x in range(0, data.shape[1], self.tile_size[1]):
                 tile = data[y:y + self.tile_size[0], x:x + self.tile_size[1]]
@@ -52,7 +52,7 @@ class TiffRenderer(Renderer):
 
     def render(self, array: np.ndarray, filename: str):
         with tifffile.TiffWriter(filename, bigtiff=self.bigtiff) as tif:
-            tif.save(self.tiles(array),
+            tif.save(self._tiles(array),
                      dtype='uint8',
                      shape=(array.shape[0], array.shape[1], self.channels),
                      tile=self.tile_size,
@@ -69,21 +69,6 @@ class BaseJSONEncoder(abc.ABC):
         pass
 
 
-class PatchJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Patch
-
-    def encode(self, patch: Patch):
-        return {
-            'slide': patch.slide.ID,
-            'x': patch.x,
-            'y': patch.y,
-            'size': patch.size,
-            'features': patch.features
-        }
-
-
 class NumpyArrayJSONEncoder(BaseJSONEncoder):
     @property
     def target(self):
@@ -91,6 +76,15 @@ class NumpyArrayJSONEncoder(BaseJSONEncoder):
 
     def encode(self, array: np.ndarray):
         return array.tolist()
+
+
+class PolygonJSONEncoder(BaseJSONEncoder):
+    @property
+    def target(self):
+        return Polygon
+
+    def encode(self, obj: Polygon):
+        return obj.coords
 
 
 class Int64JSONEncoder(BaseJSONEncoder):
@@ -126,29 +120,8 @@ def convert_numpy_types(obj):
     return obj
 
 
-class SlideJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Slide
-
-    def encode(
-        self,
-        slide: Slide,
-    ) -> Union[List, Dict]:
-        dct = dict(filename=slide.filename, masks={})
-
-        for k, v in slide.masks.items():
-            dct['masks'][k] = dict(array=v.array.tolist(),
-                                   extraction_level=v.extraction_level,
-                                   level_downsample=v.level_downsample)
-        return dct
-
-
 class JSONEncoder(json.JSONEncoder):
-    encoders = [
-        NumpyArrayJSONEncoder(),
-        SlideJSONEncoder(),
-    ]
+    encoders = [NumpyArrayJSONEncoder(), PolygonJSONEncoder()]
 
     def default(self, obj):
         encoded = None
@@ -188,12 +161,14 @@ def to_zarr(slide: Slide, path: str):
         array = group.array(name, mask.array)
         array.attrs['level'] = mask.extraction_level
         array.attrs['downsample'] = mask.level_downsample
+        array.attrs['threshold'] = mask.threshold
 
 
 def from_zarr(path: str) -> Slide:
     group = zarr.open_group(path)
     slide = EcvlSlide(group.attrs['slide'])
     for name, value in group.arrays():
-        slide.masks[name] = Mask(np.array(value), value.attrs['level'],
-                                 value.attrs['downsample'])
+        slide.masks[name] = Mask(value, value.attrs['level'],
+                                 value.attrs['downsample'],
+                                 value.attrs.get('threshold'))
     return slide
