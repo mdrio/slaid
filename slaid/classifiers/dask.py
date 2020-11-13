@@ -34,7 +34,7 @@ class Classifier(BasicClassifier):
                                                               filter_,
                                                               threshold),
                                 shape=size[::-1],
-                                dtype='uint8' if threshold else 'float32'))
+                                dtype='uint8' if threshold else 'float16'))
         mask = self._concatenate(rows, axis=0)
         return Mask(mask.compute(rerun_exceptions_locally=True), level,
                     slide.level_downsamples[level])
