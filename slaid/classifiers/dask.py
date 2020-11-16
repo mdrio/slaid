@@ -21,7 +21,8 @@ class Classifier(BasicClassifier):
                  threshold: float = None,
                  level: int = 2,
                  patch_size: Tuple[int, int] = None,
-                 n_batch: int = 1) -> Mask:
+                 n_batch: int = 1,
+                 round_to_zero: float = 0.01) -> Mask:
         rows = []
         for i, (start, size) in enumerate(
                 self._get_batch_coordinates(slide, level, n_batch,
@@ -36,6 +37,7 @@ class Classifier(BasicClassifier):
                                 shape=size[::-1],
                                 dtype='uint8' if threshold else 'float16'))
         mask = self._concatenate(rows, axis=0)
+        mask = self._round_to_zero(mask, round_to_zero)
         return Mask(mask.compute(rerun_exceptions_locally=True), level,
                     slide.level_downsamples[level])
 
