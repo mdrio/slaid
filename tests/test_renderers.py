@@ -7,7 +7,7 @@ import numpy as np
 from slaid.renderers import TiffRenderer
 
 
-class TiffRendererTest(unittest.TestCase):
+class TestTiffRenderer(unittest.TestCase):
     def test_render_grayscale(self):
         renderer = TiffRenderer(rgb=False)
         data = np.zeros((100, 100))

@@ -17,7 +17,7 @@ input_basename_no_ext = 'PH10023-1.thumb'
 slide = Slide(input_)
 
 
-class ExtractTissueTest:
+class BaseTest:
     model = None
     cmd = ''
     feature = 'tissue'
@@ -48,7 +48,7 @@ class ExtractTissueTest:
         self.assertEqual(output[self.feature].attrs['downsample'],
                          slide.level_downsamples[level])
 
-    def test_classify_default(self):
+    def test_classifies_with_default_args(self):
         subprocess.check_call([
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             input_, OUTPUT_DIR
@@ -58,7 +58,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, 2)
 
-    def test_classify_input_zarr(self):
+    def test_classifies_zarr_input(self):
         slide = Slide(input_)
         zarr_path = '/tmp/test-slaid/slide.zarr'
         to_zarr(slide, zarr_path)
@@ -76,7 +76,7 @@ class ExtractTissueTest:
         print(g.attrs.asdict())
         #  self._test_output(output, slide, 2)
 
-    def test_classify_custom(self):
+    def test_classifies_custom_args(self):
         extr_level = 1
         cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature}  -l '\
             f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
@@ -86,7 +86,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, extr_level)
 
-    def test_classify_overwrite(self):
+    def test_overwrites_existing_classification_output(self):
         output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         print(output)
         os.makedirs(output)
@@ -101,7 +101,7 @@ class ExtractTissueTest:
 
         self._test_output(output, slide, 2)
 
-    def test_classify_no_overwrite(self):
+    def test_raises_error_output_already_exists(self):
         output = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         os.makedirs(output)
         subprocess.check_call([
@@ -116,12 +116,12 @@ class ExtractTissueTest:
             ])
 
 
-class SerialEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+class TestSerialEddlClassifier(BaseTest, unittest.TestCase):
     model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
     cmd = 'serial'
 
 
-class ParallelEddlExtractTissueTest(ExtractTissueTest, unittest.TestCase):
+class TestParallelEddlClassifier(BaseTest, unittest.TestCase):
     model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
     cmd = 'parallel'
 
