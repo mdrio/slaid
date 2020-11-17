@@ -13,3 +13,4 @@ scipy
 dataclasses
 opencv-python
 shapely
+pytest-spec
