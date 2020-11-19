@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 import tiledb
 
-from slaid.commons import Slide
+from slaid.commons import Mask, Slide
+from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import Slide as EcvlSlide
 
 IMAGE = 'tests/data/test.tif'
@@ -40,7 +41,10 @@ class TestImage(unittest.TestCase):
 
 
 class TestMask:
-    def test_dumps_to_tiledb(self, mask, tmp_path):
+    cls = Mask
+
+    def test_dumps_to_tiledb(self, array, tmp_path):
+        mask = self.cls(array, 1, 1, 0.8)
         mask.to_tiledb(str(tmp_path))
         with tiledb.open(str(tmp_path), 'r') as array:
             assert (array == np.array(mask.array)).all()
@@ -50,5 +54,8 @@ class TestMask:
             assert 'model' not in array.meta.keys()
 
 
-if __name__ == '__main__':
-    unittest.main()
+class TestDaskMask(TestMask):
+    cls = DaskMask
+
+    def test_dumps_to_tiledb(self, dask_array, tmp_path):
+        super().test_dumps_to_tiledb(dask_array, tmp_path)

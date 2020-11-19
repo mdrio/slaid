@@ -149,7 +149,10 @@ class Mask:
             if self.model:
                 array.meta['model'] = self.model
 
-    #  def from_tiledb(path, **kwargs)
+    @classmethod
+    def from_tiledb(path, **kwargs):
+        with tiledb.open(path, **kwargs) as array:
+            print(array)
 
     def to_zarr(self, path, **kwargs):
         pass
