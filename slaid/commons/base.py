@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import PIL
 import shapely
+import tiledb
 from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
 from shapely.geometry import Polygon as ShapelyPolygon
 
@@ -100,11 +101,13 @@ class Mask:
                  array: np.ndarray,
                  extraction_level: int,
                  level_downsample: int,
-                 threshold: float = None):
+                 threshold: float = None,
+                 model: str = None):
         self.array = array
         self.extraction_level = extraction_level
         self.level_downsample = level_downsample
         self.threshold = threshold
+        self.model = model
 
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
@@ -131,6 +134,22 @@ class Mask:
                                            origin=(0, 0)).exterior.coords))
             for p in polygons
         ]
+
+    def to_tiledb(self, path, **kwargs):
+        tiledb.from_numpy(path, self.array)
+        self._write_meta_tiledb(path)
+
+    def _write_meta_tiledb(self, path):
+        with tiledb.open(path, 'w') as array:
+            array.meta['extraction_level'] = self.extraction_level
+            array.meta['level_downsample'] = self.level_downsample
+            if self.threshold:
+                array.meta['threshold'] = self.threshold
+            if self.model:
+                array.meta['model'] = self.model
+
+    def to_zarr(self, path, **kwargs):
+        pass
 
 
 class Slide(abc.ABC):

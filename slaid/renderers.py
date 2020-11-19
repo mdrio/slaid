@@ -4,6 +4,7 @@ from typing import Any, Tuple, Union
 
 import numpy as np
 import tifffile
+import tiledb
 import zarr
 
 from slaid.commons import Mask, Slide
@@ -172,3 +173,22 @@ def from_zarr(path: str) -> Slide:
                                  value.attrs['downsample'],
                                  value.attrs.get('threshold'))
     return slide
+
+
+#  def to_tiledb(slide: Slide, path: str, config: dict = None):
+#      group = tiledb.group_create(path)
+#      for mask in slide.mak
+#      if slide.masks:
+#          group
+#
+#      dom = tiledb.Domain(
+#          tiledb.Dim(name="rows", domain=(0, slide), tile=4, dtype=np.int32),
+#          tiledb.Dim(name="cols", domain=(0, 15), tile=4, dtype=np.int32))
+#
+#      # The array will be sparse with a single attribute "a" so each (i,j) cell can store an integer.
+#      schema = tiledb.ArraySchema(domain=dom,
+#                                  sparse=True,
+#                                  attrs=[tiledb.Attr(name="a", dtype=np.int32)])
+#
+#      # Create the (empty) array on disk.
+#      tiledb.SparseArray.create(array_name, schema)

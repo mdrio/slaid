@@ -1,8 +1,8 @@
-import tifffile
 import tempfile
 import unittest
 
 import numpy as np
+import tifffile
 
 from slaid.renderers import TiffRenderer
 
