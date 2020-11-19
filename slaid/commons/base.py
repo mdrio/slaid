@@ -137,16 +137,19 @@ class Mask:
 
     def to_tiledb(self, path, **kwargs):
         tiledb.from_numpy(path, self.array)
-        self._write_meta_tiledb(path)
+        print(f'kwargs {kwargs}')
+        self._write_meta_tiledb(path, **kwargs)
 
-    def _write_meta_tiledb(self, path):
-        with tiledb.open(path, 'w') as array:
+    def _write_meta_tiledb(self, path, **kwargs):
+        with tiledb.open(path, 'w', **kwargs) as array:
             array.meta['extraction_level'] = self.extraction_level
             array.meta['level_downsample'] = self.level_downsample
             if self.threshold:
                 array.meta['threshold'] = self.threshold
             if self.model:
                 array.meta['model'] = self.model
+
+    #  def from_tiledb(path, **kwargs)
 
     def to_zarr(self, path, **kwargs):
         pass
