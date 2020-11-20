@@ -35,7 +35,7 @@ class Classifier(BasicClassifier):
                                                               filter_,
                                                               threshold),
                                 shape=size[::-1],
-                                dtype='uint8' if threshold else 'float16'))
+                                dtype='uint8' if threshold else 'float32'))
         mask = self._concatenate(rows, axis=0)
         mask = self._round_to_zero(mask, round_to_zero)
         return Mask(mask.compute(rerun_exceptions_locally=True), level,

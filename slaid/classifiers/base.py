@@ -133,7 +133,7 @@ class BasicClassifier(Classifier):
         array = batch.array
         batch_shape = array.shape
         res = np.zeros(batch_shape[:2],
-                       dtype='uint8' if threshold else 'float16')
+                       dtype='uint8' if threshold else 'float32')
         for patch in batch.get_patches(patch_size, filter_):
             orig_shape = patch.array.shape
             flatten_array = self._flat_array(patch.array)
@@ -150,7 +150,7 @@ class BasicClassifier(Classifier):
             prediction[prediction >= threshold] = 1
             prediction[prediction < threshold] = 0
             prediction = prediction.astype('uint8')
-        return prediction.astype('float16')
+        return prediction.astype('float32')
 
     def _get_batch_coordinates(self, slide, level, n_batch, patch_size):
         dimensions = slide.level_dimensions[level]

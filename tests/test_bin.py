@@ -4,11 +4,12 @@ import os
 import shutil
 import subprocess
 import unittest
+import pytest
 
 import zarr
 
 from slaid.commons.ecvl import Slide
-from slaid.renderers import to_zarr
+from slaid.renderers import from_tiledb, to_zarr
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -17,9 +18,9 @@ input_basename_no_ext = 'PH10023-1.thumb'
 slide = Slide(input_)
 
 
-class BaseTest:
-    model = None
-    cmd = ''
+class TestSerialEddlClassifier:
+    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
+    cmd = 'serial'
     feature = 'tissue'
 
     @staticmethod
@@ -41,12 +42,12 @@ class BaseTest:
         return slide, zarr_group
 
     def _test_output(self, output, slide, level):
-        self.assertEqual(output.attrs['slide'], slide.filename)
-        self.assertEqual(output[self.feature].shape,
-                         slide.level_dimensions[level][::-1])
-        self.assertEqual(output[self.feature].attrs['level'], level)
-        self.assertEqual(output[self.feature].attrs['downsample'],
-                         slide.level_downsamples[level])
+        assert output.attrs['slide'] == slide.filename
+        assert output[
+            self.feature].shape == slide.level_dimensions[level][::-1]
+        assert output[self.feature].attrs['level'] == level
+        assert output[
+            self.feature].attrs['downsample'] == slide.level_downsamples[level]
 
     def test_classifies_with_default_args(self):
         subprocess.check_call([
@@ -57,6 +58,20 @@ class BaseTest:
         slide, output = self._get_input_output(output_path)
 
         self._test_output(output, slide, 2)
+
+    def test_classifies_with_tiledb_as_output(self, tmp_path):
+        subprocess.check_call([
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            input_, '-w', 'tiledb',
+            str(tmp_path)
+        ])
+        output_path = os.path.join(tmp_path,
+                                   f'{os.path.basename(input_)}.tiledb')
+        output_slide = from_tiledb(output_path)
+
+        assert os.path.basename(output_slide.filename) == os.path.basename(
+            slide.filename)
+        assert output_slide.masks(self.feature) == slide.masks(self.feature)
 
     def test_classifies_zarr_input(self):
         slide = Slide(input_)
@@ -95,7 +110,7 @@ class BaseTest:
             '--overwrite', input_, OUTPUT_DIR
         ])
         stats = os.stat(output)
-        self.assertTrue(stats.st_size > 0)
+        assert stats.st_size > 0
         output_path = os.path.join(OUTPUT_DIR, f'{input_basename_no_ext}.zarr')
         slide, output = self._get_input_output(output_path)
 
@@ -109,19 +124,14 @@ class BaseTest:
             '--overwrite', input_, OUTPUT_DIR
         ])
 
-        with self.assertRaises(subprocess.CalledProcessError):
+        with pytest.raises(subprocess.CalledProcessError):
             subprocess.check_call([
                 'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
                 input_, OUTPUT_DIR
             ])
 
 
-class TestSerialEddlClassifier(BaseTest, unittest.TestCase):
-    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
-    cmd = 'serial'
-
-
-class TestParallelEddlClassifier(BaseTest, unittest.TestCase):
+class TestParallelEddlClassifier(TestSerialEddlClassifier):
     model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
     cmd = 'parallel'
 

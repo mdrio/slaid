@@ -2,30 +2,23 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
-import pickle
 
 import pkg_resources
 from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons.dask import init_client
 from slaid.commons import PATCH_SIZE
+from slaid.commons.dask import init_client
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import from_zarr, to_zarr
+from slaid.renderers import from_tiledb, from_zarr, to_tiledb, to_zarr
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S',
                     level=logging.DEBUG)
 
-
-def pickle_dump(obj, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump(obj, f)
-
-
-WRITERS = {'zarr': to_zarr}
+WRITERS = {'zarr': to_zarr, 'tiledb': to_tiledb}
 
 
 def set_model(func, model):
@@ -131,7 +124,8 @@ class SerialRunner:
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
-        output_filename = cls.get_output_filename(slide_filename, output_dir)
+        #  output_filename = cls.get_output_filename(slide_filename, output_dir,
+        #                                            writer)
 
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
@@ -156,14 +150,14 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        WRITERS[writer](slide, output_filename)
-        logging.info(output_filename)
+        WRITERS[writer](slide, output_dir)
+        logging.info(output_dir)
 
     @staticmethod
-    def get_output_filename(slide_filename, output_dir):
+    def get_output_filename(slide_filename, output_dir, ext):
         slide_basename = os.path.basename(slide_filename)
         slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-        output_filename = f'{slide_basename_no_ext}.zarr'
+        output_filename = f'{slide_basename_no_ext}.{ext}'
         output_filename = os.path.join(output_dir, output_filename)
         return output_filename
 

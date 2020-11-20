@@ -3,6 +3,7 @@ import json
 import os
 from typing import Any, Tuple, Union
 
+import logging
 import numpy as np
 import tifffile
 import tiledb
@@ -11,6 +12,8 @@ import zarr
 from slaid.commons import Mask, Slide
 from slaid.commons.base import Polygon
 from slaid.commons.ecvl import Slide as EcvlSlide
+
+logger = logging.getLogger(__file__)
 
 
 class Renderer(abc.ABC):
@@ -156,6 +159,7 @@ def to_json(obj: Any, filename: str = None) -> Union[str, None]:
 
 
 def to_zarr(slide: Slide, path: str):
+    logger.info('dumping slide to zarr on path %s', path)
     group = zarr.open_group(path)
     if 'slide' not in group.attrs:
         group.attrs['slide'] = slide.filename
@@ -177,11 +181,11 @@ def from_zarr(path: str) -> Slide:
 
 
 def to_tiledb(slide: Slide, path: str, **kwargs):
-    basename = os.path.basename(slide.filename)
-    filename = f'{basename}.tiledb'
-    path = os.path.join(path, filename)
     if not os.path.isdir(path):
+        logger.info('creating tiledb group at path %s', path)
         tiledb.group_create(path)
+    with open(os.path.join(path, '.slide'), 'w') as f:
+        f.write(slide.filename)
 
     for name, mask in slide.masks.items():
         mask.to_tiledb(os.path.join(path, name), **kwargs)
@@ -189,8 +193,8 @@ def to_tiledb(slide: Slide, path: str, **kwargs):
 
 
 def from_tiledb(path: str, **kwargs) -> Slide:
-    basename = os.path.basename(path)
-    filename = os.path.splitext(basename)[0]
+    with open(os.path.join(path, '.slide'), 'r') as f:
+        filename = f.read()
     slide = EcvlSlide(filename)
     masks = []
     tiledb.ls(path, lambda obj_path, obj_type: masks.append(obj_path))
