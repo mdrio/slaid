@@ -150,9 +150,20 @@ class Mask:
                 array.meta['model'] = self.model
 
     @classmethod
-    def from_tiledb(path, **kwargs):
-        with tiledb.open(path, **kwargs) as array:
-            print(array)
+    def from_tiledb(cls, path, **kwargs):
+        array = tiledb.open(path, **kwargs)
+        return Mask(array, array.meta['extraction_level'],
+                    array.meta['level_downsample'],
+                    cls._get_meta(array, 'threshold'),
+                    cls._get_meta(array, 'model'))
+
+    @staticmethod
+    def _get_meta(array, attr):
+        try:
+            res = array.meta[attr]
+        except KeyError:
+            res = None
+        return res
 
     def to_zarr(self, path, **kwargs):
         pass

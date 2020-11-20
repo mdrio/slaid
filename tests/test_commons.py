@@ -53,9 +53,18 @@ class TestMask:
             assert array.meta['threshold'] == mask.threshold
             assert 'model' not in array.meta.keys()
 
+    def test_creates_from_tiledb(self, tiledb_path):
+        mask = self.cls.from_tiledb(tiledb_path)
+        with tiledb.open(tiledb_path, 'r') as array:
+            assert (mask.array[:] == array[:]).all()
+
 
 class TestDaskMask(TestMask):
     cls = DaskMask
 
     def test_dumps_to_tiledb(self, dask_array, tmp_path):
         super().test_dumps_to_tiledb(dask_array, tmp_path)
+
+
+if __name__ == '__main__':
+    unittest.main()
