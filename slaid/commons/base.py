@@ -109,6 +109,13 @@ class Mask:
         self.threshold = threshold
         self.model = model
 
+    def __eq__(self, other):
+        return self.extraction_level == other.extraction_level \
+            and self.level_downsample == other.level_downsample \
+            and self.threshold == other.threshold \
+            and self.model == other.model \
+            and (self.array == other.array).all()
+
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
         if threshold:

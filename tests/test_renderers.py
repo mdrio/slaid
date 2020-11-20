@@ -1,10 +1,12 @@
+import os
 import tempfile
 import unittest
 
 import numpy as np
 import tifffile
 
-from slaid.renderers import TiffRenderer
+from slaid.renderers import TiffRenderer, from_tiledb, to_tiledb
+import tiledb
 
 
 class TestTiffRenderer(unittest.TestCase):
@@ -39,5 +41,21 @@ class TestTiffRenderer(unittest.TestCase):
             self.assertTrue((data_output[1:, :, :, ] == 0).all())
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_slide_to_tiledb(slide_with_mask, tmp_path):
+    slide = slide_with_mask(np.ones)
+    path = str(tmp_path)
+    path = to_tiledb(slide, path)
+    assert os.path.isdir(path)
+    for name, mask in slide.masks.items():
+        assert tiledb.array_exists(os.path.join(path, name))
+
+
+def test_slide_from_tiledb(slide_with_mask, tmp_path):
+    slide = slide_with_mask(np.ones)
+    path = str(tmp_path)
+    path = to_tiledb(slide, path)
+    tiledb_slide = from_tiledb(path)
+
+    assert os.path.basename(slide.filename) == os.path.basename(
+        tiledb_slide.filename)
+    assert slide.masks == tiledb_slide.masks

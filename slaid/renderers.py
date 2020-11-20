@@ -1,5 +1,6 @@
 import abc
 import json
+import os
 from typing import Any, Tuple, Union
 
 import numpy as np
@@ -175,20 +176,24 @@ def from_zarr(path: str) -> Slide:
     return slide
 
 
-#  def to_tiledb(slide: Slide, path: str, config: dict = None):
-#      group = tiledb.group_create(path)
-#      for mask in slide.mak
-#      if slide.masks:
-#          group
-#
-#      dom = tiledb.Domain(
-#          tiledb.Dim(name="rows", domain=(0, slide), tile=4, dtype=np.int32),
-#          tiledb.Dim(name="cols", domain=(0, 15), tile=4, dtype=np.int32))
-#
-#      # The array will be sparse with a single attribute "a" so each (i,j) cell can store an integer.
-#      schema = tiledb.ArraySchema(domain=dom,
-#                                  sparse=True,
-#                                  attrs=[tiledb.Attr(name="a", dtype=np.int32)])
-#
-#      # Create the (empty) array on disk.
-#      tiledb.SparseArray.create(array_name, schema)
+def to_tiledb(slide: Slide, path: str, **kwargs):
+    basename = os.path.basename(slide.filename)
+    filename = f'{basename}.tiledb'
+    path = os.path.join(path, filename)
+    if not os.path.isdir(path):
+        tiledb.group_create(path)
+
+    for name, mask in slide.masks.items():
+        mask.to_tiledb(os.path.join(path, name), **kwargs)
+    return path
+
+
+def from_tiledb(path: str, **kwargs) -> Slide:
+    basename = os.path.basename(path)
+    filename = os.path.splitext(basename)[0]
+    slide = EcvlSlide(filename)
+    masks = []
+    tiledb.ls(path, lambda obj_path, obj_type: masks.append(obj_path))
+    for name in masks:
+        slide.masks[os.path.basename(name)] = Mask.from_tiledb(name)
+    return slide
