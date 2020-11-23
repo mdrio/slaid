@@ -150,14 +150,15 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        WRITERS[writer](slide, output_dir)
-        logging.info(output_dir)
+        output_filename = cls.get_output_filename(slide.filename, output_dir,
+                                                  writer)
+        WRITERS[writer](slide, output_filename)
+        logging.info('output %s', output_filename)
 
     @staticmethod
     def get_output_filename(slide_filename, output_dir, ext):
         slide_basename = os.path.basename(slide_filename)
-        slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-        output_filename = f'{slide_basename_no_ext}.{ext}'
+        output_filename = f'{slide_basename}.{ext}'
         output_filename = os.path.join(output_dir, output_filename)
         return output_filename
 
