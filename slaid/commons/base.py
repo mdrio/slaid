@@ -164,15 +164,15 @@ class Mask:
             attrs['model'] = self.model
         return attrs
 
-    def to_tiledb(self, path, overwrite: bool = False, **kwargs):
+    def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
         logger.info('dumping mask to tiledb on path %s', path)
         if os.path.isdir(path) and overwrite:
-            tiledb.remove(path)
-        tiledb.from_numpy(path, self.array)
-        self._write_meta_tiledb(path, **kwargs)
+            tiledb.remove(path, ctx=ctx)
+        tiledb.from_numpy(path, self.array, ctx=ctx)
+        self._write_meta_tiledb(path, ctx=ctx)
 
-    def _write_meta_tiledb(self, path, **kwargs):
-        with tiledb.open(path, 'w', **kwargs) as array:
+    def _write_meta_tiledb(self, path, ctx: tiledb.Ctx = None):
+        with tiledb.open(path, 'w', ctx=ctx) as array:
             array.meta['extraction_level'] = self.extraction_level
             array.meta['level_downsample'] = self.level_downsample
             if self.threshold:
@@ -181,8 +181,8 @@ class Mask:
                 array.meta['model'] = self.model
 
     @classmethod
-    def from_tiledb(cls, path, **kwargs):
-        array = tiledb.open(path, **kwargs)
+    def from_tiledb(cls, path, ctx: tiledb.Ctx = None):
+        array = tiledb.open(path, ctx=ctx)
         return Mask(array, array.meta['extraction_level'],
                     array.meta['level_downsample'],
                     cls._get_meta(array, 'threshold'),

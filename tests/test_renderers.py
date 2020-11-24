@@ -45,7 +45,7 @@ class TestTiffRenderer(unittest.TestCase):
 def test_slide_to_tiledb(slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
-    path = to_tiledb(slide, path)
+    to_tiledb(slide, path)
     assert os.path.isdir(path)
     for name, mask in slide.masks.items():
         assert tiledb.array_exists(os.path.join(path, name))
@@ -54,7 +54,7 @@ def test_slide_to_tiledb(slide_with_mask, tmp_path):
 def test_slide_from_tiledb(slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
-    path = to_tiledb(slide, path)
+    to_tiledb(slide, path)
     tiledb_slide = from_tiledb(path)
 
     assert os.path.basename(slide.filename) == os.path.basename(

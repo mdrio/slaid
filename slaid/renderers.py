@@ -195,22 +195,22 @@ def to_tiledb(slide: Slide,
               path: str,
               overwrite: bool = False,
               mask: str = False,
-              **kwargs):
+              ctx: tiledb.Ctx = None):
     if not os.path.isdir(path):
         logger.info('creating tiledb group at path %s', path)
-        tiledb.group_create(path)
+        tiledb.group_create(path, ctx=ctx)
     with open(os.path.join(path, '.slide'), 'w') as f:
         f.write(slide.filename)
 
-    _dump_masks(path, slide, overwrite, 'to_tiledb', mask, **kwargs)
+    _dump_masks(path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
 
 
-def from_tiledb(path: str, **kwargs) -> Slide:
+def from_tiledb(path: str, ctx: tiledb.Ctx = None) -> Slide:
     with open(os.path.join(path, '.slide'), 'r') as f:
         filename = f.read()
     slide = EcvlSlide(filename)
     masks = []
-    tiledb.ls(path, lambda obj_path, obj_type: masks.append(obj_path))
+    tiledb.ls(path, lambda obj_path, obj_type: masks.append(obj_path), ctx=ctx)
     for name in masks:
-        slide.masks[os.path.basename(name)] = Mask.from_tiledb(name)
+        slide.masks[os.path.basename(name)] = Mask.from_tiledb(name, ctx=ctx)
     return slide

@@ -4,6 +4,7 @@ import logging
 import os
 
 import pkg_resources
+import tiledb
 from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
@@ -42,6 +43,15 @@ def get_parallel_classifier(model, feature):
     return Classifier(model, feature)
 
 
+def load_config_file(config_file: str, backend: str):
+    if config_file is None:
+        return
+    if backend == 'tiledb':
+        config = tiledb.Config.load(config_file)
+        tiledb.Ctx(config)
+        tiledb.VFS(config)
+
+
 class SerialRunner:
     @classmethod
     def run(cls,
@@ -59,7 +69,8 @@ class SerialRunner:
                 WRITERS.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
-            round_to_zero: ('z', float) = 0.01):
+            round_to_zero: ('z', float) = 0.01,
+            config_file: str = None):
         classifier = cls.get_classifier(model, feature, gpu)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
