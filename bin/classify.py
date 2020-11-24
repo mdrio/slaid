@@ -19,6 +19,7 @@ logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     level=logging.DEBUG)
 
 WRITERS = {'zarr': to_zarr, 'tiledb': to_tiledb}
+READERS = {'zarr': from_zarr, 'tiledb': from_tiledb}
 
 
 def set_model(func, model):
@@ -95,9 +96,10 @@ class SerialRunner:
     @staticmethod
     def get_slides(input_path):
 
-        return [os.path.join(input_path, f) for f in os.listdir(input_path)
-                ] if os.path.isdir(input_path) and os.path.splitext(
-                    input_path)[-1] != '.zarr' else [input_path]
+        return [
+            os.path.join(input_path, f) for f in os.listdir(input_path)
+        ] if os.path.isdir(input_path) and os.path.splitext(
+            input_path)[-1][1:] not in WRITERS.keys() else [input_path]
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -124,15 +126,11 @@ class SerialRunner:
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
-        #  output_filename = cls.get_output_filename(slide_filename, output_dir,
-        #                                            writer)
-
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
-        if slide_ext == 'zarr':
-            slide = from_zarr(slide_filename)
-        else:
-            slide = create_slide(slide_filename)
+        slide = READERS.get(slide_ext, create_slide)(slide_filename)
+        output_filename = cls.get_output_filename(slide.filename, output_dir,
+                                                  writer)
 
         if classifier.feature in slide.masks:
             if not overwrite_output_if_exists:
@@ -150,9 +148,7 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        output_filename = cls.get_output_filename(slide.filename, output_dir,
-                                                  writer)
-        WRITERS[writer](slide, output_filename)
+        WRITERS[writer](slide, output_filename, mask=feature)
         logging.info('output %s', output_filename)
 
     @staticmethod

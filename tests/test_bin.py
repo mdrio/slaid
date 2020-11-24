@@ -6,11 +6,12 @@ import shutil
 import subprocess
 import unittest
 
+import numpy as np
 import pytest
 import zarr
 
 from slaid.commons.ecvl import Slide
-from slaid.renderers import from_tiledb, to_zarr
+from slaid.renderers import from_tiledb, to_tiledb, to_zarr, from_zarr
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -49,9 +50,9 @@ class TestSerialEddlClassifier:
         assert output.attrs['slide'] == slide.filename
         assert output[
             self.feature].shape == slide.level_dimensions[level][::-1]
-        assert output[self.feature].attrs['level'] == level
-        assert output[
-            self.feature].attrs['downsample'] == slide.level_downsamples[level]
+        assert output[self.feature].attrs['extraction_level'] == level
+        assert output[self.feature].attrs[
+            'level_downsample'] == slide.level_downsamples[level]
 
     def test_classifies_with_default_args(self, tmp_path):
         path = str(tmp_path)
@@ -86,29 +87,39 @@ class TestSerialEddlClassifier:
         assert output.masks[
             self.feature].level_downsample == slide.level_downsamples[level]
 
-    def test_classifies_zarr_input(self):
-        slide = Slide(input_)
-        zarr_path = '/tmp/test-slaid/slide.zarr'
-        to_zarr(slide, zarr_path)
-        print(os.listdir(zarr_path))
-        assert len(os.listdir(zarr_path)) > 0
-        print(os)
-        print(slide.level_dimensions)
+    def test_classifies_zarr_input(self, tmp_path, slide_with_mask):
+        slide = slide_with_mask(np.ones)
+        path = os.path.join(str(tmp_path),
+                            f'{os.path.basename(slide.filename)}.zarr')
+        to_zarr(slide, path)
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            zarr_path, OUTPUT_DIR
+            path,
+            str(tmp_path)
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
-        output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
+        output = from_zarr(path)
+        assert 'mask' in output.masks
+        assert self.feature in output.masks
 
-        slide, output = self._get_input_output(output_path)
-        print(slide, output_path)
-        import zarr
-        g = zarr.open_group(output_path)
-        print(g.attrs.asdict())
-        #  self._test_output(output, slide, 2)
+    def test_classifies_tiledb_input(self, tmp_path, slide_with_mask):
+        slide = slide_with_mask(np.ones)
+        path = os.path.join(str(tmp_path),
+                            f'{os.path.basename(slide.filename)}.tiledb')
+        to_tiledb(slide, path)
+
+        cmd = [
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '-w', 'tiledb', path,
+            str(tmp_path)
+        ]
+        logger.info('cmd %s', ' '.join(cmd))
+        subprocess.check_call(cmd)
+        output = from_tiledb(path)
+        assert 'mask' in output.masks
+        assert self.feature in output.masks
 
     def test_classifies_custom_args(self):
         extr_level = 1
@@ -135,19 +146,23 @@ class TestSerialEddlClassifier:
 
         self._test_output(output, slide, 2)
 
-    def test_raises_error_output_already_exists(self):
-        output = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
-        os.makedirs(output)
-        subprocess.check_call([
-            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '--overwrite', input_, OUTPUT_DIR
-        ])
-
-        with pytest.raises(subprocess.CalledProcessError):
-            subprocess.check_call([
-                'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-                input_, OUTPUT_DIR
-            ])
+    #  def test_raises_error_output_already_exists(self, slide_with_mask,
+    #                                              tmp_path):
+    #      slide = slide_with_mask(np.ones)
+    #      path = os.path.join(str(tmp_path),
+    #                          f'{os.path.basename(slide.filename)}.tiledb')
+    #      to_tiledb(slide, path)
+    #      subprocess.check_call([
+    #          'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+    #          input_, OUTPUT_DIR
+    #      ])
+    #
+    #      with pytest.raises(subprocess.CalledProcessError):
+    #          subprocess.check_call([
+    #              'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+    #              input_, OUTPUT_DIR
+    #          ])
+    #
 
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):

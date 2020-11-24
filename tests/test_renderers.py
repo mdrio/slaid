@@ -4,9 +4,10 @@ import unittest
 
 import numpy as np
 import tifffile
-
-from slaid.renderers import TiffRenderer, from_tiledb, to_tiledb
 import tiledb
+
+from slaid.renderers import (TiffRenderer, from_tiledb, from_zarr, to_tiledb,
+                             to_zarr)
 
 
 class TestTiffRenderer(unittest.TestCase):
@@ -59,3 +60,11 @@ def test_slide_from_tiledb(slide_with_mask, tmp_path):
     assert os.path.basename(slide.filename) == os.path.basename(
         tiledb_slide.filename)
     assert slide.masks == tiledb_slide.masks
+
+
+def test_slide_to_zarr(slide_with_mask, tmp_path):
+    slide = slide_with_mask(np.ones)
+    path = str(tmp_path)
+    to_zarr(slide, path)
+    res = from_zarr(path)
+    assert res == slide

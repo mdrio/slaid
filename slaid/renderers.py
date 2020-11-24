@@ -1,9 +1,9 @@
 import abc
 import json
-import os
-from typing import Any, Tuple, Union
-
 import logging
+import os
+from typing import Any, Callable, Tuple, Union
+
 import numpy as np
 import tifffile
 import tiledb
@@ -158,38 +158,51 @@ def to_json(obj: Any, filename: str = None) -> Union[str, None]:
         return json.dumps(obj, cls=JSONEncoder)
 
 
-def to_zarr(slide: Slide, path: str):
+def to_zarr(slide: Slide,
+            path: str,
+            mask: str = None,
+            overwrite: bool = False,
+            **kwargs):
     logger.info('dumping slide to zarr on path %s', path)
     group = zarr.open_group(path)
     if 'slide' not in group.attrs:
         group.attrs['slide'] = slide.filename
-    for name, mask in slide.masks.items():
-        array = group.array(name, mask.array)
-        array.attrs['level'] = mask.extraction_level
-        array.attrs['downsample'] = mask.level_downsample
-        array.attrs['threshold'] = mask.threshold
+    _dump_masks(path, slide, overwrite, 'to_zarr', mask, **kwargs)
+
+
+def _dump_masks(path: str,
+                slide: Slide,
+                overwrite: bool,
+                func: str,
+                only_mask: str = None,
+                **kwargs):
+    masks = {only_mask: slide.masks[only_mask]} if only_mask else slide.masks
+    for name, mask_ in masks.items():
+        getattr(mask_, func)(os.path.join(path, name), overwrite, **kwargs)
 
 
 def from_zarr(path: str) -> Slide:
+    logger.info('loading slide from zarr at path %s', path)
     group = zarr.open_group(path)
     slide = EcvlSlide(group.attrs['slide'])
     for name, value in group.arrays():
-        slide.masks[name] = Mask(value, value.attrs['level'],
-                                 value.attrs['downsample'],
-                                 value.attrs.get('threshold'))
+        logger.info('loading mask %s', name)
+        slide.masks[name] = Mask(value, **value.attrs)
     return slide
 
 
-def to_tiledb(slide: Slide, path: str, **kwargs):
+def to_tiledb(slide: Slide,
+              path: str,
+              overwrite: bool = False,
+              mask: str = False,
+              **kwargs):
     if not os.path.isdir(path):
         logger.info('creating tiledb group at path %s', path)
         tiledb.group_create(path)
     with open(os.path.join(path, '.slide'), 'w') as f:
         f.write(slide.filename)
 
-    for name, mask in slide.masks.items():
-        mask.to_tiledb(os.path.join(path, name), **kwargs)
-    return path
+    _dump_masks(path, slide, overwrite, 'to_tiledb', mask, **kwargs)
 
 
 def from_tiledb(path: str, **kwargs) -> Slide:

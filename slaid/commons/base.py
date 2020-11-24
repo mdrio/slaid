@@ -12,6 +12,7 @@ import numpy as np
 import PIL
 import shapely
 import tiledb
+import zarr
 from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
 from shapely.geometry import Polygon as ShapelyPolygon
 
@@ -110,11 +111,12 @@ class Mask:
         self.model = model
 
     def __eq__(self, other):
+        check_array = (np.array(self.array) == np.array(other.array)).all()
         return self.extraction_level == other.extraction_level \
             and self.level_downsample == other.level_downsample \
             and self.threshold == other.threshold \
             and self.model == other.model \
-            and (self.array == other.array).all()
+            and check_array
 
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
@@ -142,9 +144,31 @@ class Mask:
             for p in polygons
         ]
 
-    def to_tiledb(self, path, **kwargs):
+    def to_zarr(self, path: str, overwrite: bool = False, **kwargs):
+        logger.info('dumping mask to zarr on path %s', path)
+        name = os.path.basename(path)
+        group = zarr.open_group(os.path.dirname(path))
+        mode = 'w' if overwrite else 'w-'
+        array = group.array(name, self.array, mode=mode)
+        for attr, value in self._get_attributes().items():
+            logger.info('writing attr %s %s', attr, value)
+            array.attrs[attr] = value
+
+    def _get_attributes(self):
+        attrs = {}
+        attrs['extraction_level'] = self.extraction_level
+        attrs['level_downsample'] = self.level_downsample
+        if self.threshold:
+            attrs['threshold'] = self.threshold
+        if self.model:
+            attrs['model'] = self.model
+        return attrs
+
+    def to_tiledb(self, path, overwrite: bool = False, **kwargs):
+        logger.info('dumping mask to tiledb on path %s', path)
+        if os.path.isdir(path) and overwrite:
+            tiledb.remove(path)
         tiledb.from_numpy(path, self.array)
-        print(f'kwargs {kwargs}')
         self._write_meta_tiledb(path, **kwargs)
 
     def _write_meta_tiledb(self, path, **kwargs):
@@ -172,14 +196,14 @@ class Mask:
             res = None
         return res
 
-    def to_zarr(self, path, **kwargs):
-        pass
-
 
 class Slide(abc.ABC):
     def __init__(self, filename: str):
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
+
+    def __eq__(self, other):
+        return self._filename == other.filename and self.masks == other.masks
 
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
