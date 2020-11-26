@@ -140,8 +140,6 @@ class SerialRunner:
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
         slide = READERS.get(slide_ext, create_slide)(slide_filename)
-        output_filename = cls.get_output_filename(slide.filename, output_dir,
-                                                  writer)
 
         if classifier.feature in slide.masks:
             if not overwrite_output_if_exists:
@@ -159,7 +157,7 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        WRITERS[writer](slide, output_filename, mask=feature)
+        output_filename = WRITERS[writer](slide, output_dir, mask=feature)
         logging.info('output %s', output_filename)
 
     @staticmethod

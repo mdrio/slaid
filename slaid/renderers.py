@@ -2,7 +2,7 @@ import abc
 import json
 import logging
 import os
-from typing import Any, Callable, Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 import tifffile
@@ -162,12 +162,15 @@ def to_zarr(slide: Slide,
             path: str,
             mask: str = None,
             overwrite: bool = False,
-            **kwargs):
-    logger.info('dumping slide to zarr on path %s', path)
-    group = zarr.open_group(path)
+            **kwargs) -> str:
+    output_path = os.path.join(path,
+                               f'{os.path.basename(slide.filename)}.zarr')
+    logger.info('dumping slide to zarr on path %s', output_path)
+    group = zarr.open_group(output_path)
     if 'slide' not in group.attrs:
         group.attrs['slide'] = slide.filename
-    _dump_masks(path, slide, overwrite, 'to_zarr', mask, **kwargs)
+    _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
+    return output_path
 
 
 def _dump_masks(path: str,
@@ -195,14 +198,21 @@ def to_tiledb(slide: Slide,
               path: str,
               overwrite: bool = False,
               mask: str = False,
-              ctx: tiledb.Ctx = None):
+              ctx: tiledb.Ctx = None) -> str:
     if not os.path.isdir(path):
         logger.info('creating tiledb group at path %s', path)
         tiledb.group_create(path, ctx=ctx)
-    with open(os.path.join(path, '.slide'), 'w') as f:
+    output_path = os.path.join(path,
+                               f'{os.path.basename(slide.filename)}.tiledb')
+    os.makedirs(output_path, exist_ok=True)
+    slide_filename = os.path.join(output_path, '.slide')
+
+    with open(slide_filename, 'w') as f:
+        logger.debug('writing slide file on %s', slide_filename)
         f.write(slide.filename)
 
-    _dump_masks(path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
+    _dump_masks(output_path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
+    return output_path
 
 
 def from_tiledb(path: str, ctx: tiledb.Ctx = None) -> Slide:

@@ -7,7 +7,6 @@ import subprocess
 import unittest
 
 import numpy as np
-import pytest
 import zarr
 
 from slaid.commons.ecvl import Slide
@@ -69,12 +68,14 @@ class TestSerialEddlClassifier:
 
     def test_classifies_with_tiledb_as_output(self, tmp_path):
         level = 1
-        subprocess.check_call([
+        cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             input_, '-w', 'tiledb', '-l',
             str(level),
             str(tmp_path)
-        ])
+        ]
+        logger.info('cmd %s', ' '.join(cmd))
+        subprocess.check_call(cmd)
         output_path = os.path.join(str(tmp_path), f'{input_basename}.tiledb')
         logger.info('checking output_path %s', output_path)
         output = from_tiledb(output_path)
@@ -89,35 +90,32 @@ class TestSerialEddlClassifier:
 
     def test_classifies_zarr_input(self, tmp_path, slide_with_mask):
         slide = slide_with_mask(np.ones)
-        path = os.path.join(str(tmp_path),
-                            f'{os.path.basename(slide.filename)}.zarr')
-        to_zarr(slide, path)
+        path = str(tmp_path)
+        slide_path = to_zarr(slide, path)
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            path,
-            str(tmp_path)
+            slide_path, path
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
-        output = from_zarr(path)
+        output = from_zarr(slide_path)
         assert 'mask' in output.masks
         assert self.feature in output.masks
 
     def test_classifies_tiledb_input(self, tmp_path, slide_with_mask):
         slide = slide_with_mask(np.ones)
-        path = os.path.join(str(tmp_path),
-                            f'{os.path.basename(slide.filename)}.tiledb')
-        to_tiledb(slide, path)
+        path = str(tmp_path)
+        slide_path = to_tiledb(slide, path)
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '-w', 'tiledb', path,
+            '-w', 'tiledb', slide_path,
             str(tmp_path)
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
-        output = from_tiledb(path)
+        output = from_tiledb(slide_path)
         assert 'mask' in output.masks
         assert self.feature in output.masks
 
@@ -132,37 +130,31 @@ class TestSerialEddlClassifier:
         self._test_output(output, slide, extr_level)
 
     def test_overwrites_existing_classification_output(self):
-        output = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
-        print(output)
-        os.makedirs(output)
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
+        os.makedirs(output_path)
         subprocess.check_call([
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             '--overwrite', input_, OUTPUT_DIR
         ])
-        stats = os.stat(output)
+        stats = os.stat(output_path)
         assert stats.st_size > 0
-        output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
         slide, output = self._get_input_output(output_path)
 
         self._test_output(output, slide, 2)
 
-    #  def test_raises_error_output_already_exists(self, slide_with_mask,
-    #                                              tmp_path):
-    #      slide = slide_with_mask(np.ones)
-    #      path = os.path.join(str(tmp_path),
-    #                          f'{os.path.basename(slide.filename)}.tiledb')
-    #      to_tiledb(slide, path)
-    #      subprocess.check_call([
-    #          'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-    #          input_, OUTPUT_DIR
-    #      ])
-    #
-    #      with pytest.raises(subprocess.CalledProcessError):
-    #          subprocess.check_call([
-    #              'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-    #              input_, OUTPUT_DIR
-    #          ])
-    #
+    def test_skips_already_existing_masks(self, slide_with_mask, tmp_path):
+        slide = slide_with_mask(np.ones)
+        output_path = to_tiledb(slide, str(tmp_path))
+        logger.debug(output_path)
+        cmd = [
+            'classify.py', self.cmd, '-f', 'mask', '-m', self.model,
+            output_path,
+            str(tmp_path)
+        ]
+        logger.debug('cmd %s', ' '.join(cmd))
+        subprocess.check_call(cmd)
+        ouput = from_tiledb(output_path)
+        assert slide == ouput
 
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):
