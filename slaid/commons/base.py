@@ -148,8 +148,9 @@ class Mask:
         logger.info('dumping mask to zarr on path %s', path)
         name = os.path.basename(path)
         group = zarr.open_group(os.path.dirname(path))
-        mode = 'w' if overwrite else 'w-'
-        array = group.array(name, self.array, mode=mode)
+        if overwrite and name in group:
+            del group[name]
+        array = group.array(name, self.array)
         for attr, value in self._get_attributes().items():
             logger.info('writing attr %s %s', attr, value)
             array.attrs[attr] = value
