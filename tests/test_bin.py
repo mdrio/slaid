@@ -46,7 +46,8 @@ class TestSerialEddlClassifier:
         return slide, zarr_group
 
     def _test_output(self, output, slide, level):
-        assert output.attrs['slide'] == slide.filename
+        assert output.attrs['filename'] == slide.filename
+        assert tuple(output.attrs['resolution']) == slide.dimensions
         assert output[
             self.feature].shape == slide.level_dimensions[level][::-1]
         assert output[self.feature].attrs['extraction_level'] == level
