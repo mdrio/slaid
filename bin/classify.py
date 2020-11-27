@@ -101,8 +101,7 @@ class SerialRunner:
 
     @staticmethod
     def prepare_output_dir(output_dir):
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
     @staticmethod
     def get_slides(input_path):
@@ -157,7 +156,10 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        output_filename = WRITERS[writer](slide, output_dir, mask=feature)
+        output_filename = WRITERS[writer](slide,
+                                          output_dir,
+                                          overwrite=overwrite_output_if_exists,
+                                          mask=feature)
         logging.info('output %s', output_filename)
 
     @staticmethod
