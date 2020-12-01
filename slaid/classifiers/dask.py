@@ -6,7 +6,8 @@ import dask.array as da
 import numpy as np
 from dask import delayed
 
-from slaid.classifiers.base import BasicClassifier, Mask
+from slaid.classifiers.base import BasicClassifier
+from slaid.commons.dask import Mask
 from slaid.commons import Slide
 
 logger = logging.getLogger('dask')
@@ -38,8 +39,7 @@ class Classifier(BasicClassifier):
                                 dtype='uint8' if threshold else 'float32'))
         mask = self._concatenate(rows, axis=0)
         mask = self._round_to_zero(mask, round_to_zero)
-        return Mask(mask.compute(rerun_exceptions_locally=True), level,
-                    slide.level_downsamples[level])
+        return Mask(mask, level, slide.level_downsamples[level])
 
     @staticmethod
     def _get_zeros(size, dtype):
