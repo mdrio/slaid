@@ -1,4 +1,3 @@
-import os
 from typing import List, Tuple
 
 import numpy as np
@@ -70,6 +69,6 @@ class Slide(BaseSlide):
         return open_slide(self._filename).level_downsamples
 
 
-def create_slide(filename: str):
+def load(filename: str):
     slide = Slide(filename)
     return slide

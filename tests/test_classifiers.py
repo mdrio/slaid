@@ -7,7 +7,7 @@ from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
 from slaid.classifiers import BasicClassifier, Batch, Filter, Patch
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
-from slaid.commons.ecvl import create_slide
+from slaid.commons.ecvl import load
 
 
 class BaseTestClassifier:
@@ -22,7 +22,7 @@ class BaseTestClassifier:
         pass
 
     def test_classifies_a_slide(self):
-        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        slide = load('tests/data/PH10023-1.thumb.tif')
         model = DummyModel(np.zeros)
         tissue_detector = self.get_classifier(model)
         #  import pudb
@@ -32,7 +32,7 @@ class BaseTestClassifier:
                          slide.level_dimensions[self.LEVEL][::-1])
 
     def test_return_all_zeros_if_there_is_no_tissue(self):
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         model = DummyModel(np.zeros)
         tissue_detector = self.get_classifier(model)
         mask = tissue_detector.classify(slide, level=self.LEVEL)
@@ -41,7 +41,7 @@ class BaseTestClassifier:
         self.assertEqual(mask.array.all(), 0)
 
     def test_return_all_ones_if_all_is_tissue(self):
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         model = DummyModel(np.ones)
         tissue_detector = self.get_classifier(model)
         mask = tissue_detector.classify(slide, level=self.LEVEL)
@@ -50,7 +50,7 @@ class BaseTestClassifier:
 
     def test_returns_a_mask(self):
         level = 0
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())
         mask = tissue_detector.classify(slide, level=level)
 
@@ -60,7 +60,7 @@ class BaseTestClassifier:
 
     def test_classifies_by_patch_at_level_0(self, n_batch=1):
         level = 0
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())
         mask = tissue_detector.classify(slide,
                                         level=level,
@@ -76,7 +76,7 @@ class BaseTestClassifier:
 
     def test_classifies_by_patch_at_level_1(self):
         level = 1
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         downsample = slide.level_downsamples[level]
         tissue_detector = self.get_classifier(self.get_model())
 
@@ -92,7 +92,7 @@ class BaseTestClassifier:
         tissue_level = 0
         cancer_level = 0
         patch_size = (100, 100)
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
         mask = Mask(mask_array, tissue_level,
                     slide.level_downsamples[tissue_level])
@@ -119,7 +119,7 @@ class BaseTestClassifier:
         tissue_level = 0
         cancer_level = 2
         patch_size = (100, 100)
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
         mask = Mask(mask_array, tissue_level,
                     slide.level_downsamples[tissue_level])
@@ -148,7 +148,7 @@ class BaseTestClassifier:
         tissue_level = 0
         cancer_level = 2
         patch_size = (75, 75)
-        slide = create_slide('tests/data/test.tif')
+        slide = load('tests/data/test.tif')
         mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
         mask = Mask(mask_array, tissue_level,
                     slide.level_downsamples[tissue_level])
@@ -211,7 +211,7 @@ class TestEddlClassifier(BasicClassifierTest):
 
 class TestBatch(unittest.TestCase):
     def test_produces_array_with_a_correct_shape(self):
-        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        slide = load('tests/data/PH10023-1.thumb.tif')
         classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
         n_batches = [1, 2, 3, 5, 10, 100]
         patch_sizes = [(256, 256), (256, 256), None, None, None, None]
@@ -226,7 +226,7 @@ class TestBatch(unittest.TestCase):
                              batches_array.shape[:2][::-1])
 
     def test_returns_correct_patches(self):
-        slide = create_slide('tests/data/PH10023-1.thumb.tif')
+        slide = load('tests/data/PH10023-1.thumb.tif')
         classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
         n_batch = 1
         patch_size = (256, 256)

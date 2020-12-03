@@ -14,24 +14,19 @@ SLIDE_INFO_FILENAME = '.slide_info'
 
 
 def dump(slide: Slide,
-         path: str,
+         output_path: str,
          overwrite: bool = False,
          mask: str = False,
-         ctx: tiledb.Ctx = None) -> str:
-    if not os.path.isdir(path):
-        logger.info('creating tiledb group at path %s', path)
-        tiledb.group_create(path, ctx=ctx)
-    output_path = os.path.join(path,
-                               f'{os.path.basename(slide.filename)}.tiledb')
-    os.makedirs(output_path, exist_ok=True)
-    slide_filename = os.path.join(output_path, SLIDE_INFO_FILENAME)
-
-    with open(slide_filename, 'w') as f:
-        logger.debug('writing slide file on %s', slide_filename)
-        json.dump(_get_slide_metadata(slide), f)
+         ctx: tiledb.Ctx = None):
+    if not os.path.isdir(output_path):
+        logger.info('creating tiledb group at path %s', output_path)
+        tiledb.group_create(output_path, ctx=ctx)
+        slide_filename = os.path.join(output_path, SLIDE_INFO_FILENAME)
+        with open(slide_filename, 'w') as f:
+            logger.debug('writing slide file on %s', slide_filename)
+            json.dump(_get_slide_metadata(slide), f)
 
     _dump_masks(output_path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
-    return output_path
 
 
 def load(path: str, ctx: tiledb.Ctx = None) -> Slide:
@@ -43,3 +38,7 @@ def load(path: str, ctx: tiledb.Ctx = None) -> Slide:
     for name in masks:
         slide.masks[os.path.basename(name)] = Mask.from_tiledb(name, ctx=ctx)
     return slide
+
+
+def mask_exists(path: str, mask: 'str') -> bool:
+    return os.path.exists(os.path.join(path, mask))

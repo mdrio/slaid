@@ -93,7 +93,9 @@ class TestSerialEddlClassifier:
     def test_classifies_zarr_input(self, tmp_path, slide_with_mask):
         slide = slide_with_mask(np.ones)
         path = str(tmp_path)
-        slide_path = zarr_io.dump(slide, path)
+        slide_path = os.path.join(path,
+                                  f'{os.path.basename(slide.filename)}.zarr')
+        zarr_io.dump(slide, slide_path)
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
@@ -108,12 +110,13 @@ class TestSerialEddlClassifier:
     def test_classifies_tiledb_input(self, tmp_path, slide_with_mask):
         slide = slide_with_mask(np.ones)
         path = str(tmp_path)
-        slide_path = tiledb_io.dump(slide, path)
+        slide_path = os.path.join(
+            path, f'{os.path.basename(slide.filename)}.tiledb')
+        tiledb_io.dump(slide, slide_path)
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '-w', 'tiledb', slide_path,
-            str(tmp_path)
+            '-w', 'tiledb', slide_path, path
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
@@ -146,16 +149,18 @@ class TestSerialEddlClassifier:
 
     def test_skips_already_existing_masks(self, slide_with_mask, tmp_path):
         slide = slide_with_mask(np.ones)
-        output_path = tiledb_io.dump(slide, str(tmp_path))
-        logger.debug(output_path)
+        path = str(tmp_path)
+        slide_path = os.path.join(
+            path, f'{os.path.basename(slide.filename)}.tiledb')
+        tiledb_io.dump(slide, slide_path)
         cmd = [
             'classify.py', self.cmd, '-f', 'mask', '-m', self.model,
-            output_path,
+            slide_path,
             str(tmp_path)
         ]
         logger.debug('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
-        ouput = tiledb_io.load(output_path)
+        ouput = tiledb_io.load(slide_path)
         assert slide == ouput
 
 

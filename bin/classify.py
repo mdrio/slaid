@@ -7,21 +7,20 @@ import pkg_resources
 import tiledb
 from clize import parameters, run
 
+import slaid.writers.tiledb as tiledb_io
+import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.dask import init_client
-from slaid.commons.ecvl import create_slide
-import slaid.writers.tiledb as tiledb_io
-import slaid.writers.zarr as zarr_io
+import slaid.commons.ecvl as ecvl
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S',
                     level=logging.DEBUG)
 
-WRITERS = {'zarr': zarr_io.dump, 'tiledb': tiledb_io.dump}
-READERS = {'zarr': zarr_io.load, 'tiledb': tiledb_io.load}
+STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
 
 def set_model(func, model):
@@ -66,8 +65,8 @@ class SerialRunner:
             threshold: ('t', float) = None,
             patch_size=None,
             gpu=False,
-            writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
-                WRITERS.keys())[0],
+            writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+                STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             round_to_zero: ('z', float) = 0.01,
@@ -110,7 +109,7 @@ class SerialRunner:
         return [
             os.path.join(input_path, f) for f in os.listdir(input_path)
         ] if os.path.isdir(input_path) and os.path.splitext(
-            input_path)[-1][1:] not in WRITERS.keys() else [input_path]
+            input_path)[-1][1:] not in STORAGE.keys() else [input_path]
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -132,20 +131,23 @@ class SerialRunner:
                        extraction_level,
                        threshold=None,
                        patch_size=PATCH_SIZE,
-                       writer=list(WRITERS.keys())[0],
+                       writer=list(STORAGE.keys())[0],
                        filter_=None,
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
-        slide = READERS.get(slide_ext, create_slide)(slide_filename)
+        slide = STORAGE.get(slide_ext, ecvl).load(slide_filename)
 
-        if classifier.feature in slide.masks:
+        output_path = os.path.join(
+            output_dir, f'{os.path.basename(slide.filename)}.{writer}')
+        if classifier.feature in slide.masks or STORAGE[writer].mask_exists(
+                output_path, classifier.feature):
             if not overwrite_output_if_exists:
                 logging.info(
-                    'skipping slide %s, feature %s already exists. See flag overwrite',
-                    slide.filename, classifier.feature)
+                    'skipping slide %s, feature %s already exists. '
+                    'See flag overwrite', slide.filename, classifier.feature)
                 return
 
         mask = classifier.classify(slide,
@@ -157,11 +159,11 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        output_filename = WRITERS[writer](slide,
-                                          output_dir,
-                                          overwrite=overwrite_output_if_exists,
-                                          mask=feature)
-        logging.info('output %s', output_filename)
+        STORAGE[writer].dump(slide,
+                             output_path,
+                             overwrite=overwrite_output_if_exists,
+                             mask=feature)
+        logging.info('output %s', output_path)
 
     @staticmethod
     def get_output_filename(slide_filename, output_dir, ext):
@@ -185,8 +187,8 @@ class ParallelRunner(SerialRunner):
             threshold: ('t', float) = None,
             patch_size=None,
             gpu=False,
-            writer: ('w', parameters.one_of(*list(WRITERS.keys()))) = list(
-                WRITERS.keys())[0],
+            writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+                STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             round_to_zero: ('z', float) = 0.01):
