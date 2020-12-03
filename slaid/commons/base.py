@@ -199,8 +199,11 @@ class Mask:
 
 
 class Slide(abc.ABC):
+    class InvalidFile(Exception):
+        pass
+
     def __init__(self, filename: str):
-        self._filename = os.path.abspath(filename)
+        self._filename = filename
         self.masks: Dict[str, Mask] = {}
 
     def __eq__(self, other):

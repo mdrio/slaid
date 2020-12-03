@@ -5,8 +5,8 @@ import zarr
 
 from slaid.commons import Mask, Slide
 from slaid.commons.ecvl import Slide as EcvlSlide
-from slaid.writers import _get_slide_metadata
-from slaid.writers import _dump_masks
+from slaid.writers import ReducedSlide, _dump_masks, _get_slide_metadata
+
 logger = logging.getLogger(__file__)
 
 
@@ -25,7 +25,10 @@ def dump(slide: Slide,
 def load(path: str) -> Slide:
     logger.info('loading slide from zarr at path %s', path)
     group = zarr.open_group(path)
-    slide = EcvlSlide(group.attrs['filename'])
+    try:
+        slide = EcvlSlide(group.attrs['filename'])
+    except Slide.InvalidFile:
+        slide = ReducedSlide(group.attrs['filename'])
     for name, value in group.arrays():
         logger.info('loading mask %s', name)
         slide.masks[name] = Mask(value, **value.attrs)
