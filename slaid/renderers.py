@@ -1,14 +1,19 @@
 import abc
 import json
+import logging
+import os
 from typing import Any, Tuple, Union
 
 import numpy as np
 import tifffile
+import tiledb
 import zarr
 
 from slaid.commons import Mask, Slide
 from slaid.commons.base import Polygon
 from slaid.commons.ecvl import Slide as EcvlSlide
+
+logger = logging.getLogger(__file__)
 
 
 class Renderer(abc.ABC):
@@ -153,22 +158,76 @@ def to_json(obj: Any, filename: str = None) -> Union[str, None]:
         return json.dumps(obj, cls=JSONEncoder)
 
 
-def to_zarr(slide: Slide, path: str):
-    group = zarr.open_group(path)
-    if 'slide' not in group.attrs:
-        group.attrs['slide'] = slide.filename
-    for name, mask in slide.masks.items():
-        array = group.array(name, mask.array)
-        array.attrs['level'] = mask.extraction_level
-        array.attrs['downsample'] = mask.level_downsample
-        array.attrs['threshold'] = mask.threshold
+def to_zarr(slide: Slide,
+            path: str,
+            mask: str = None,
+            overwrite: bool = False,
+            **kwargs) -> str:
+    output_path = os.path.join(path,
+                               f'{os.path.basename(slide.filename)}.zarr')
+    logger.info('dumping slide to zarr on path %s', output_path)
+    group = zarr.open_group(output_path)
+    if not group.attrs:
+        group.attrs.update(_get_slide_metadata(slide))
+    _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
+    return output_path
 
 
 def from_zarr(path: str) -> Slide:
+    logger.info('loading slide from zarr at path %s', path)
     group = zarr.open_group(path)
-    slide = EcvlSlide(group.attrs['slide'])
+    slide = EcvlSlide(group.attrs['filename'])
     for name, value in group.arrays():
-        slide.masks[name] = Mask(value, value.attrs['level'],
-                                 value.attrs['downsample'],
-                                 value.attrs.get('threshold'))
+        logger.info('loading mask %s', name)
+        slide.masks[name] = Mask(value, **value.attrs)
     return slide
+
+
+SLIDE_INFO_FILENAME = '.slide_info'
+
+
+def to_tiledb(slide: Slide,
+              path: str,
+              overwrite: bool = False,
+              mask: str = False,
+              ctx: tiledb.Ctx = None) -> str:
+    if not os.path.isdir(path):
+        logger.info('creating tiledb group at path %s', path)
+        tiledb.group_create(path, ctx=ctx)
+    output_path = os.path.join(path,
+                               f'{os.path.basename(slide.filename)}.tiledb')
+    os.makedirs(output_path, exist_ok=True)
+    slide_filename = os.path.join(output_path, SLIDE_INFO_FILENAME)
+
+    with open(slide_filename, 'w') as f:
+        logger.debug('writing slide file on %s', slide_filename)
+        json.dump(_get_slide_metadata(slide), f)
+
+    _dump_masks(output_path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
+    return output_path
+
+
+def from_tiledb(path: str, ctx: tiledb.Ctx = None) -> Slide:
+    with open(os.path.join(path, SLIDE_INFO_FILENAME), 'r') as f:
+        slide_info = json.load(f)
+    slide = EcvlSlide(slide_info['filename'])
+    masks = []
+    tiledb.ls(path, lambda obj_path, obj_type: masks.append(obj_path), ctx=ctx)
+    for name in masks:
+        slide.masks[os.path.basename(name)] = Mask.from_tiledb(name, ctx=ctx)
+    return slide
+
+
+def _get_slide_metadata(slide: Slide) -> dict:
+    return {'filename': slide.filename, 'resolution': slide.dimensions}
+
+
+def _dump_masks(path: str,
+                slide: Slide,
+                overwrite: bool,
+                func: str,
+                only_mask: str = None,
+                **kwargs):
+    masks = {only_mask: slide.masks[only_mask]} if only_mask else slide.masks
+    for name, mask_ in masks.items():
+        getattr(mask_, func)(os.path.join(path, name), overwrite, **kwargs)

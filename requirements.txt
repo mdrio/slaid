@@ -7,10 +7,10 @@ pandas
 pyecvl
 pyeddl
 clize
-dask[complete]
+dask[complete]==2.27.0
 zarr
 scipy
 dataclasses
 opencv-python
 shapely
-pytest-spec
+tiledb==0.7.0

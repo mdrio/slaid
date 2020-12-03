@@ -2,30 +2,25 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
-import pickle
 
 import pkg_resources
+import tiledb
 from clize import parameters, run
 
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons.dask import init_client
 from slaid.commons import PATCH_SIZE
+from slaid.commons.dask import init_client
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import from_zarr, to_zarr
+from slaid.renderers import from_tiledb, from_zarr, to_tiledb, to_zarr
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S',
                     level=logging.DEBUG)
 
-
-def pickle_dump(obj, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump(obj, f)
-
-
-WRITERS = {'zarr': to_zarr}
+WRITERS = {'zarr': to_zarr, 'tiledb': to_tiledb}
+READERS = {'zarr': from_zarr, 'tiledb': from_tiledb}
 
 
 def set_model(func, model):
@@ -48,6 +43,15 @@ def get_parallel_classifier(model, feature):
     return Classifier(model, feature)
 
 
+def load_config_file(config_file: str, backend: str):
+    if config_file is None:
+        return
+    if backend == 'tiledb':
+        config = tiledb.Config.load(config_file)
+        tiledb.Ctx(config)
+        tiledb.VFS(config)
+
+
 class SerialRunner:
     @classmethod
     def run(cls,
@@ -65,7 +69,8 @@ class SerialRunner:
                 WRITERS.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
-            round_to_zero: ('z', float) = 0.01):
+            round_to_zero: ('z', float) = 0.01,
+            config_file: str = None):
         classifier = cls.get_classifier(model, feature, gpu)
         patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
@@ -96,15 +101,15 @@ class SerialRunner:
 
     @staticmethod
     def prepare_output_dir(output_dir):
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
     @staticmethod
     def get_slides(input_path):
 
-        return [os.path.join(input_path, f) for f in os.listdir(input_path)
-                ] if os.path.isdir(input_path) and os.path.splitext(
-                    input_path)[-1] != '.zarr' else [input_path]
+        return [
+            os.path.join(input_path, f) for f in os.listdir(input_path)
+        ] if os.path.isdir(input_path) and os.path.splitext(
+            input_path)[-1][1:] not in WRITERS.keys() else [input_path]
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -131,14 +136,9 @@ class SerialRunner:
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
-        output_filename = cls.get_output_filename(slide_filename, output_dir)
-
         slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
         slide_ext = slide_ext_with_dot[1:]
-        if slide_ext == 'zarr':
-            slide = from_zarr(slide_filename)
-        else:
-            slide = create_slide(slide_filename)
+        slide = READERS.get(slide_ext, create_slide)(slide_filename)
 
         if classifier.feature in slide.masks:
             if not overwrite_output_if_exists:
@@ -156,14 +156,16 @@ class SerialRunner:
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
-        WRITERS[writer](slide, output_filename)
-        logging.info(output_filename)
+        output_filename = WRITERS[writer](slide,
+                                          output_dir,
+                                          overwrite=overwrite_output_if_exists,
+                                          mask=feature)
+        logging.info('output %s', output_filename)
 
     @staticmethod
-    def get_output_filename(slide_filename, output_dir):
+    def get_output_filename(slide_filename, output_dir, ext):
         slide_basename = os.path.basename(slide_filename)
-        slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-        output_filename = f'{slide_basename_no_ext}.zarr'
+        output_filename = f'{slide_basename}.{ext}'
         output_filename = os.path.join(output_dir, output_filename)
         return output_filename
 
