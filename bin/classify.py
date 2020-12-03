@@ -12,15 +12,16 @@ from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.dask import init_client
 from slaid.commons.ecvl import create_slide
-from slaid.renderers import from_tiledb, from_zarr, to_tiledb, to_zarr
+import slaid.writers.tiledb as tiledb_io
+import slaid.writers.zarr as zarr_io
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S',
                     level=logging.DEBUG)
 
-WRITERS = {'zarr': to_zarr, 'tiledb': to_tiledb}
-READERS = {'zarr': from_zarr, 'tiledb': from_tiledb}
+WRITERS = {'zarr': zarr_io.dump, 'tiledb': tiledb_io.dump}
+READERS = {'zarr': zarr_io.load, 'tiledb': tiledb_io.load}
 
 
 def set_model(func, model):

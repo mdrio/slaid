@@ -1,13 +1,10 @@
-import os
 import tempfile
 import unittest
 
 import numpy as np
 import tifffile
-import tiledb
 
-from slaid.renderers import (TiffRenderer, from_tiledb, from_zarr, to_tiledb,
-                             to_zarr)
+from slaid.renderers import TiffRenderer
 
 
 class TestTiffRenderer(unittest.TestCase):
@@ -40,31 +37,3 @@ class TestTiffRenderer(unittest.TestCase):
             self.assertTrue((data_output[0, :, 3] == 255).all())
 
             self.assertTrue((data_output[1:, :, :, ] == 0).all())
-
-
-def test_slide_to_tiledb(slide_with_mask, tmp_path):
-    slide = slide_with_mask(np.ones)
-    path = str(tmp_path)
-    slide_path = to_tiledb(slide, path)
-    assert os.path.isdir(slide_path)
-    for name, mask in slide.masks.items():
-        assert tiledb.array_exists(os.path.join(slide_path, name))
-
-
-def test_slide_from_tiledb(slide_with_mask, tmp_path):
-    slide = slide_with_mask(np.ones)
-    path = str(tmp_path)
-    slide_path = to_tiledb(slide, path)
-    tiledb_slide = from_tiledb(slide_path)
-
-    assert os.path.basename(slide.filename) == os.path.basename(
-        tiledb_slide.filename)
-    assert slide.masks == tiledb_slide.masks
-
-
-def test_slide_to_zarr(slide_with_mask, tmp_path):
-    slide = slide_with_mask(np.ones)
-    path = str(tmp_path)
-    slide_path = to_zarr(slide, path)
-    res = from_zarr(slide_path)
-    assert res == slide
