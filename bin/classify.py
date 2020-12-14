@@ -7,13 +7,13 @@ import pkg_resources
 import tiledb
 from clize import parameters, run
 
+import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.dask import init_client
-import slaid.commons.ecvl as ecvl
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -105,11 +105,24 @@ class SerialRunner:
 
     @staticmethod
     def get_slides(input_path):
+        inputs = os.listdir(
+            input_path) if os.path.isdir(input_path) and os.path.splitext(
+                input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+        for f in inputs:
+            slide_ext_with_dot = os.path.splitext(f)[-1]
+            slide_ext = slide_ext_with_dot[1:]
+            try:
+                slide = STORAGE.get(slide_ext, ecvl).load(
+                    os.path.abspath(os.path.join(input_path, f)))
+            except Exception as ex:
+                logging.error(f'an error occurs with file {f}: {ex}')
+            else:
+                yield slide
 
-        return [
-            os.path.join(input_path, f) for f in os.listdir(input_path)
-        ] if os.path.isdir(input_path) and os.path.splitext(
-            input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+        #  return [
+        #      os.path.join(input_path, f) for f in os.listdir(input_path)
+        #  ] if os.path.isdir(input_path) and os.path.splitext(
+        #      input_path)[-1][1:] not in STORAGE.keys() else [input_path]
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -124,7 +137,7 @@ class SerialRunner:
 
     @classmethod
     def classify_slide(cls,
-                       slide_filename,
+                       slide,
                        output_dir,
                        classifier,
                        n_batch,
@@ -135,10 +148,6 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
-
-        slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
-        slide_ext = slide_ext_with_dot[1:]
-        slide = STORAGE.get(slide_ext, ecvl).load(slide_filename)
 
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')

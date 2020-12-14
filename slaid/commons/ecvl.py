@@ -1,3 +1,4 @@
+import logging
 from typing import List, Tuple
 
 import numpy as np
@@ -10,6 +11,8 @@ from pyeddl.tensor import Tensor as EddlTensor
 from slaid.commons import Image as BaseImage
 from slaid.commons import Slide as BaseSlide
 from slaid.commons import Tensor as BaseTensor
+
+logger = logging.getLogger('ecvl')
 
 
 class Tensor(BaseTensor):
@@ -46,6 +49,9 @@ class Image(BaseImage):
 class Slide(BaseSlide):
     def __init__(self, filename: str):
         self._level_dimensions = OpenSlideGetLevels(filename)
+        if not self._level_dimensions:
+            raise BaseSlide.InvalidFile(
+                f'Cannot open file {filename}, is it a slide image?')
         super().__init__(filename)
 
     @property
