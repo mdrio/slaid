@@ -7,7 +7,7 @@ RUN useradd -ms  /bin/bash slaid && \
     pip uninstall -y setuptools && \
     pip install setuptools==45
 USER slaid
-RUN  pip install  --user -e .
+RUN pip install --use-feature=2020-resolver --user -e . 
 ENV PATH="/home/slaid/.local/bin:${PATH}"
 
 
