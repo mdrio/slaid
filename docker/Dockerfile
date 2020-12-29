@@ -1,4 +1,5 @@
-FROM mobydick.crs4.it:5000/pyecvl-gpu:7c5d3e6
+FROM dhealth/pylibs-toolkit:0.5.1
+
 COPY . /tmp/slaid
 WORKDIR /tmp/slaid
 RUN useradd -ms  /bin/bash slaid && \
