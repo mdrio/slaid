@@ -2,7 +2,7 @@ import unittest
 from collections import defaultdict
 
 import numpy as np
-from commons import DummyModel, EddlGreenIsTissueModel, GreenIsTissueModel
+from commons import DummyModel, EddlGreenModel, GreenModel, EddlGreenPatchModel
 
 from slaid.classifiers import BasicClassifier, Batch, Filter, Patch
 from slaid.classifiers.dask import Classifier as DaskClassifier
@@ -25,8 +25,6 @@ class BaseTestClassifier:
         slide = load('tests/data/PH10023-1.thumb.tif')
         model = DummyModel(np.zeros)
         tissue_detector = self.get_classifier(model)
-        #  import pudb
-        #  pudb.set_trace()
         mask = tissue_detector.classify(slide, level=self.LEVEL)
         self.assertEqual(mask.array.shape,
                          slide.level_dimensions[self.LEVEL][::-1])
@@ -58,124 +56,6 @@ class BaseTestClassifier:
         self.assertEqual(mask.array[:300, :].all(), 1)
         self.assertEqual(mask.array[300:, :].all(), 0)
 
-    def test_classifies_by_patch_at_level_0(self, n_batch=1):
-        level = 0
-        slide = load('tests/data/test.tif')
-        tissue_detector = self.get_classifier(self.get_model())
-        mask = tissue_detector.classify(slide,
-                                        level=level,
-                                        patch_size=(200, 200),
-                                        n_batch=n_batch)
-
-        self.assertEqual(mask.array.shape[::-1], slide.level_dimensions[level])
-        self.assertEqual(mask.array[:300, :].all(), 1)
-        self.assertEqual(mask.array[300:, :].all(), 0)
-
-    def test_classifies_by_patch_at_level_0_with_2_batches(self):
-        self.test_classifies_by_patch_at_level_0(2)
-
-    def test_classifies_by_patch_at_level_1(self):
-        level = 1
-        slide = load('tests/data/test.tif')
-        downsample = slide.level_downsamples[level]
-        tissue_detector = self.get_classifier(self.get_model())
-
-        mask = tissue_detector.classify(slide,
-                                        level=level,
-                                        patch_size=(200, 200))
-
-        self.assertEqual(mask.array.shape[::-1], slide.level_dimensions[level])
-        self.assertEqual(mask.array[:round(300 // downsample), :].all(), 1)
-        self.assertEqual(mask.array[round(300 // downsample):, :].all(), 0)
-
-    def test_classifies_with_filter_at_the_same_level(self):
-        tissue_level = 0
-        cancer_level = 0
-        patch_size = (100, 100)
-        slide = load('tests/data/test.tif')
-        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
-        mask = Mask(mask_array, tissue_level,
-                    slide.level_downsamples[tissue_level])
-        tissue_patch = Patch(100, 100, patch_size,
-                             slide.level_downsamples[tissue_level])
-        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
-                   tissue_patch.col:tissue_patch.col +
-                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
-
-        slide.masks['tissue'] = mask
-        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
-        mask = tissue_detector.classify(slide,
-                                        level=cancer_level,
-                                        patch_size=patch_size,
-                                        filter_=Filter.create(
-                                            slide, 'tissue >= 1'))
-
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[cancer_level])
-        self.assertEqual(np.sum(mask.array), 10000)
-
-    def test_classifies_with_filter_at_a_different_level_with_proportional_patch_size(
-            self):
-        tissue_level = 0
-        cancer_level = 2
-        patch_size = (100, 100)
-        slide = load('tests/data/test.tif')
-        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
-        mask = Mask(mask_array, tissue_level,
-                    slide.level_downsamples[tissue_level])
-        tissue_patch = Patch(100, 100, patch_size,
-                             slide.level_downsamples[tissue_level])
-        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
-                   tissue_patch.col:tissue_patch.col +
-                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
-
-        slide.masks['tissue'] = mask
-        downsample = slide.level_downsamples[cancer_level]
-        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
-        mask = tissue_detector.classify(
-            slide,
-            level=cancer_level,
-            patch_size=(int(patch_size[0] // downsample),
-                        int(patch_size[1] // downsample)),
-            filter_=Filter.create(slide, 'tissue >= 1'))
-
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[cancer_level])
-        self.assertTrue(np.sum(mask.array) > 0)
-
-    def test_classifies_filter_at_different_level__not_proportional_patch_size(
-            self):
-        tissue_level = 0
-        cancer_level = 2
-        patch_size = (75, 75)
-        slide = load('tests/data/test.tif')
-        mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
-        mask = Mask(mask_array, tissue_level,
-                    slide.level_downsamples[tissue_level])
-        tissue_patch = Patch(100, 100, patch_size,
-                             slide.level_downsamples[tissue_level])
-
-        mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
-                   tissue_patch.col:tissue_patch.col +
-                   tissue_patch.size[1]] = np.ones(tissue_patch.size)
-
-        slide.masks['tissue'] = mask
-
-        downsample = slide.level_downsamples[cancer_level]
-        expected_ratio = patch_size[0]**2 / (downsample * patch_size[0])**2
-
-        tissue_detector = self.get_classifier(self.get_model(), 'cancer')
-        mask = tissue_detector.classify(slide,
-                                        level=cancer_level,
-                                        patch_size=patch_size,
-                                        filter_=Filter.create(
-                                            slide,
-                                            f'tissue >= {expected_ratio}'))
-
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[cancer_level])
-        self.assertTrue(np.sum(mask.array) > 0)
-
 
 class BasicClassifierTest(BaseTestClassifier, unittest.TestCase):
     @staticmethod
@@ -184,7 +64,7 @@ class BasicClassifierTest(BaseTestClassifier, unittest.TestCase):
 
     @staticmethod
     def get_model():
-        return GreenIsTissueModel()
+        return GreenModel()
 
 
 class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
@@ -200,51 +80,147 @@ class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
 
     @staticmethod
     def get_model():
-        return GreenIsTissueModel()
+        return GreenModel()
 
 
 class TestEddlClassifier(BasicClassifierTest):
     @staticmethod
     def get_model():
-        return EddlGreenIsTissueModel()
+        return EddlGreenModel()
 
 
-class TestBatch(unittest.TestCase):
-    def test_produces_array_with_a_correct_shape(self):
-        slide = load('tests/data/PH10023-1.thumb.tif')
-        classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
-        n_batches = [1, 2, 3, 5, 10, 100]
-        patch_sizes = [(256, 256), (256, 256), None, None, None, None]
+class TestEddlPatchClassifier(unittest.TestCase):
+    @staticmethod
+    def get_model(patch_size):
+        return EddlGreenPatchModel(patch_size)
+
+    @staticmethod
+    def get_classifier(model, feature='tissue'):
+        return BasicClassifier(model, feature)
+
+    def test_classifies_by_patch_at_level_0(self, n_batch=1):
         level = 0
-        for n_batch, patch_size in zip(n_batches, patch_sizes):
-            batches = list(
-                Batch(start, size, np.zeros(size[::-1]), 1)
-                for start, size in classifier._get_batch_coordinates(
-                    slide, level, n_batch, patch_size))
-            batches_array = np.concatenate([b.array for b in batches], axis=0)
-            self.assertEqual(slide.level_dimensions[level],
-                             batches_array.shape[:2][::-1])
+        slide = load('tests/data/test.tif')
+        patch_size = (100, 256)
+        classifier = self.get_classifier(self.get_model(patch_size))
+        mask = classifier.classify(slide, level=level, n_batch=n_batch)
 
-    def test_returns_correct_patches(self):
-        slide = load('tests/data/PH10023-1.thumb.tif')
-        classifier = BasicClassifier(DummyModel(np.zeros), 'tissue')
-        n_batch = 1
-        patch_size = (256, 256)
-        level = 0
-        batches = list(
-            Batch(start, size, np.zeros(size[::-1]), 1)
-            for start, size in classifier._get_batch_coordinates(
-                slide, level, n_batch, patch_size))
+        self.assertEqual(
+            mask.array.shape,
+            tuple([
+                slide.level_dimensions[level][::-1][i] // patch_size[i]
+                for i in range(2)
+            ]),
+        )
+        print(mask.array[:3, :])
+        self.assertEqual(mask.array[:3, :].all(), 1)
+        self.assertEqual(mask.array[3:, :].all(), 0)
 
-        rows = []
-        for b in batches:
-            patches_by_row = defaultdict(list)
-            for p in b.get_patches(patch_size):
-                patches_by_row[p.row].append(p)
-            for r in patches_by_row.values():
-                rows.append(np.concatenate([_.array for _ in r], axis=1))
-        mask = np.concatenate(rows, axis=0)
-        self.assertEqual(mask.shape[:2], slide.level_dimensions[level][::-1])
+    #  def test_classifies_by_patch_at_level_0_with_2_batches(self):
+    #      self.test_classifies_by_patch_at_level_0(2)
+    #
+    #  def test_classifies_by_patch_at_level_1(self):
+    #      level = 1
+    #      slide = load('tests/data/test.tif')
+    #      downsample = slide.level_downsamples[level]
+    #      tissue_detector = self.get_classifier(self.get_model())
+    #
+    #      mask = tissue_detector.classify(slide,
+    #                                      level=level,
+    #                                      patch_size=(200, 200))
+    #
+    #      self.assertEqual(mask.array.shape[::-1], slide.level_dimensions[level])
+    #      self.assertEqual(mask.array[:round(300 // downsample), :].all(), 1)
+    #      self.assertEqual(mask.array[round(300 // downsample):, :].all(), 0)
+    #
+    #  def test_classifies_with_filter_at_the_same_level(self):
+    #      tissue_level = 0
+    #      cancer_level = 0
+    #      patch_size = (100, 100)
+    #      slide = load('tests/data/test.tif')
+    #      mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+    #      mask = Mask(mask_array, tissue_level,
+    #                  slide.level_downsamples[tissue_level])
+    #      tissue_patch = Patch(100, 100, patch_size,
+    #                           slide.level_downsamples[tissue_level])
+    #      mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+    #                 tissue_patch.col:tissue_patch.col +
+    #                 tissue_patch.size[1]] = np.ones(tissue_patch.size)
+    #
+    #      slide.masks['tissue'] = mask
+    #      tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+    #      mask = tissue_detector.classify(slide,
+    #                                      level=cancer_level,
+    #                                      patch_size=patch_size,
+    #                                      filter_=Filter.create(
+    #                                          slide, 'tissue >= 1'))
+    #
+    #      self.assertEqual(mask.array.shape[::-1],
+    #                       slide.level_dimensions[cancer_level])
+    #      self.assertEqual(np.sum(mask.array), 10000)
+    #
+    #  def test_classifies_with_filter_at_a_different_level_with_proportional_patch_size(
+    #          self):
+    #      tissue_level = 0
+    #      cancer_level = 2
+    #      patch_size = (100, 100)
+    #      slide = load('tests/data/test.tif')
+    #      mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+    #      mask = Mask(mask_array, tissue_level,
+    #                  slide.level_downsamples[tissue_level])
+    #      tissue_patch = Patch(100, 100, patch_size,
+    #                           slide.level_downsamples[tissue_level])
+    #      mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+    #                 tissue_patch.col:tissue_patch.col +
+    #                 tissue_patch.size[1]] = np.ones(tissue_patch.size)
+    #
+    #      slide.masks['tissue'] = mask
+    #      downsample = slide.level_downsamples[cancer_level]
+    #      tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+    #      mask = tissue_detector.classify(
+    #          slide,
+    #          level=cancer_level,
+    #          patch_size=(int(patch_size[0] // downsample),
+    #                      int(patch_size[1] // downsample)),
+    #          filter_=Filter.create(slide, 'tissue >= 1'))
+    #
+    #      self.assertEqual(mask.array.shape[::-1],
+    #                       slide.level_dimensions[cancer_level])
+    #      self.assertTrue(np.sum(mask.array) > 0)
+    #
+    #  def test_classifies_filter_at_different_level__not_proportional_patch_size(
+    #          self):
+    #      tissue_level = 0
+    #      cancer_level = 2
+    #      patch_size = (75, 75)
+    #      slide = load('tests/data/test.tif')
+    #      mask_array = np.zeros(slide.level_dimensions[tissue_level][::-1])
+    #      mask = Mask(mask_array, tissue_level,
+    #                  slide.level_downsamples[tissue_level])
+    #      tissue_patch = Patch(100, 100, patch_size,
+    #                           slide.level_downsamples[tissue_level])
+    #
+    #      mask_array[tissue_patch.row:tissue_patch.row + tissue_patch.size[0],
+    #                 tissue_patch.col:tissue_patch.col +
+    #                 tissue_patch.size[1]] = np.ones(tissue_patch.size)
+    #
+    #      slide.masks['tissue'] = mask
+    #
+    #      downsample = slide.level_downsamples[cancer_level]
+    #      expected_ratio = patch_size[0]**2 / (downsample * patch_size[0])**2
+    #
+    #      tissue_detector = self.get_classifier(self.get_model(), 'cancer')
+    #      mask = tissue_detector.classify(slide,
+    #                                      level=cancer_level,
+    #                                      patch_size=patch_size,
+    #                                      filter_=Filter.create(
+    #                                          slide,
+    #                                          f'tissue >= {expected_ratio}'))
+    #
+    #      self.assertEqual(mask.array.shape[::-1],
+    #                       slide.level_dimensions[cancer_level])
+    #      self.assertTrue(np.sum(mask.array) > 0)
+    #
 
 
 class TestFilter(unittest.TestCase):

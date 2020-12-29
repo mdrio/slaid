@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
+import pickle
 import shutil
 import subprocess
 import unittest
@@ -9,9 +10,10 @@ import unittest
 import numpy as np
 import zarr
 
-from slaid.commons.ecvl import Slide
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
+from slaid.commons.ecvl import Slide
+from slaid.models.eddl import Model
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -23,8 +25,14 @@ logger = logging.getLogger()
 logging.basicConfig(level=logging.DEBUG)
 
 
+def get_input_output(output):
+    slide = Slide(input_)
+    zarr_group = zarr.open_group(output)
+    return slide, zarr_group
+
+
 class TestSerialEddlClassifier:
-    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
+    model = 'slaid/resources/models/extract_tissue_eddl_1.1.pkl'
     cmd = 'serial'
     feature = 'tissue'
 
@@ -41,11 +49,6 @@ class TestSerialEddlClassifier:
     def teardown(self):
         self._clean_output_dir()
 
-    def _get_input_output(self, output):
-        slide = Slide(input_)
-        zarr_group = zarr.open_group(output)
-        return slide, zarr_group
-
     def _test_output(self, output, slide, level):
         assert output.attrs['filename'] == slide.filename
         assert tuple(output.attrs['resolution']) == slide.dimensions
@@ -59,12 +62,12 @@ class TestSerialEddlClassifier:
         path = str(tmp_path)
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            input_, path
+            '-l', '2', input_, path
         ]
         subprocess.check_call(cmd)
         logger.info('running cmd %s', ' '.join(cmd))
         output_path = os.path.join(path, f'{input_basename}.zarr')
-        slide, output = self._get_input_output(output_path)
+        slide, output = get_input_output(output_path)
 
         self._test_output(output, slide, 2)
 
@@ -130,9 +133,30 @@ class TestSerialEddlClassifier:
             f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
-        slide, output = self._get_input_output(output_path)
+        slide, output = get_input_output(output_path)
 
         self._test_output(output, slide, extr_level)
+
+    def test_classifies_by_patch(self):
+        extr_level = 1
+
+        model_filename = 'slaid/resources/models/classify_tumor_eddl_0.1.pkl'
+        with open(model_filename, 'rb') as f:
+            model = pickle.load(f)
+        cmd = f'classify.py {self.cmd} -m {model_filename} -f {self.feature}  -l 1 '\
+            f'   -t 0.7  {input_} {OUTPUT_DIR}'
+        subprocess.check_call(cmd.split())
+        output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
+        slide, output = get_input_output(output_path)
+
+        assert output.attrs['filename'] == slide.filename
+        assert tuple(output.attrs['resolution']) == slide.dimensions
+        assert output[self.feature].shape == tuple(
+            slide.level_dimensions[extr_level][::-1][i] // model.patch_size[i]
+            for i in range(2))
+        assert output[self.feature].attrs['extraction_level'] == extr_level
+        assert output[self.feature].attrs[
+            'level_downsample'] == slide.level_downsamples[extr_level]
 
     def test_overwrites_existing_classification_output(self):
         output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
@@ -143,7 +167,7 @@ class TestSerialEddlClassifier:
         ])
         stats = os.stat(output_path)
         assert stats.st_size > 0
-        slide, output = self._get_input_output(output_path)
+        slide, output = get_input_output(output_path)
 
         self._test_output(output, slide, 2)
 
@@ -165,8 +189,37 @@ class TestSerialEddlClassifier:
 
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):
-    model = 'slaid/resources/models/extract_tissue_eddl-1.0.0.bin'
+    #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
     cmd = 'parallel'
+
+
+class TestParallelPatchEddlClassifier:
+    model = 'slaid/resources/models/classify_tumor_eddl_0.1.pkl'
+    cmd = 'parallel'
+    feature = 'tumor'
+
+    def test_classifies_with_default_args(self, tmp_path):
+        path = str(tmp_path)
+        level = 1
+        cmd = [
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '-l',
+            str(level), input_, path
+        ]
+        subprocess.check_call(cmd)
+        logger.info('running cmd %s', ' '.join(cmd))
+        output_path = os.path.join(path, f'{input_basename}.zarr')
+        slide, output = get_input_output(output_path)
+
+        assert output.attrs['filename'] == slide.filename
+        assert tuple(output.attrs['resolution']) == slide.dimensions
+        assert output[self.feature].shape == tuple([
+            slide.level_dimensions[level][::-1][i] // (256, 256)[i]
+            for i in range(2)
+        ])
+        assert output[self.feature].attrs['extraction_level'] == level
+        assert output[self.feature].attrs[
+            'level_downsample'] == slide.level_downsamples[level]
 
 
 if __name__ == '__main__':

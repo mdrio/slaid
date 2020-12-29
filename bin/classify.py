@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
+import pickle
 
 import pkg_resources
 import tiledb
@@ -10,7 +11,7 @@ from clize import parameters, run
 import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
-from slaid.classifiers import BasicClassifier
+from slaid.classifiers import BasicClassifier, Filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import PATCH_SIZE
 from slaid.commons.dask import init_client
@@ -63,7 +64,6 @@ class SerialRunner:
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            patch_size=None,
             gpu=False,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
@@ -72,12 +72,11 @@ class SerialRunner:
             round_to_zero: ('z', float) = 0.01,
             config_file: str = None):
         classifier = cls.get_classifier(model, feature, gpu)
-        patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
-                            extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists, round_to_zero)
+                            extraction_level, threshold, writer, filter_,
+                            overwrite_output_if_exists, round_to_zero)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
@@ -86,18 +85,20 @@ class SerialRunner:
 
     @staticmethod
     def get_model(filename, gpu):
-        if os.path.splitext(filename)[-1] in ('.pkl', '.pickle'):
-            from slaid.models import PickledModel
-            model = PickledModel(filename)
-        else:
-            from slaid.models.eddl import Model
-            model = Model(filename, gpu)
+        #  ext = os.path.splitext(filename)[-1]
+        #  if ext in ('.pkl', '.pickle'):
+        #      from slaid.models import PickledModel
+        #      model = PickledModel(filename)
+        #  elif ext == '.tgz':
+        #      from slaid.models.eddl import Model
+        #      model = Model(filename, gpu)
+        #  else:
+        #      raise RuntimeError(f'model {filename} is not supported')
+        #  return model
+        with open(filename, 'rb') as f:
+            model = pickle.load(f)
+        model.gpu = gpu
         return model
-
-    @staticmethod
-    def parse_patch_size(patch_size: str):
-        return tuple([int(e)
-                      for e in patch_size.split('x')]) if patch_size else None
 
     @staticmethod
     def prepare_output_dir(output_dir):
@@ -105,15 +106,18 @@ class SerialRunner:
 
     @staticmethod
     def get_slides(input_path):
-        inputs = os.listdir(
-            input_path) if os.path.isdir(input_path) and os.path.splitext(
-                input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+        inputs = [
+            os.path.abspath(os.path.join(input_path, f))
+            for f in os.listdir(input_path)
+        ] if os.path.isdir(input_path) and os.path.splitext(
+            input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+        logging.info('processing inputs %s', inputs)
         for f in inputs:
             slide_ext_with_dot = os.path.splitext(f)[-1]
             slide_ext = slide_ext_with_dot[1:]
             try:
-                slide = STORAGE.get(slide_ext, ecvl).load(
-                    os.path.abspath(os.path.join(input_path, f)))
+                slide = STORAGE.get(slide_ext, ecvl).load(f)
+
             except Exception as ex:
                 logging.error(f'an error occurs with file {f}: {ex}')
             else:
@@ -126,14 +130,13 @@ class SerialRunner:
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
-                        extraction_level, threshold, patch_size, writer,
-                        filter_, overwrite_output_if_exists, round_to_zero):
+                        extraction_level, threshold, writer, filter_,
+                        overwrite_output_if_exists, round_to_zero):
 
         for slide in cls.get_slides(input_path):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
-                               extraction_level, threshold, patch_size, writer,
-                               filter_, overwrite_output_if_exists,
-                               round_to_zero)
+                               extraction_level, threshold, writer, filter_,
+                               overwrite_output_if_exists, round_to_zero)
 
     @classmethod
     def classify_slide(cls,
@@ -143,12 +146,12 @@ class SerialRunner:
                        n_batch,
                        extraction_level,
                        threshold=None,
-                       patch_size=PATCH_SIZE,
                        writer=list(STORAGE.keys())[0],
                        filter_=None,
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
+        filter_ = Filter.create(slide, filter_) if filter_ else None
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
         if classifier.feature in slide.masks or STORAGE[writer].mask_exists(
@@ -164,7 +167,6 @@ class SerialRunner:
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   patch_size=patch_size,
                                    round_to_zero=round_to_zero)
         feature = classifier.feature
         slide.masks[feature] = mask
@@ -194,7 +196,6 @@ class ParallelRunner(SerialRunner):
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            patch_size=None,
             gpu=False,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
@@ -202,12 +203,11 @@ class ParallelRunner(SerialRunner):
             overwrite_output_if_exists: 'overwrite' = False,
             round_to_zero: ('z', float) = 0.01):
         classifier = cls.get_classifier(model, feature, gpu, processes)
-        patch_size = cls.parse_patch_size(patch_size)
         cls.prepare_output_dir(output_dir)
 
         cls.classify_slides(input_path, output_dir, classifier, n_batch,
-                            extraction_level, threshold, patch_size, writer,
-                            filter_, overwrite_output_if_exists, round_to_zero)
+                            extraction_level, threshold, writer, filter_,
+                            overwrite_output_if_exists, round_to_zero)
 
     @classmethod
     def get_classifier(cls, model, feature, gpu, processes):
@@ -220,14 +220,14 @@ if __name__ == '__main__':
 
     runners = {'serial': SerialRunner.run, 'parallel': ParallelRunner.run}
     model = os.environ.get("SLAID_MODEL")
-    if model is not None:
+    if model:
         model = pkg_resources.resource_filename('slaid',
                                                 f'resources/models/{model}')
         for k, v in runners.items():
             runners[k] = set_model(v, model)
 
     feature = os.environ.get("SLAID_FEATURE")
-    if feature is not None:
+    if feature:
         for k, v in runners.items():
             runners[k] = set_feature(v, feature)
 
