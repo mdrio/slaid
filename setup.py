@@ -2,6 +2,7 @@ import setuptools
 
 with open('requirements.txt') as f:
     reqs = [line for line in f]
+reqs.append('pytest-spec')
 
 with open('VERSION') as f:
     VERSION = f.read()
