@@ -29,10 +29,9 @@ def build(image='slaid',
              docker_args=docker_args)
     ]
 
-    for model_path, model_name, feature, dockerfile in get_models():
+    for model_path, model_name, feature in get_models():
         kwargs_list.append(
-            dict(dockerfile=dockerfile,
-                 build_dir=docker_build_dir,
+            dict(build_dir=docker_build_dir,
                  image=image,
                  tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
                  build_args=[f'MODEL={model_path}', f'FEATURE={feature}'],
@@ -42,12 +41,12 @@ def build(image='slaid',
         docker_build(**kwargs)
 
 
-def docker_build(dockerfile,
-                 build_dir,
+def docker_build(build_dir,
                  image,
                  tag='',
                  build_args=None,
-                 docker_args=''):
+                 docker_args='',
+                 dockerfile='Dockerfile'):
     build_args = build_args or []
     build_args = f'{" ".join(["--build-arg " + arg for arg in build_args])}'\
         if build_args else ''
@@ -68,7 +67,7 @@ def push(image='slaid', lib_version='', repo='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for model_path, model_name, feature, dockerfile in get_models():
+    for model_path, model_name, feature in get_models():
         kwargs_list.append(
             dict(image=image,
                  tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
@@ -94,7 +93,7 @@ def tag(repo, image='slaid', lib_version='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for _, model_name, _, _ in get_models():
+    for _, model_name, _ in get_models():
         kwargs_list.append(
             dict(repo=repo,
                  image=image,
@@ -113,15 +112,12 @@ def docker_tag(repo, image, tag, docker_args=''):
 
 
 def get_models():
-    dockerfiles = glob.glob(f'{os.path.join(DIR,"Dockerfile.*")}')
-    for dockerfile in dockerfiles:
-        model_type = os.path.splitext(dockerfile)[1][1:]
-        feature = model_type.split('_')[1]
-        models = glob.glob(f'../slaid/resources/models/{model_type}*')
-        for model in models:
-            model_path = os.path.basename(model)
-            model_name = os.path.splitext(model_path)[0]
-            yield model_path, model_name, feature, dockerfile
+    models = glob.glob(f'../slaid/resources/models/*.pkl')
+    for model in models:
+        model_path = os.path.basename(model)
+        model_name = os.path.splitext(model_path)[0]
+        feature = model_name.split('_')[1]
+        yield model_path, model_name, feature
 
 
 if __name__ == '__main__':

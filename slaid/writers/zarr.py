@@ -30,8 +30,8 @@ def load(path: str) -> Slide:
     except Slide.InvalidFile:
         slide = ReducedSlide(group.attrs['filename'])
     for name, value in group.arrays():
-        logger.info('loading mask %s', name)
-        slide.masks[name] = Mask(value, **value.attrs)
+        logger.info('loading mask %s, %s', name, value.attrs.asdict())
+        slide.masks[name] = Mask(value, **value.attrs.asdict())
     return slide
 
 
