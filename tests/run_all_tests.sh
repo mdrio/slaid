@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -xe
 
-pytest --spec tests
+pytest --spec -x tests
 python  tests/integration/test_pipeline.py
