@@ -5,7 +5,7 @@ import os
 
 from clize import run
 
-from slaid.renderers import JSONEncoder, from_zarr
+from slaid.writers import zarr
 
 
 def main(zarr_archive,
@@ -15,7 +15,7 @@ def main(zarr_archive,
          downsample: ('d', int) = 1,
          threshold: (float, 't') = None):
 
-    s = from_zarr(zarr_archive)
+    s = zarr.load(zarr_archive)
     mask = s.masks[mask_name]
     ext = os.path.splitext(output)[-1]
 
