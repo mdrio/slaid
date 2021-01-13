@@ -56,8 +56,10 @@ class Filter:
             mask = ndimage.zoom(mask,
                                 self.mask.level_downsample / batch.downsample)
 
-        mask = mask[batch.location[0]:batch.location[0] + batch.array.shape[0],
-                    batch.location[1]:batch.location[1] + batch.array.shape[1]]
+        batch_location = tuple(
+            [int(l // batch.downsample) for l in batch.location])
+        mask = mask[batch_location[0]:batch_location[0] + batch.array.shape[0],
+                    batch_location[1]:batch_location[1] + batch.array.shape[1]]
 
         if patch_size is not None:
             mask = self._compute_mean_patch(mask, patch_size)
