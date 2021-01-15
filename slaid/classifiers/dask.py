@@ -32,7 +32,6 @@ class Classifier(BasicClassifier):
         for i, (start, size) in enumerate(
                 self._get_batch_coordinates(slide, level, n_batch,
                                             patch_size)):
-            logger.debug('batch %s of %s', i, n_batch)
             batches[start[0]].append(
                 da.from_delayed(
                     delayed(self._classify_batch)(slide, start, size, level,
