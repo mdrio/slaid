@@ -20,14 +20,22 @@ class Model(BaseModel, ABC):
 
     def __init__(self, weight_filename, gpu=True):
         self._weight_filename = weight_filename
-        self._gpu = gpu
+        self.gpu = gpu
+
+    def _set_gpu(self, value: bool):
+        self._gpu = value
         self._create_model()
+
+    def _get_gpu(self)-> bool:
+        return self._gpu
+    
+    gpu = property(_get_gpu, _set_gpu)
 
     def _create_model(self):
         net = self._create_net()
         eddl.build(net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
                    ["categorical_accuracy"],
-                   eddl.CS_GPU() if self._gpu else eddl.CS_CPU())
+                   eddl.CS_GPU() if self.gpu else eddl.CS_CPU())
         eddl.load(net, self._weight_filename, "bin")
         self._model = net
 

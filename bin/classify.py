@@ -85,16 +85,6 @@ class SerialRunner:
 
     @staticmethod
     def get_model(filename, gpu):
-        #  ext = os.path.splitext(filename)[-1]
-        #  if ext in ('.pkl', '.pickle'):
-        #      from slaid.models import PickledModel
-        #      model = PickledModel(filename)
-        #  elif ext == '.tgz':
-        #      from slaid.models.eddl import Model
-        #      model = Model(filename, gpu)
-        #  else:
-        #      raise RuntimeError(f'model {filename} is not supported')
-        #  return model
         with open(filename, 'rb') as f:
             model = pickle.load(f)
         model.gpu = gpu
