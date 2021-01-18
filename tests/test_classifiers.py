@@ -101,6 +101,7 @@ class TestEddlPatchClassifier(unittest.TestCase):
     def test_classifies_by_patch_at_level_0(self, n_batch=1):
         level = 0
         slide = load('tests/data/test.tif')
+        print(slide.level_dimensions[level])
         patch_size = (100, 256)
         classifier = self.get_classifier(self.get_model(patch_size))
         mask = classifier.classify(slide, level=level, n_batch=n_batch)
@@ -112,7 +113,7 @@ class TestEddlPatchClassifier(unittest.TestCase):
                 for i in range(2)
             ]),
         )
-        print(mask.array[:3, :])
+        print(mask.array)
         self.assertEqual(mask.array[:3, :].all(), 1)
         self.assertEqual(mask.array[3:, :].all(), 0)
 
