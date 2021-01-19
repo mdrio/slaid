@@ -35,7 +35,7 @@ class Model(BaseModel, ABC):
         net = self._create_net()
         eddl.build(net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
                    ["categorical_accuracy"],
-                   eddl.CS_GPU() if self.gpu else eddl.CS_CPU())
+                   eddl.CS_GPU([1], mem="low_mem") if self.gpu else eddl.CS_CPU())
         eddl.load(net, self._weight_filename, "bin")
         self._model = net
 
