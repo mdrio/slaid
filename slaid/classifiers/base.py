@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
+from progress.bar import Bar
 from scipy import ndimage
 
 from slaid.commons import Mask, Slide
@@ -103,7 +104,7 @@ class BasicClassifier(Classifier):
                           batches: "BatchIterator",
                           filter_: Filter,
                           threshold,
-                          n_patch: int = 10) -> Mask:
+                          n_patch: int = 25) -> Mask:
         dimensions = batches.slide.level_dimensions[batches.level][::-1]
         dtype = 'uint8' if threshold else 'float32'
         res = np.zeros((dimensions[0] // batches.patch_size[0],
@@ -111,11 +112,12 @@ class BasicClassifier(Classifier):
                        dtype=dtype)
 
         patches_to_predict = []
-        for batch in batches:
-            patches_to_predict.extend(
-                batch.get_patches(batches.patch_size, filter_))
+        with Bar("Collecting patches", max=len(batches)) as patches_bar:
+            for batch in batches:
+                patches_to_predict.extend(
+                    batch.get_patches(batches.patch_size, filter_))
+                patches_bar.next()
 
-        print(patches_to_predict)
         mod = len(patches_to_predict) % n_patch
         patch_to_add = n_patch - mod if mod else 0
 
@@ -124,13 +126,14 @@ class BasicClassifier(Classifier):
         for _ in range(patch_to_add):
             patches_to_predict.append(patches_to_predict[0])
 
-        for i in range(0, len(patches_to_predict), n_patch):
-            patches = patches_to_predict[i:i + n_patch]
-            predictions = self._classify_array(
-                np.stack([p.array for p in patches]), threshold)
+        with Bar('Predictions', max=len(patches_to_predict)) as predict_bar:
+            for i in range(0, len(patches_to_predict), n_patch):
+                patches = patches_to_predict[i:i + n_patch]
+                predictions = self._classify_array(
+                    np.stack([p.array for p in patches]), threshold)
+                predict_bar.next()
         for i, p in enumerate(predictions[0]):
             patch = patches[i]
-            print(patch)
             res[patch.row + patch.batch.row,
                 patch.column + patch.batch.column] = p
         return res
@@ -264,15 +267,14 @@ class Batch:
                     filter_: Filter = None) -> "Patch":
         dimensions = self.slide.level_dimensions[self.level]
         if filter_ is None:
-            for row in range(0, self.array.shape[0], patch_size[0]):
+            for row in range(0, self.size[0], patch_size[0]):
                 if self.row + patch_size[0] > dimensions[0]:
                     continue
-                for col in range(0, self.array.shape[1], patch_size[1]):
+                for col in range(0, self.size[1], patch_size[1]):
                     if self.column + patch_size[1] > dimensions[1]:
                         continue
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
-                    print(patch_row, patch_column)
                     yield Patch(self, patch_row, patch_column, patch_size)
 
         else:
@@ -317,7 +319,7 @@ class BatchIterator:
                     (round(i * self._downsample), round(j * self._downsample)),
                     size, self.level)
 
-    def __len_(self):
+    def __len__(self):
         return self._level_dimensions[0] // self._batch_size[0]
 
 
