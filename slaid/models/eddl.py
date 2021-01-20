@@ -50,7 +50,7 @@ class Model(BaseModel, ABC):
             output_np = prob_T.getdata()
             temp_mask.append(output_np[:, 1])
 
-        flat_mask = np.vstack(temp_mask)
+        flat_mask = np.vstack(temp_mask).flatten()
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:

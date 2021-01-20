@@ -54,17 +54,12 @@ class Filter:
                batch: "Batch",
                patch_size: Tuple[int, int] = None) -> np.ndarray:
         mask = self.mask.array
-        if self.mask.level_downsample != batch.downsample:
-            mask = ndimage.zoom(mask,
-                                self.mask.level_downsample / batch.downsample)
 
         batch_location = tuple(
             [int(l // batch.downsample) for l in batch.location])
-        mask = mask[batch_location[0]:batch_location[0] + batch.array.shape[0],
-                    batch_location[1]:batch_location[1] + batch.array.shape[1]]
+        mask = mask[batch_location[0]:batch_location[0] + batch.size[0],
+                    batch_location[1]:batch_location[1] + batch.size[1]]
 
-        if patch_size is not None:
-            mask = self._compute_mean_patch(mask, patch_size)
         return getattr(mask, self.operator)(self.value)
 
     def _compute_mean_patch(self, array, patch_size):
@@ -126,14 +121,19 @@ class BasicClassifier(Classifier):
         for _ in range(patch_to_add):
             patches_to_predict.append(patches_to_predict[0])
 
-        with Bar('Predictions', max=len(patches_to_predict)) as predict_bar:
+        predictions = []
+        with Bar('Predictions',
+                 max=len(patches_to_predict) // n_patch) as predict_bar:
             for i in range(0, len(patches_to_predict), n_patch):
                 patches = patches_to_predict[i:i + n_patch]
-                predictions = self._classify_array(
-                    np.stack([p.array for p in patches]), threshold)
+                print([p.array.shape for p in patches])
+                predictions.append(
+                    self._classify_array(np.stack([p.array for p in patches]),
+                                         threshold))
                 predict_bar.next()
-        for i, p in enumerate(predictions[0]):
-            patch = patches[i]
+        predictions = np.concatenate(predictions)
+        for i, p in enumerate(predictions):
+            patch = patches_to_predict[i]
             res[patch.row + patch.batch.row,
                 patch.column + patch.batch.column] = p
         return res
@@ -265,13 +265,15 @@ class Batch:
     def get_patches(self,
                     patch_size: Tuple[int, int],
                     filter_: Filter = None) -> "Patch":
-        dimensions = self.slide.level_dimensions[self.level]
+        dimensions = self.slide.level_dimensions[self.level][::-1]
         if filter_ is None:
             for row in range(0, self.size[0], patch_size[0]):
-                if self.row + patch_size[0] > dimensions[0]:
+                if self.row // self.downsample + row + patch_size[
+                        0] > dimensions[0]:
                     continue
                 for col in range(0, self.size[1], patch_size[1]):
-                    if self.column + patch_size[1] > dimensions[1]:
+                    if (self.column // self.downsample
+                        ) + col + patch_size[1] > dimensions[1]:
                         continue
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
