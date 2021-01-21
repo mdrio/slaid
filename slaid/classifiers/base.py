@@ -54,8 +54,8 @@ class Filter:
                patch_size: Tuple[int, int] = None) -> np.ndarray:
         mask = self.mask.array
 
-        dimensions = self.slide.level_dimensions[self.level][::-1]
-        dimensions_0 = self.slide.level_dimensions[0][::-1]
+        dimensions = batch.slide.level_dimensions[batch.level][::-1]
+        dimensions_0 = batch.slide.level_dimensions[0][::-1]
 
         ratio = tuple([dimensions[i] // mask.shape[i] for i in range(2)])
         ratio_0 = tuple([dimensions_0[i] // mask.shape[i] for i in range(2)])
@@ -263,6 +263,7 @@ class Batch:
     @property
     def array(self):
         if self._array is None:
+            logger.debug('reading region for batch %s', self)
             image = self.slide.read_region(self.location[::-1], self.level,
                                            self.size[::-1])
             self._array = image.to_array(True)
@@ -288,10 +289,9 @@ class Batch:
         else:
             index_patches = filter_.filter(self, patch_size)
             for p in np.argwhere(index_patches):
-                p = p * patch_size
-                yield Patch(self, int((self.row + p[0]) // patch_size[0]),
-                            int((self.column + p[1]) // patch_size[1]),
-                            patch_size)
+                patch = Patch(self, p[0], p[1], patch_size)
+                logger.debug('yielding patch %s', patch)
+                yield patch
 
 
 @dataclass
