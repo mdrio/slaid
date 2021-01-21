@@ -49,25 +49,10 @@ class Filter:
         value = float(parsed['value'])
         return Filter(mask, operator, value)
 
-    def filter(self,
-               batch: "Batch",
-               patch_size: Tuple[int, int] = None) -> np.ndarray:
-        mask = self.mask.array
-
-        dimensions = batch.slide.level_dimensions[batch.level][::-1]
-        dimensions_0 = batch.slide.level_dimensions[0][::-1]
-
-        ratio = tuple([dimensions[i] // mask.shape[i] for i in range(2)])
-        ratio_0 = tuple([dimensions_0[i] // mask.shape[i] for i in range(2)])
-
-        batch_location = tuple(
-            [batch.location[i] // ratio_0[i] for i in range(2)])
-        batch_size = tuple([batch.size[i] // ratio[i] for i in range(2)])
-
-        mask = mask[batch_location[0]:batch_location[0] + batch_size[0],
-                    batch_location[1]:batch_location[1] + batch_size[1]]
-
-        return getattr(mask, self.operator)(self.value)
+    def filter(self) -> np.ndarray:
+        mask = np.array(self.mask.array)
+        index_patches = getattr(mask, self.operator)(self.value)
+        return np.argwhere(index_patches)
 
     def _compute_mean_patch(self, array, patch_size):
         sum_ = np.add.reduceat(np.add.reduceat(array,
@@ -97,28 +82,30 @@ class BasicClassifier(Classifier):
         batches = BatchIterator(slide, level, n_batch, patch_size)
         args = (batches, filter_, threshold)
         mask = self._classify_patches(
-            *args) if patch_size else self._classify_batches(*args)
+            slide, patch_size, level, filter_,
+            threshold) if patch_size else self._classify_batches(*args)
 
         mask = self._round_to_zero(mask, round_to_zero)
         return Mask(mask, level, slide.level_downsamples[level])
 
     def _classify_patches(self,
-                          batches: "BatchIterator",
+                          slide: Slide,
+                          patch_size,
+                          level,
                           filter_: Filter,
                           threshold,
                           n_patch: int = 25) -> Mask:
-        dimensions = batches.slide.level_dimensions[batches.level][::-1]
+        dimensions = slide.level_dimensions[level][::-1]
         dtype = 'uint8' if threshold else 'float32'
-        res = np.zeros((dimensions[0] // batches.patch_size[0],
-                        dimensions[1] // batches.patch_size[1]),
-                       dtype=dtype)
+        res = np.zeros(
+            (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
+            dtype=dtype)
 
-        patches_to_predict = []
-        with Bar("Collecting patches", max=len(batches)) as patches_bar:
-            for batch in batches:
-                patches_to_predict.extend(
-                    batch.get_patches(batches.patch_size, filter_))
-                patches_bar.next()
+        patch_indexes = filter_.filter() if filter_ else np.ndindex(
+            dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
+        patches_to_predict = [
+            Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
+        ]
 
         mod = len(patches_to_predict) % n_patch
         patch_to_add = n_patch - mod if mod else 0
@@ -140,8 +127,7 @@ class BasicClassifier(Classifier):
         predictions = np.concatenate(predictions)
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
-            res[patch.row + patch.batch.row,
-                patch.column + patch.batch.column] = p
+            res[patch.row, patch.column] = p
         return res
 
     def _round_to_zero(self, mask, threshold):
@@ -278,8 +264,8 @@ class Batch:
                         0] > dimensions[0]:
                     continue
                 for col in range(0, self.size[1], patch_size[1]):
-                    if (self.column // self.downsample
-                        ) + col + patch_size[1] > dimensions[1]:
+                    if self.column // self.downsample + col + patch_size[
+                            1] > dimensions[1]:
                         continue
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
@@ -329,15 +315,20 @@ class BatchIterator:
 
 @dataclass
 class Patch:
-    batch: Batch
+    slide: Slide
     row: int
     column: int
+    level: int
     size: Tuple[int, int]
+
+    def __post_init__(self):
+        self._array = None
 
     @property
     def array(self):
-        return self.batch.array[self.row *
-                                self.size[0]:self.row * self.size[0] +
-                                self.size[0], self.column *
-                                self.size[1]:self.column * self.size[1] +
-                                self.size[1]]
+        if self._array is None:
+            location = (self.row * self.size[0], self.column * self.size[1])
+            image = self.slide.read_region(location[::-1], self.level,
+                                           self.size)
+            self._array = image.to_array(True)
+        return self._array
