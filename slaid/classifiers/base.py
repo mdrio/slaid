@@ -156,12 +156,11 @@ class BasicClassifier(Classifier):
             prediction = self._classify_batch(batch, filter_, threshold)
             if prediction.size:
                 predictions.append(prediction)
-
         final_dimensions = batches.slide.level_dimensions[
             batches.level][::-1] if not batches.patch_size else (
-                batches.slide.level_dimensions[level][1] //
+                batches.slide.level_dimensions[batches.level][1] //
                 batches.patch_size[0],
-                batches.slide.level_dimensions[level][0] //
+                batches.slide.level_dimensions[batches.level][0] //
                 batches.patch_size[1])
         return self._reshape(self._concatenate(predictions, axis=1),
                              final_dimensions)
@@ -303,7 +302,6 @@ class BatchIterator:
 
     def __post_init__(self):
         self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
-        dimensions_0 = self.slide.level_dimensions[0][::-1]
         self._downsample = self.slide.level_downsamples[self.level]
 
         if self.patch_size is None:
@@ -314,8 +312,6 @@ class BatchIterator:
         self._batch_size = (batch_size_0, self._level_dimensions[1])
 
     def __iter__(self):
-        step_1 = round(self._batch_size[1] * self._downsample)
-        step_0 = round(self._batch_size[0] * self._downsample)
         for i in range(0, self._level_dimensions[0], self._batch_size[0]):
             size_0 = min(self._batch_size[0], self._level_dimensions[0] - i)
             for j in range(0, self._level_dimensions[1], self._batch_size[1]):
