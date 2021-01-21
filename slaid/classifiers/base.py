@@ -126,7 +126,6 @@ class BasicClassifier(Classifier):
                  max=len(patches_to_predict) // n_patch) as predict_bar:
             for i in range(0, len(patches_to_predict), n_patch):
                 patches = patches_to_predict[i:i + n_patch]
-                print([p.array.shape for p in patches])
                 predictions.append(
                     self._classify_array(np.stack([p.array for p in patches]),
                                          threshold))
@@ -334,5 +333,8 @@ class Patch:
 
     @property
     def array(self):
-        return self.batch.array[self.row:self.row + self.size[0],
-                                self.column:self.column + self.size[1]]
+        return self.batch.array[self.row *
+                                self.size[0]:self.row * self.size[0] +
+                                self.size[0], self.column *
+                                self.size[1]:self.column * self.size[1] +
+                                self.size[1]]

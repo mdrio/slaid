@@ -1,10 +1,9 @@
 import unittest
-from collections import defaultdict
 
 import numpy as np
 from commons import DummyModel, EddlGreenModel, GreenModel, EddlGreenPatchModel
 
-from slaid.classifiers import BasicClassifier, Batch, Filter, Patch
+from slaid.classifiers import BasicClassifier, Batch, Filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
 from slaid.commons.ecvl import load
