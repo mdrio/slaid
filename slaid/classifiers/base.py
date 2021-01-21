@@ -6,7 +6,6 @@ from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
-from scipy import ndimage
 
 from slaid.commons import Mask, Slide
 from slaid.models import Model
@@ -55,10 +54,18 @@ class Filter:
                patch_size: Tuple[int, int] = None) -> np.ndarray:
         mask = self.mask.array
 
+        dimensions = self.slide.level_dimensions[self.level][::-1]
+        dimensions_0 = self.slide.level_dimensions[0][::-1]
+
+        ratio = tuple([dimensions[i] // mask.shape[i] for i in range(2)])
+        ratio_0 = tuple([dimensions_0[i] // mask.shape[i] for i in range(2)])
+
         batch_location = tuple(
-            [int(l // batch.downsample) for l in batch.location])
-        mask = mask[batch_location[0]:batch_location[0] + batch.size[0],
-                    batch_location[1]:batch_location[1] + batch.size[1]]
+            [batch.location[i] // ratio_0[i] for i in range(2)])
+        batch_size = tuple([batch.size[i] // ratio[i] for i in range(2)])
+
+        mask = mask[batch_location[0]:batch_location[0] + batch_size[0],
+                    batch_location[1]:batch_location[1] + batch_size[1]]
 
         return getattr(mask, self.operator)(self.value)
 
