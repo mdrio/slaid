@@ -25,44 +25,50 @@ class Classifier(abc.ABC):
         pass
 
 
+@dataclass
 class Filter:
-    def __init__(self, mask: Mask, operator: str, value: float):
-        self.operator = operator
-        self.value = value
-        self.mask = mask
+    mask: Mask
 
-    @staticmethod
-    def create(slide: Slide, condition: str) -> "Filter":
-        operator_mapping = {
-            '>': '__gt__',
-            '>=': '__ge__',
-            '<': '__lt__',
-            '<=': '__le__',
-            '==': '__eq__',
-            '!=': '__ne__',
-        }
-        parsed = re.match(
-            r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
-            condition).groupdict()
-        mask = slide.masks[parsed['mask']]
-        operator = operator_mapping[parsed['operator']]
-        value = float(parsed['value'])
-        return Filter(mask, operator, value)
-
-    def filter(self) -> np.ndarray:
+    def filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.mask.array)
-        index_patches = getattr(mask, self.operator)(self.value)
+        index_patches = getattr(mask, operator)(value)
         return np.argwhere(index_patches)
 
-    def _compute_mean_patch(self, array, patch_size):
-        sum_ = np.add.reduceat(np.add.reduceat(array,
-                                               np.arange(
-                                                   0, array.shape[0],
-                                                   patch_size[0]),
-                                               axis=0),
-                               np.arange(0, array.shape[1], patch_size[1]),
-                               axis=1)
-        return sum_ / (patch_size[0] * patch_size[1])
+    def __gt__(self, value):
+        return self.filter('__gt__', value)
+
+    def __ge__(self, value):
+        return self.filter('__ge__', value)
+
+    def __lt__(self, value):
+        return self.filter('__lt__', value)
+
+    def __le__(self, value):
+        return self.filter('__le__', value)
+
+    def __eq__(self, value):
+        return self.filter('__eq__', value)
+
+    def __ne__(self, value):
+        return self.filter('__ne__', value)
+
+
+def filter(slide: Slide, condition: str) -> "Filter":
+    operator_mapping = {
+        '>': '__gt__',
+        '>=': '__ge__',
+        '<': '__lt__',
+        '<=': '__le__',
+        '==': '__eq__',
+        '!=': '__ne__',
+    }
+    parsed = re.match(
+        r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
+        condition).groupdict()
+    mask = slide.masks[parsed['mask']]
+    operator = operator_mapping[parsed['operator']]
+    value = float(parsed['value'])
+    return Filter(mask).filter(operator, value)
 
 
 class BasicClassifier(Classifier):
@@ -101,7 +107,7 @@ class BasicClassifier(Classifier):
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
             dtype=dtype)
 
-        patch_indexes = filter_.filter() if filter_ else np.ndindex(
+        patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
             Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
@@ -116,15 +122,16 @@ class BasicClassifier(Classifier):
             patches_to_predict.append(patches_to_predict[0])
 
         predictions = []
-        with Bar('Predictions',
-                 max=len(patches_to_predict) // n_patch) as predict_bar:
+        with Bar('Predictions', max=len(patches_to_predict) // n_patch
+                 or 1) as predict_bar:
             for i in range(0, len(patches_to_predict), n_patch):
                 patches = patches_to_predict[i:i + n_patch]
                 predictions.append(
                     self._classify_array(np.stack([p.array for p in patches]),
                                          threshold))
                 predict_bar.next()
-        predictions = np.concatenate(predictions)
+        if predictions:
+            predictions = np.concatenate(predictions)
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
             res[patch.row, patch.column] = p
