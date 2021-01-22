@@ -85,14 +85,18 @@ class BasicClassifier(Classifier):
                  round_to_zero: float = 0.01) -> Mask:
 
         patch_size = self.model.patch_size
-        batches = BatchIterator(slide, level, n_batch, patch_size)
-        args = (batches, filter_, threshold)
-        mask = self._classify_patches(
+        batches = BatchIterator(slide, level, n_batch)
+        array = self._classify_patches(
             slide, patch_size, level, filter_,
-            threshold) if patch_size else self._classify_batches(*args)
+            threshold) if patch_size else self._classify_batches(
+                batches, threshold)
 
-        mask = self._round_to_zero(mask, round_to_zero)
-        return Mask(mask, level, slide.level_downsamples[level])
+        #  mask = self._round_to_zero(mask, round_to_zero)
+        return self._get_mask(array, level, slide.level_downsamples[level])
+
+    @staticmethod
+    def _get_mask(array, level, downsample):
+        return Mask(array, level, downsample)
 
     def _classify_patches(self,
                           slide: Slide,
@@ -142,27 +146,18 @@ class BasicClassifier(Classifier):
             mask[mask <= threshold] = 0
         return mask
 
-    def _classify_batches(self, batches: "BatchIterator", filter_: Filter,
+    def _classify_batches(self, batches: "BatchIterator",
                           threshold: float) -> Mask:
         predictions = []
         for batch in batches:
-            prediction = self._classify_batch(batch, filter_, threshold)
+            prediction = self._classify_batch(batch, threshold)
             if prediction.size:
                 predictions.append(prediction)
-        final_dimensions = batches.slide.level_dimensions[
-            batches.level][::-1] if not batches.patch_size else (
-                batches.slide.level_dimensions[batches.level][1] //
-                batches.patch_size[0],
-                batches.slide.level_dimensions[batches.level][0] //
-                batches.patch_size[1])
-        return self._reshape(self._concatenate(predictions, axis=1),
-                             final_dimensions)
+        return self._concatenate(predictions, axis=1)
 
-    def _classify_batch(self, batch, filter_, threshold):
-        #  if patch_size:
-        #      return self._classify_batch_by_patch(slide, start, size, level,
-        #                                           patch_size, filter_,
-        #                                           threshold)
+    def _classify_batch(self, batch, threshold):
+        # FIXME
+        filter_ = None
         array = batch.array
         orig_shape = array.shape
         if filter_ is not None:
@@ -291,17 +286,12 @@ class BatchIterator:
     slide: Slide
     level: int
     n_batch: int
-    patch_size: Tuple[int, int] = None
 
     def __post_init__(self):
         self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
         self._downsample = self.slide.level_downsamples[self.level]
 
-        if self.patch_size is None:
-            batch_size_0 = self._level_dimensions[0] // self.n_batch
-        else:
-            batch_size_0 = self._level_dimensions[0] // self.n_batch
-            batch_size_0 -= batch_size_0 % self.patch_size[0]
+        batch_size_0 = self._level_dimensions[0] // self.n_batch
         self._batch_size = (batch_size_0, self._level_dimensions[1])
 
     def __iter__(self):

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
-import pickle
 import shutil
 import subprocess
 import unittest
@@ -13,7 +12,6 @@ import zarr
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.commons.ecvl import Slide
-from slaid.models.eddl import Model
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -137,27 +135,6 @@ class TestSerialEddlClassifier:
 
         self._test_output(output, slide, extr_level)
 
-    def test_classifies_by_patch(self):
-        extr_level = 1
-
-        model_filename = 'slaid/resources/models/classify_tumor_eddl_0.1.pkl'
-        with open(model_filename, 'rb') as f:
-            model = pickle.load(f)
-        cmd = f'classify.py {self.cmd} -m {model_filename} -f {self.feature}  -l 1 '\
-            f'   -t 0.7  {input_} {OUTPUT_DIR}'
-        subprocess.check_call(cmd.split())
-        output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
-        slide, output = get_input_output(output_path)
-
-        assert output.attrs['filename'] == slide.filename
-        assert tuple(output.attrs['resolution']) == slide.dimensions
-        assert output[self.feature].shape == tuple(
-            slide.level_dimensions[extr_level][::-1][i] // model.patch_size[i]
-            for i in range(2))
-        assert output[self.feature].attrs['extraction_level'] == extr_level
-        assert output[self.feature].attrs[
-            'level_downsample'] == slide.level_downsamples[extr_level]
-
     def test_overwrites_existing_classification_output(self):
         output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
         os.makedirs(output_path)
@@ -192,10 +169,13 @@ class TestParallelEddlClassifier(TestSerialEddlClassifier):
     #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
     cmd = 'parallel'
 
+    def test_classifies_by_patch(self):
+        pass
 
-class TestParallelPatchEddlClassifier:
-    model = 'slaid/resources/models/classify_tumor_eddl_0.1.pkl'
-    cmd = 'parallel'
+
+class TestPatchClassifier:
+    model = 'tests/models/all_one_by_patch.pkl'
+    cmd = 'serial'
     feature = 'tumor'
 
     def test_classifies_with_default_args(self, tmp_path):
