@@ -1,8 +1,4 @@
 import logging
-import os
-import sys
-import tarfile
-import tempfile
 from typing import List
 
 import numpy as np
@@ -26,16 +22,17 @@ class Model(BaseModel, ABC):
         self._gpu = value
         self._create_model()
 
-    def _get_gpu(self)-> bool:
+    def _get_gpu(self) -> bool:
         return self._gpu
-    
+
     gpu = property(_get_gpu, _set_gpu)
 
     def _create_model(self):
         net = self._create_net()
-        eddl.build(net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
-                   ["categorical_accuracy"],
-                   eddl.CS_GPU([1], mem="low_mem") if self.gpu else eddl.CS_CPU())
+        eddl.build(
+            net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
+            ["categorical_accuracy"],
+            eddl.CS_GPU([1], mem="low_mem") if self.gpu else eddl.CS_CPU())
         eddl.load(net, self._weight_filename, "bin")
         self._model = net
 
@@ -50,12 +47,11 @@ class Model(BaseModel, ABC):
             output_np = prob_T.getdata()
             temp_mask.append(output_np[:, 1])
 
-        flat_mask = np.vstack(temp_mask)
+        flat_mask = np.vstack(temp_mask).flatten()
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         if self.channel_first:
-            logger.debug('array.shape %s', array.shape)
             array = array.transpose(0, 3, 2, 1)
         tensor = Tensor.fromarray(array)
         #  if self.patch_size:
@@ -90,7 +86,6 @@ class TumorModel(Model):
     def _create_net():
         in_size = [256, 256]
         num_classes = 2
-        lr = 1e-5
         in_ = eddl.Input([3, in_size[0], in_size[1]])
         out = TumorModel._create_VGG16(in_, num_classes)
         net = eddl.Model([in_], [out])

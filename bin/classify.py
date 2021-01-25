@@ -11,9 +11,8 @@ from clize import parameters, run
 import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
-from slaid.classifiers import BasicClassifier, Filter
+from slaid.classifiers import BasicClassifier, do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons import PATCH_SIZE
 from slaid.commons.dask import init_client
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
@@ -141,7 +140,7 @@ class SerialRunner:
                        overwrite_output_if_exists=True,
                        round_to_zero=0.01):
 
-        filter_ = Filter.create(slide, filter_) if filter_ else None
+        filter_ = do_filter(slide, filter_) if filter_ else None
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
         if classifier.feature in slide.masks or STORAGE[writer].mask_exists(

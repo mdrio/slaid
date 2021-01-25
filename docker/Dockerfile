@@ -1,4 +1,4 @@
-FROM dhealth/pylibs-toolkit:0.5.1
+FROM pylibs-toolkit:a157c06
 ARG MODEL
 ARG FEATURE
 ENV SLAID_MODEL=$MODEL
