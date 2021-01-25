@@ -19,8 +19,8 @@ class Classifier(BasicClassifier):
         predictions = []
         for batch in batches:
             predictions.append(
-                da.from_delayed(delayed(self._classify_batch(batch,
-                                                             threshold)),
+                da.from_delayed(delayed(self._classify_batch)(batch,
+                                                              threshold),
                                 batch.size,
                                 dtype='float32' if not threshold else 'uint8'))
         return self._concatenate(predictions, axis=0)
