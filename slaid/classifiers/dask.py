@@ -23,7 +23,7 @@ class Classifier(BasicClassifier):
                                                              threshold)),
                                 batch.size,
                                 dtype='float32' if not threshold else 'uint8'))
-        return self._concatenate(predictions, axis=1)
+        return self._concatenate(predictions, axis=0)
 
     @staticmethod
     def _get_mask(array, level, downsample):

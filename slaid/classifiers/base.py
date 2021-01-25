@@ -53,7 +53,7 @@ class Filter:
         return self.filter('__ne__', value)
 
 
-def filter(slide: Slide, condition: str) -> "Filter":
+def do_filter(slide: Slide, condition: str) -> "Filter":
     operator_mapping = {
         '>': '__gt__',
         '>=': '__ge__',
@@ -153,7 +153,7 @@ class BasicClassifier(Classifier):
             prediction = self._classify_batch(batch, threshold)
             if prediction.size:
                 predictions.append(prediction)
-        return self._concatenate(predictions, axis=1)
+        return self._concatenate(predictions, axis=0)
 
     def _classify_batch(self, batch, threshold):
         # FIXME
