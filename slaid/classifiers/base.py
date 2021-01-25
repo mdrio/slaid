@@ -122,8 +122,8 @@ class BasicClassifier(Classifier):
 
         # adding fake patches, workaround for
         # https://github.com/deephealthproject/eddl/issues/236
-        for _ in range(patch_to_add):
-            patches_to_predict.append(patches_to_predict[0])
+        #  for _ in range(patch_to_add):
+        #      patches_to_predict.append(patches_to_predict[0])
 
         predictions = []
         with Bar('Predictions', max=len(patches_to_predict) // n_patch
@@ -250,7 +250,6 @@ class Batch:
     @property
     def array(self):
         if self._array is None:
-            logger.debug('reading region for batch %s', self)
             image = self.slide.read_region(self.location[::-1], self.level,
                                            self.size[::-1])
             self._array = image.to_array(True)
