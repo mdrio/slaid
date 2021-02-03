@@ -52,9 +52,14 @@ class Classifier(BasicClassifier):
         predictions = []
         for i in range(0, len(patches_to_predict), n_patch):
             patches = patches_to_predict[i:i + n_patch]
+            input_array = da.stack([
+                da.from_delayed(delayed(getattr)(p, 'array'),
+                                shape=(p.size[0], p.size[1], 3),
+                                dtype=dtype) for p in patches
+            ])
             predictions.append(
-                da.from_delayed(delayed(self._classify_array)(np.stack(
-                    [p.array for p in patches]), threshold),
+                da.from_delayed(delayed(self._classify_array)(input_array,
+                                                              threshold),
                                 shape=(len(patches), ),
                                 dtype=dtype))
         if predictions:
