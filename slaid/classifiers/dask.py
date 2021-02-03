@@ -64,35 +64,45 @@ class Classifier(BasicClassifier):
                                 dtype=dtype))
         if predictions:
             predictions = da.concatenate(predictions)
-        predictions_per_row = defaultdict(lambda: defaultdict(list))
+
+        logger.debug('predictions %s', predictions)
+        predictions = predictions.compute()
+        res = np.zeros(
+            (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
+            dtype=dtype)
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
-            predictions_per_row[patch.row][patch.column] = p
+            res[patch.row, patch.column] = p
+        return da.array(res)
+        #  predictions_per_row = defaultdict(lambda: defaultdict(list))
+        #  for i, p in enumerate(predictions):
+        #      patch = patches_to_predict[i]
+        #      predictions_per_row[patch.row][patch.column] = p
 
-        rows_counter = 0
-        rows = []
-        row_size = dimensions[0] // patch_size[0]
-        col_size = dimensions[1] // patch_size[1]
-        for i in sorted(predictions_per_row.keys()):
-            if i - rows_counter > 0:
-                rows.append(da.zeros((i - rows_counter, col_size),
-                                     dtype=dtype))
-            columns_counter = 0
-            row = []
-            for j in sorted(predictions_per_row[i].keys()):
-                if j - columns_counter > 0:
-                    row.append(da.zeros(j - columns_counter, dtype=dtype))
-                row.append(da.array([predictions_per_row[i][j]]))
-                columns_counter = j + 1
-            if col_size - columns_counter > 0:
-                row.append(da.zeros(col_size - columns_counter, dtype=dtype))
-            rows.append(da.concatenate(row).reshape(1, col_size))
-            rows_counter = i + 1
-        if row_size - rows_counter > 0:
-            rows.append(
-                da.zeros((row_size - rows_counter, col_size), dtype=dtype))
-
-        return da.concatenate(rows).reshape(row_size, col_size).rechunk()
+        #  row_size = dimensions[0] // patch_size[0]
+        #  col_size = dimensions[1] // patch_size[1]
+        #  rows_counter = 0
+        #  rows = []
+        #  for i in sorted(predictions_per_row.keys()):
+        #      if i - rows_counter > 0:
+        #          rows.append(da.zeros((i - rows_counter, col_size),
+        #                               dtype=dtype))
+        #      columns_counter = 0
+        #      row = []
+        #      for j in sorted(predictions_per_row[i].keys()):
+        #          if j - columns_counter > 0:
+        #              row.append(da.zeros(j - columns_counter, dtype=dtype))
+        #          row.append(da.array([predictions_per_row[i][j]]))
+        #          columns_counter = j + 1
+        #      if col_size - columns_counter > 0:
+        #          row.append(da.zeros(col_size - columns_counter, dtype=dtype))
+        #      rows.append(da.concatenate(row).reshape(1, col_size))
+        #      rows_counter = i + 1
+        #  if row_size - rows_counter > 0:
+        #      rows.append(
+        #          da.zeros((row_size - rows_counter, col_size), dtype=dtype))
+        #
+        #  return da.concatenate(rows).reshape(row_size, col_size).rechunk()
 
     @staticmethod
     def _get_mask(array, level, downsample):
