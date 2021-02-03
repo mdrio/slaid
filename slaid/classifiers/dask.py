@@ -84,16 +84,15 @@ class Classifier(BasicClassifier):
                     row.append(da.zeros(j - columns_counter, dtype=dtype))
                 row.append(da.array([predictions_per_row[i][j]]))
                 columns_counter = j + 1
-            if row_size - columns_counter > 0:
-                row.append(da.zeros(row_size - columns_counter, dtype=dtype))
-            rows.append(da.concatenate(row))
+            if col_size - columns_counter > 0:
+                row.append(da.zeros(col_size - columns_counter, dtype=dtype))
+            rows.append(da.concatenate(row).reshape(1, col_size))
             rows_counter = i + 1
         if row_size - rows_counter > 0:
             rows.append(
                 da.zeros((row_size - rows_counter, col_size), dtype=dtype))
 
-        print(rows)
-        return da.concatenate(rows).reshape(row_size, col_size)
+        return da.concatenate(rows).reshape(row_size, col_size).rechunk()
 
     @staticmethod
     def _get_mask(array, level, downsample):
