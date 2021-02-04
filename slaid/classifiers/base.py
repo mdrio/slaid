@@ -82,13 +82,14 @@ class BasicClassifier(Classifier):
                  threshold: float = None,
                  level: int = 2,
                  n_batch: int = 1,
-                 round_to_zero: float = 0.01) -> Mask:
+                 round_to_zero: float = 0.01,
+                 n_patch=25) -> Mask:
 
         patch_size = self.model.patch_size
         batches = BatchIterator(slide, level, n_batch)
         array = self._classify_patches(
-            slide, patch_size, level, filter_,
-            threshold) if patch_size else self._classify_batches(
+            slide, patch_size, level, filter_, threshold,
+            n_patch) if patch_size else self._classify_batches(
                 batches, threshold)
 
         #  mask = self._round_to_zero(mask, round_to_zero)
@@ -116,9 +117,6 @@ class BasicClassifier(Classifier):
         patches_to_predict = [
             Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
         ]
-
-        mod = len(patches_to_predict) % n_patch
-        patch_to_add = n_patch - mod if mod else 0
 
         # adding fake patches, workaround for
         # https://github.com/deephealthproject/eddl/issues/236

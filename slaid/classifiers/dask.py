@@ -1,6 +1,5 @@
 import logging
 import threading
-from collections import defaultdict
 
 import dask.array as da
 import numpy as np
