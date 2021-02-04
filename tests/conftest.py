@@ -37,3 +37,13 @@ def tiledb_path(tmp_path):
         array.meta['level_downsample'] = 1
         array.meta['threshold'] = 0.8
     return tmp_path
+
+
+@pytest.fixture
+def slide_path():
+    return 'tests/data/PH10023-1.thumb.tif'
+
+
+@pytest.fixture
+def model_all_ones_path():
+    return 'tests/models/all_one_by_patch.pkl'

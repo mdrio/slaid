@@ -8,10 +8,12 @@ import unittest
 
 import numpy as np
 import zarr
+from commons import DummyModel
 
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.commons.ecvl import Slide
+from slaid.runners import ParallelRunner, SerialRunner
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -200,6 +202,20 @@ class TestPatchClassifier:
         assert output[self.feature].attrs['extraction_level'] == level
         assert output[self.feature].attrs[
             'level_downsample'] == slide.level_downsamples[level]
+
+
+def test_n_patch(slide_path, tmp_path, model_all_ones_path):
+    classifier, slides = SerialRunner.run(slide_path,
+                                          tmp_path,
+                                          model=model_all_ones_path,
+                                          feature='test',
+                                          extraction_level=1,
+                                          gpu=False,
+                                          n_patch=2,
+                                          writer='zarr')
+    model = classifier.model
+    assert len(model.array_predicted) > 0
+    assert model.array_predicted[0].shape[0] == 2
 
 
 if __name__ == '__main__':

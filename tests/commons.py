@@ -51,13 +51,26 @@ class EddlGreenPatchModel(EddlModel):
         return [tensor]
 
 
-class DummyModel:
-    def __init__(self, func, patch_size=None, channel_first=False):
-        self.func = func
+class BaseDummyModel:
+    def __init__(self, patch_size=None, channel_first=False):
         self.patch_size = patch_size
         self.channel_first = channel_first
+        self.array_predicted = []
 
     def predict(self, array):
+        self.array_predicted.append(array)
+        return self._predict(array)
+
+    def _predict(self, array):
+        raise NotImplementedError
+
+
+class DummyModel(BaseDummyModel):
+    def __init__(self, func, patch_size=None, channel_first=False):
+        self.func = func
+        super().__init__(patch_size, channel_first)
+
+    def _predict(self, array):
         return self.func(array.shape[0])
 
 
@@ -94,8 +107,8 @@ class DummySlide(Slide):
         raise NotImplementedError()
 
 
-class AllOneModel:
-    def predict(self, array):
+class AllOneModel(BaseDummyModel):
+    def _predict(self, array):
         return np.ones(array.shape[0], dtype=np.uint8)
 
     def get_best_level_for_downsample(self, downsample: int):
