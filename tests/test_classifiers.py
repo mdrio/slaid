@@ -37,13 +37,27 @@ class BaseTestClassifier:
                          slide.level_dimensions[self.LEVEL])
         self.assertEqual(mask.array.all(), 0)
 
-    def test_return_all_ones_if_all_is_tissue(self):
+    def test_return_all_100_if_all_is_tissue(self):
         slide = load('tests/data/test.tif')
         model = DummyModel(np.ones)
         tissue_detector = self.get_classifier(model)
         mask = tissue_detector.classify(slide, level=self.LEVEL)
         self.assertEqual(mask.array.shape[::-1],
                          slide.level_dimensions[self.LEVEL])
+        self.assertTrue((mask.array == 100).all())
+        self.assertEqual(mask.array.dtype, 'uint8')
+
+    def test_return_all_1_if_all_is_tissue(self):
+        slide = load('tests/data/test.tif')
+        model = DummyModel(np.ones)
+        tissue_detector = self.get_classifier(model)
+        mask = tissue_detector.classify(slide,
+                                        level=self.LEVEL,
+                                        round_to_0_100=False)
+        self.assertEqual(mask.array.shape[::-1],
+                         slide.level_dimensions[self.LEVEL])
+        self.assertTrue((mask.array == 1).all())
+        self.assertEqual(mask.array.dtype, 'float32')
 
     def test_returns_a_mask(self):
         level = 0
@@ -132,7 +146,7 @@ class TestEddlPatchClassifier(unittest.TestCase):
                                    level=level,
                                    filter_=Filter(filter_mask) > 0)
 
-        self.assertTrue((mask.array == filter_mask.array).all())
+        self.assertTrue((mask.array / 100 == filter_mask.array).all())
 
     def test_classifies_with_no_filtered_patch(self):
         level = 0

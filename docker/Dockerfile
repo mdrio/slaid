@@ -1,4 +1,4 @@
-FROM pylibs-toolkit:a157c06
+FROM  local/pylibs-toolkit:a157c06
 ARG MODEL
 ARG FEATURE
 ENV SLAID_MODEL=$MODEL

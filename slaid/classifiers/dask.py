@@ -16,15 +16,16 @@ logger = logging.getLogger('dask')
 class Classifier(BasicClassifier):
     lock = threading.Lock()
 
-    def _classify_batches(self, batches: BatchIterator,
-                          threshold: float) -> Mask:
+    def _classify_batches(self, batches: BatchIterator, threshold: float,
+                          round_to_0_100: bool) -> Mask:
         predictions = []
         for batch in batches:
             predictions.append(
-                da.from_delayed(delayed(self._classify_batch)(batch,
-                                                              threshold),
+                da.from_delayed(delayed(self._classify_batch)(batch, threshold,
+                                                              round_to_0_100),
                                 batch.size,
-                                dtype='float32' if not threshold else 'uint8'))
+                                dtype='uint8'
+                                if threshold or round_to_0_100 else 'float32'))
         return self._concatenate(predictions, axis=0)
 
     def _classify_patches(self,
@@ -33,10 +34,10 @@ class Classifier(BasicClassifier):
                           level,
                           filter_: Filter,
                           threshold,
-                          n_patch: int = 25) -> Mask:
+                          n_patch: int = 25,
+                          round_to_0_100: bool = True) -> Mask:
         dimensions = slide.level_dimensions[level][::-1]
-        dtype = 'uint8' if threshold else 'float32'
-
+        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
@@ -58,7 +59,8 @@ class Classifier(BasicClassifier):
             ])
             predictions.append(
                 da.from_delayed(delayed(self._classify_array)(input_array,
-                                                              threshold),
+                                                              threshold,
+                                                              round_to_0_100),
                                 shape=(len(patches), ),
                                 dtype=dtype))
         if predictions:
@@ -72,7 +74,7 @@ class Classifier(BasicClassifier):
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
             res[patch.row, patch.column] = p
-        return da.array(res)
+        return da.array(res, dtype=dtype)
         #  predictions_per_row = defaultdict(lambda: defaultdict(list))
         #  for i, p in enumerate(predictions):
         #      patch = patches_to_predict[i]
@@ -120,6 +122,6 @@ class Classifier(BasicClassifier):
     def _reshape(array, shape):
         return da.reshape(array, shape)
 
-    def _classify_array(self, array, threshold) -> np.ndarray:
+    def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
         with self.lock:
-            return super()._classify_array(array, threshold)
+            return super()._classify_array(array, threshold, round_to_0_100)
