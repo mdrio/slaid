@@ -32,6 +32,8 @@ class Filter:
 
     def filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.mask.array)
+        if self.mask.round_to_0_100:
+            mask = mask / 100
         index_patches = getattr(mask, operator)(value)
         return np.argwhere(index_patches)
 
