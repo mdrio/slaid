@@ -5,6 +5,7 @@ import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime as dt
 from typing import Dict, List, Tuple
 
 import cv2
@@ -97,18 +98,15 @@ def mask_to_polygons(mask, epsilon=10., min_area=10.):
     return all_polygons
 
 
+@dataclass
 class Mask:
-    def __init__(self,
-                 array: np.ndarray,
-                 extraction_level: int,
-                 level_downsample: int,
-                 threshold: float = None,
-                 model: str = None):
-        self.array = array
-        self.extraction_level = extraction_level
-        self.level_downsample = level_downsample
-        self.threshold = threshold
-        self.model = model
+    array: np.ndarray
+    extraction_level: int
+    level_downsample: int
+    datetime: dt = None
+    round_to_0_100: bool = False
+    threshold: float = None
+    model: str = None
 
     def __eq__(self, other):
         check_array = (np.array(self.array) == np.array(other.array)).all()
@@ -116,10 +114,14 @@ class Mask:
             and self.level_downsample == other.level_downsample \
             and self.threshold == other.threshold \
             and self.model == other.model \
+            and self.round_to_0_100 == other.round_to_0_100 \
+            and self.datetime == other.datetime \
             and check_array
 
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
+        if self.round_to_0_100:
+            array = array / 100
         if threshold:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
@@ -159,6 +161,8 @@ class Mask:
         attrs = {}
         attrs['extraction_level'] = self.extraction_level
         attrs['level_downsample'] = self.level_downsample
+        attrs['datetime'] = self.datetime.timestamp()
+        attrs['round_to_0_100'] = self.round_to_0_100
         if self.threshold:
             attrs['threshold'] = self.threshold
         if self.model:

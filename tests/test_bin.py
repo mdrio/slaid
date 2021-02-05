@@ -8,12 +8,11 @@ import unittest
 
 import numpy as np
 import zarr
-from commons import DummyModel
 
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.commons.ecvl import Slide
-from slaid.runners import ParallelRunner, SerialRunner
+from slaid.runners import SerialRunner
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -70,6 +69,21 @@ class TestSerialEddlClassifier:
         slide, output = get_input_output(output_path)
 
         self._test_output(output, slide, 2)
+        assert output[self.feature].dtype == 'uint8'
+
+    def test_classifies_with_no_round(self, tmp_path):
+        path = str(tmp_path)
+        cmd = [
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '--no-round', '-l', '2', input_, path
+        ]
+        subprocess.check_call(cmd)
+        logger.info('running cmd %s', ' '.join(cmd))
+        output_path = os.path.join(path, f'{input_basename}.zarr')
+        slide, output = get_input_output(output_path)
+
+        assert output[self.feature].dtype == 'float32'
+        assert (np.array(output[self.feature]) <= 1).all()
 
     def test_classifies_with_tiledb_as_output(self, tmp_path):
         level = 1
@@ -150,22 +164,6 @@ class TestSerialEddlClassifier:
 
         self._test_output(output, slide, 2)
 
-    def test_skips_already_existing_masks(self, slide_with_mask, tmp_path):
-        slide = slide_with_mask(np.ones)
-        path = str(tmp_path)
-        slide_path = os.path.join(
-            path, f'{os.path.basename(slide.filename)}.tiledb')
-        tiledb_io.dump(slide, slide_path)
-        cmd = [
-            'classify.py', self.cmd, '-f', 'mask', '-m', self.model,
-            slide_path,
-            str(tmp_path)
-        ]
-        logger.debug('cmd %s', ' '.join(cmd))
-        subprocess.check_call(cmd)
-        ouput = tiledb_io.load(slide_path)
-        assert slide == ouput
-
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):
     #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
@@ -202,6 +200,32 @@ class TestPatchClassifier:
         assert output[self.feature].attrs['extraction_level'] == level
         assert output[self.feature].attrs[
             'level_downsample'] == slide.level_downsamples[level]
+        assert output[self.feature].dtype == 'uint8'
+
+    def test_classifies_with_no_round(self, tmp_path):
+        path = str(tmp_path)
+        level = 1
+        cmd = [
+            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
+            '-l',
+            str(level), '--no-round', input_, path
+        ]
+        subprocess.check_call(cmd)
+        logger.info('running cmd %s', ' '.join(cmd))
+        output_path = os.path.join(path, f'{input_basename}.zarr')
+        slide, output = get_input_output(output_path)
+
+        assert output.attrs['filename'] == slide.filename
+        assert tuple(output.attrs['resolution']) == slide.dimensions
+        assert output[self.feature].shape == tuple([
+            slide.level_dimensions[level][::-1][i] // (256, 256)[i]
+            for i in range(2)
+        ])
+        assert output[self.feature].attrs['extraction_level'] == level
+        assert output[self.feature].attrs[
+            'level_downsample'] == slide.level_downsamples[level]
+        assert output[self.feature].dtype == 'float32'
+        assert (np.array(output[self.feature]) <= 1).all()
 
 
 def test_n_patch(slide_path, tmp_path, model_all_ones_path):

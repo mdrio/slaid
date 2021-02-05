@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime as dt
 
 import zarr
 
@@ -31,7 +32,10 @@ def load(path: str) -> Slide:
         slide = ReducedSlide(group.attrs['filename'])
     for name, value in group.arrays():
         logger.info('loading mask %s, %s', name, value.attrs.asdict())
-        slide.masks[name] = Mask(value, **value.attrs.asdict())
+        kwargs = value.attrs.asdict()
+        if 'datetime' in kwargs:
+            kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
+        slide.masks[name] = Mask(value, **kwargs)
     return slide
 
 

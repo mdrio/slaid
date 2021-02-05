@@ -1,4 +1,5 @@
 import abc
+from datetime import datetime as dt
 import logging
 import re
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ class Classifier(abc.ABC):
                  threshold: float = None,
                  level: int = 2,
                  n_batch: int = 1,
-                 round_to_zero: float = 0.01) -> Mask:
+                 round_to_0_100: bool = True) -> Mask:
         pass
 
 
@@ -31,6 +32,8 @@ class Filter:
 
     def filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.mask.array)
+        if self.mask.round_to_0_100:
+            mask = mask / 100
         index_patches = getattr(mask, operator)(value)
         return np.argwhere(index_patches)
 
@@ -72,6 +75,8 @@ def do_filter(slide: Slide, condition: str) -> "Filter":
 
 
 class BasicClassifier(Classifier):
+    MASK_CLASS = Mask
+
     def __init__(self, model: "Model", feature: str):
         self.model = model
         self.feature = feature
@@ -82,22 +87,26 @@ class BasicClassifier(Classifier):
                  threshold: float = None,
                  level: int = 2,
                  n_batch: int = 1,
-                 round_to_zero: float = 0.01,
+                 round_to_0_100: bool = True,
                  n_patch=25) -> Mask:
 
         patch_size = self.model.patch_size
         batches = BatchIterator(slide, level, n_batch)
         array = self._classify_patches(
-            slide, patch_size, level, filter_, threshold,
-            n_patch) if patch_size else self._classify_batches(
-                batches, threshold)
+            slide, patch_size, level, filter_, threshold, n_patch,
+            round_to_0_100) if patch_size else self._classify_batches(
+                batches, threshold, round_to_0_100)
 
-        #  mask = self._round_to_zero(mask, round_to_zero)
-        return self._get_mask(array, level, slide.level_downsamples[level])
+        return self._get_mask(array, level, slide.level_downsamples[level],
+                              dt.now(), round_to_0_100)
 
-    @staticmethod
-    def _get_mask(array, level, downsample):
-        return Mask(array, level, downsample)
+    def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
+        return self.MASK_CLASS(array,
+                               level,
+                               downsample,
+                               datetime,
+                               round_to_0_100,
+                               model=str(self.model))
 
     def _classify_patches(self,
                           slide: Slide,
@@ -105,9 +114,10 @@ class BasicClassifier(Classifier):
                           level,
                           filter_: Filter,
                           threshold,
-                          n_patch: int = 25) -> Mask:
+                          n_patch: int = 25,
+                          round_to_0_100: bool = True) -> Mask:
         dimensions = slide.level_dimensions[level][::-1]
-        dtype = 'uint8' if threshold else 'float32'
+        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         res = np.zeros(
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
             dtype=dtype)
@@ -130,7 +140,7 @@ class BasicClassifier(Classifier):
                 patches = patches_to_predict[i:i + n_patch]
                 predictions.append(
                     self._classify_array(np.stack([p.array for p in patches]),
-                                         threshold))
+                                         threshold, round_to_0_100))
                 predict_bar.next()
         if predictions:
             predictions = np.concatenate(predictions)
@@ -139,21 +149,16 @@ class BasicClassifier(Classifier):
             res[patch.row, patch.column] = p
         return res
 
-    def _round_to_zero(self, mask, threshold):
-        if threshold > 0:
-            mask[mask <= threshold] = 0
-        return mask
-
-    def _classify_batches(self, batches: "BatchIterator",
-                          threshold: float) -> Mask:
+    def _classify_batches(self, batches: "BatchIterator", threshold: float,
+                          round_to_0_100: bool) -> Mask:
         predictions = []
         for batch in batches:
-            prediction = self._classify_batch(batch, threshold)
+            prediction = self._classify_batch(batch, threshold, round_to_0_100)
             if prediction.size:
                 predictions.append(prediction)
         return self._concatenate(predictions, axis=0)
 
-    def _classify_batch(self, batch, threshold):
+    def _classify_batch(self, batch, threshold, round_to_0_100):
         # FIXME
         filter_ = None
         array = batch.array
@@ -164,7 +169,7 @@ class BasicClassifier(Classifier):
         else:
             array = self._flat_array(array)
 
-        prediction = self._classify_array(array, threshold)
+        prediction = self._classify_array(array, threshold, round_to_0_100)
         if filter_ is not None:
             res = np.zeros(orig_shape[:2], dtype=prediction.dtype)
             res[indexes_pixel_to_process] = prediction
@@ -172,34 +177,16 @@ class BasicClassifier(Classifier):
             res = prediction.reshape(orig_shape[:2])
         return res
 
-    def _classify_batch_by_patch(self, slide, start, size, level, patch_size,
-                                 filter_, threshold):
-        batch = self._get_batch(slide, start, size, level)
-        array = batch.array
-        batch_shape = array.shape
-        res_shape = (batch_shape[0] // patch_size[0],
-                     batch_shape[1] // patch_size[1])
-
-        res = np.zeros(res_shape, dtype='uint8' if threshold else 'float32')
-        patches_to_predict = [
-            p for p in batch.get_patches(patch_size, filter_)
-            if p.array.shape[:2] == patch_size
-        ]
-        prediction = self._classify_array(
-            np.stack([p.array for p in patches_to_predict]),
-            threshold) if len(patches_to_predict) else [[]]
-        for i, p in enumerate(prediction[0]):
-            patch = patches_to_predict[i]
-            res[patch.row, patch.col] = p
-
-        return res
-
-    def _classify_array(self, array, threshold) -> np.ndarray:
+    def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
         prediction = self.model.predict(array)
+        if round_to_0_100:
+            prediction = prediction * 100
+            return prediction.astype('uint8')
         if threshold:
             prediction[prediction >= threshold] = 1
             prediction[prediction < threshold] = 0
-            prediction = prediction.astype('uint8')
+            return prediction.astype('uint8')
+
         return prediction.astype('float32')
 
     @staticmethod

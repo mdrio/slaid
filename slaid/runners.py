@@ -30,7 +30,7 @@ class SerialRunner:
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
-            round_to_zero: ('z', float) = 0.01,
+            no_round: bool = False,
             n_patch: int = 25):
         classifier = cls.get_classifier(model, feature, gpu)
         cls.prepare_output_dir(output_dir)
@@ -38,7 +38,7 @@ class SerialRunner:
         slides = cls.classify_slides(input_path, output_dir, classifier,
                                      n_batch, extraction_level, threshold,
                                      writer, filter_,
-                                     overwrite_output_if_exists, round_to_zero,
+                                     overwrite_output_if_exists, no_round,
                                      n_patch)
         return classifier, slides
 
@@ -85,14 +85,13 @@ class SerialRunner:
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
                         extraction_level, threshold, writer, filter_,
-                        overwrite_output_if_exists, round_to_zero, n_patch):
+                        overwrite_output_if_exists, no_round, n_patch):
 
         slides = []
         for slide in cls.get_slides(input_path):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
                                extraction_level, threshold, writer, filter_,
-                               overwrite_output_if_exists, round_to_zero,
-                               n_patch)
+                               overwrite_output_if_exists, no_round, n_patch)
             slides.append(slide)
         return slides
 
@@ -107,7 +106,7 @@ class SerialRunner:
                        writer=list(STORAGE.keys())[0],
                        filter_=None,
                        overwrite_output_if_exists=True,
-                       round_to_zero=0.01,
+                       no_round: bool = False,
                        n_patch=25):
 
         filter_ = do_filter(slide, filter_) if filter_ else None
@@ -126,7 +125,7 @@ class SerialRunner:
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_zero=round_to_zero,
+                                   round_to_0_100=not no_round,
                                    n_patch=n_patch)
         feature = classifier.feature
         slide.masks[feature] = mask
@@ -162,7 +161,7 @@ class ParallelRunner(SerialRunner):
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
-            round_to_zero: ('z', float) = 0.01,
+            no_round: bool = False,
             n_patch: int = 25):
         classifier = cls.get_classifier(model, feature, gpu, processes)
         cls.prepare_output_dir(output_dir)
@@ -170,7 +169,7 @@ class ParallelRunner(SerialRunner):
         slides = cls.classify_slides(input_path, output_dir, classifier,
                                      n_batch, extraction_level, threshold,
                                      writer, filter_,
-                                     overwrite_output_if_exists, round_to_zero,
+                                     overwrite_output_if_exists, no_round,
                                      n_patch)
         return classifier, slides
 
