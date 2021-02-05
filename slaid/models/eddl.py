@@ -13,6 +13,7 @@ logger = logging.getLogger('eddl-models')
 class Model(BaseModel, ABC):
     patch_size = None
     channel_first = False
+    normalization_factor = 1
 
     def __init__(self, weight_filename, gpu=True):
         self._weight_filename = weight_filename
@@ -53,7 +54,7 @@ class Model(BaseModel, ABC):
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         if self.channel_first:
             array = array.transpose(0, 3, 2, 1)
-        tensor = Tensor.fromarray(array)
+        tensor = Tensor.fromarray(array / self.normalization_factor)
         #  if self.patch_size:
         #      tensor = Tensor.unsqueeze(tensor)
         return eddl.predict(self._model, [tensor])
@@ -81,6 +82,7 @@ class TissueModel(Model):
 class TumorModel(Model):
     patch_size = (256, 256)
     channel_first = True
+    normalization_factor = 255
 
     @staticmethod
     def _create_net():
