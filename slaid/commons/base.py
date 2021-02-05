@@ -103,8 +103,8 @@ class Mask:
     array: np.ndarray
     extraction_level: int
     level_downsample: int
-    datetime: dt
-    round_to_0_100: bool
+    datetime: dt = None
+    round_to_0_100: bool = False
     threshold: float = None
     model: str = None
 
@@ -125,6 +125,8 @@ class Mask:
         array = self.array[::downsample, ::downsample]
         if threshold:
             array = apply_threshold(array, threshold)
+        if self.round_to_0_100:
+            array = array / 100
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
     def to_polygons(self,

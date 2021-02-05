@@ -33,7 +33,8 @@ def load(path: str) -> Slide:
     for name, value in group.arrays():
         logger.info('loading mask %s, %s', name, value.attrs.asdict())
         kwargs = value.attrs.asdict()
-        kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
+        if 'datetime' in kwargs:
+            kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
         slide.masks[name] = Mask(value, **kwargs)
     return slide
 
