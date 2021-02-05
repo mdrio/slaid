@@ -1,8 +1,11 @@
+from datetime import datetime as dt
+
 import dask.array as da
-from slaid.commons import Mask
 import numpy as np
 import pytest
 import tiledb
+
+from slaid.commons import Mask
 
 
 @pytest.fixture
@@ -12,7 +15,7 @@ def slide_with_mask():
     def _slide_with_mask(create_array_func):
         slide = Slide('tests/data/PH10023-1.thumb.tif')
         array = create_array_func(slide.dimensions[::-1])
-        slide.masks['mask'] = Mask(array, 1, 1)
+        slide.masks['mask'] = Mask(array, 1, 1, dt.now(), False)
         return slide
 
     return _slide_with_mask

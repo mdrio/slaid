@@ -1,4 +1,5 @@
 import abc
+from datetime import datetime as dt
 import logging
 import re
 from dataclasses import dataclass
@@ -72,6 +73,8 @@ def do_filter(slide: Slide, condition: str) -> "Filter":
 
 
 class BasicClassifier(Classifier):
+    MASK_CLASS = Mask
+
     def __init__(self, model: "Model", feature: str):
         self.model = model
         self.feature = feature
@@ -92,11 +95,16 @@ class BasicClassifier(Classifier):
             round_to_0_100) if patch_size else self._classify_batches(
                 batches, threshold, round_to_0_100)
 
-        return self._get_mask(array, level, slide.level_downsamples[level])
+        return self._get_mask(array, level, slide.level_downsamples[level],
+                              dt.now(), round_to_0_100)
 
-    @staticmethod
-    def _get_mask(array, level, downsample):
-        return Mask(array, level, downsample)
+    def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
+        return self.MASK_CLASS(array,
+                               level,
+                               downsample,
+                               datetime,
+                               round_to_0_100,
+                               model=str(self.model))
 
     def _classify_patches(self,
                           slide: Slide,
@@ -170,7 +178,7 @@ class BasicClassifier(Classifier):
     def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
         prediction = self.model.predict(array)
         if round_to_0_100:
-            prediction = np.round(prediction, 2) * 100
+            prediction = prediction * 100
             return prediction.astype('uint8')
         if threshold:
             prediction[prediction >= threshold] = 1

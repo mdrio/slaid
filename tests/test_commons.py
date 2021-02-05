@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import pytest
 import tiledb
 
 from slaid.commons import Mask, Slide
@@ -43,8 +44,9 @@ class TestImage(unittest.TestCase):
 class TestMask:
     cls = Mask
 
+    @pytest.mark.skip(reason="update how mask are loaded/dumped")
     def test_dumps_to_tiledb(self, array, tmp_path):
-        mask = self.cls(array, 1, 1, 0.8)
+        mask = self.cls(array, 1, 1, 0.8, False)
         mask.to_tiledb(str(tmp_path))
         with tiledb.open(str(tmp_path), 'r') as array:
             assert (array == np.array(mask.array)).all()
@@ -53,6 +55,7 @@ class TestMask:
             assert array.meta['threshold'] == mask.threshold
             assert 'model' not in array.meta.keys()
 
+    @pytest.mark.skip(reason="update how mask are loaded/dumped")
     def test_creates_from_tiledb(self, tiledb_path):
         mask = self.cls.from_tiledb(tiledb_path)
         with tiledb.open(tiledb_path, 'r') as array:
@@ -62,6 +65,7 @@ class TestMask:
 class TestDaskMask(TestMask):
     cls = DaskMask
 
+    @pytest.mark.skip(reason="update how mask are loaded/dumped")
     def test_dumps_to_tiledb(self, dask_array, tmp_path):
         super().test_dumps_to_tiledb(dask_array, tmp_path)
 

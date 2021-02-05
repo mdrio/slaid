@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime as dt
 
 import numpy as np
 from commons import DummyModel, EddlGreenModel, EddlGreenPatchModel, GreenModel
@@ -138,7 +139,8 @@ class TestEddlPatchClassifier(unittest.TestCase):
             np.array(slide.level_dimensions[level][::-1]) //
             np.array(patch_size))
         mask_array[0, :] = 1
-        filter_mask = Mask(mask_array, level, slide.level_downsamples[level])
+        filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
+                           dt.now(), False)
 
         slide.masks['tissue'] = filter_mask
         classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
@@ -155,7 +157,8 @@ class TestEddlPatchClassifier(unittest.TestCase):
         mask_array = np.zeros(
             np.array(slide.level_dimensions[level][::-1]) //
             np.array(patch_size))
-        filter_mask = Mask(mask_array, level, slide.level_downsamples[level])
+        filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
+                           dt.now(), False)
 
         slide.masks['tissue'] = filter_mask
         classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
@@ -173,7 +176,7 @@ class TestFilter(unittest.TestCase):
         array = np.zeros((10, 10))
         indexes_ones = (0, 0)
         array[indexes_ones] = 1
-        mask = Mask(array, 0, 1)
+        mask = Mask(array, 0, 1, dt.now(), False)
         filtered = Filter(mask).filter('__gt__', 0.5)
 
         self.assertTrue((filtered == indexes_ones).all())

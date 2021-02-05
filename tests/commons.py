@@ -8,7 +8,12 @@ from slaid.commons.base import Image
 from slaid.models.eddl import Model as EddlModel
 
 
-class GreenModel:
+class BaseModel:
+    def __str__(self):
+        return self.__class__.__name__
+
+
+class GreenModel(BaseModel):
     def __init__(self, patch_size=None, channel_first=False):
         self.patch_size = patch_size
         self.channel_first = channel_first
@@ -17,7 +22,7 @@ class GreenModel:
         return array[:, 1] / 255
 
 
-class EddlGreenModel(EddlModel):
+class EddlGreenModel(BaseModel, EddlModel):
     def __init__(self, patch_size=None, channel_first=False):
         self.patch_size = patch_size
         self.channel_first = channel_first
@@ -33,7 +38,7 @@ class EddlGreenModel(EddlModel):
         return [tensor]
 
 
-class EddlGreenPatchModel(EddlModel):
+class EddlGreenPatchModel(BaseModel, EddlModel):
     def __init__(self, patch_size=(256, 256), channel_first=False):
         self.patch_size = patch_size
         self.channel_first = channel_first
@@ -51,7 +56,7 @@ class EddlGreenPatchModel(EddlModel):
         return [tensor]
 
 
-class BaseDummyModel:
+class BaseDummyModel(BaseModel):
     def __init__(self, patch_size=None, channel_first=False):
         self.patch_size = patch_size
         self.channel_first = channel_first

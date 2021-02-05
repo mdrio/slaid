@@ -19,6 +19,9 @@ class Model(BaseModel, ABC):
         self._weight_filename = weight_filename
         self.gpu = gpu
 
+    def __str__(self):
+        return self._weight_filename
+
     def _set_gpu(self, value: bool):
         self._gpu = value
         self._create_model()

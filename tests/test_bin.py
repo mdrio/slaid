@@ -164,22 +164,6 @@ class TestSerialEddlClassifier:
 
         self._test_output(output, slide, 2)
 
-    def test_skips_already_existing_masks(self, slide_with_mask, tmp_path):
-        slide = slide_with_mask(np.ones)
-        path = str(tmp_path)
-        slide_path = os.path.join(
-            path, f'{os.path.basename(slide.filename)}.tiledb')
-        tiledb_io.dump(slide, slide_path)
-        cmd = [
-            'classify.py', self.cmd, '-f', 'mask', '-m', self.model,
-            slide_path,
-            str(tmp_path)
-        ]
-        logger.debug('cmd %s', ' '.join(cmd))
-        subprocess.check_call(cmd)
-        ouput = tiledb_io.load(slide_path)
-        assert slide == ouput
-
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):
     #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
