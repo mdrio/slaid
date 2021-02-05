@@ -118,15 +118,12 @@ class Mask:
             and self.datetime == other.datetime \
             and check_array
 
-
-#
-
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
-        if threshold:
-            array = apply_threshold(array, threshold)
         if self.round_to_0_100:
             array = array / 100
+        if threshold:
+            array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
     def to_polygons(self,
