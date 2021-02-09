@@ -34,7 +34,7 @@ def build(image='slaid',
             dict(build_dir=docker_build_dir,
                  image=image,
                  tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
-                 build_args=[f'MODEL={model_path}', f'FEATURE={feature}'],
+                 build_args=[f'MODEL={model_path}'],
                  docker_args=docker_args))
 
     for kwargs in kwargs_list:
@@ -112,7 +112,7 @@ def docker_tag(repo, image, tag, docker_args=''):
 
 
 def get_models():
-    models = glob.glob(f'../slaid/resources/models/*.pkl')
+    models = glob.glob('../slaid/resources/models/*.pkl')
     for model in models:
         model_path = os.path.basename(model)
         model_name = os.path.splitext(model_path)[0]

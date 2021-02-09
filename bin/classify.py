@@ -54,9 +54,4 @@ if __name__ == '__main__':
         for k, v in runners.items():
             runners[k] = set_model(v, model)
 
-    feature = os.environ.get("SLAID_FEATURE")
-    if feature:
-        for k, v in runners.items():
-            runners[k] = set_feature(v, feature)
-
     run(runners)

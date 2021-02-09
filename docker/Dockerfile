@@ -1,8 +1,7 @@
-FROM  local/pylibs-toolkit:a157c06
+FROM  mobydick.crs4.it:5000/pylibs-toolkit:a157c06
 ARG MODEL
 ARG FEATURE
 ENV SLAID_MODEL=$MODEL
-ENV SLAID_FEATURE=$FEATURE
 
 COPY . /tmp/slaid
 WORKDIR /tmp/slaid
