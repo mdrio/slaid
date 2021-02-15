@@ -10,9 +10,10 @@ RUN useradd -ms  /bin/bash slaid && \
     apt update && apt install -y openslide-tools ffmpeg libsm6 libxext6 && \
     pip uninstall -y setuptools && \
     pip install setuptools==45
-USER slaid
+# USER slaid
 RUN pip install --use-feature=2020-resolver --user -e . 
-ENV PATH="/home/slaid/.local/bin:${PATH}"
+# ENV PATH="/home/slaid/.local/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
 ENTRYPOINT ["classify.py"]
 
