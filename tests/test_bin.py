@@ -31,7 +31,7 @@ def get_input_output(output):
 
 
 class TestSerialEddlClassifier:
-    model = 'slaid/resources/models/extract_tissue_eddl_1.1.pkl'
+    model = 'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'
     cmd = 'serial'
     feature = 'tissue'
 

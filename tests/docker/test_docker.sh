@@ -6,7 +6,7 @@ OUTDIR=$DIR/../data
 IMAGE='test.tif'
 IMAGE_NO_EXT='test'
 MODEL_DIR=$DIR/../../slaid/resources/models
-model=extract_tissue_eddl_1.1.pkl
+model=tissue_model-extract_tissue_eddl_1.1.bin
 for mode in serial parallel; do 
   for ext in tiledb zarr; do 
     docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models  slaid $mode -w ${ext}  -m /models/$model -l 0 /data/$IMAGE --overwrite  -f tissue /data

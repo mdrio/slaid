@@ -10,6 +10,7 @@ import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier, do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.dask import init_client
+from slaid.models.eddl import load_model
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
@@ -49,8 +50,14 @@ class SerialRunner:
 
     @staticmethod
     def get_model(filename, gpu):
-        with open(filename, 'rb') as f:
-            model = pickle.load(f)
+        ext = os.path.splitext(filename)[-1]
+        if ext in ('.pkl', '.pickle'):
+            with open(filename, 'rb') as f:
+                model = pickle.load(f)
+        elif ext == '.bin':
+            model = load_model(filename)
+        else:
+            raise NotImplementedError(f'unsupported model type {ext}')
         model.gpu = gpu
         return model
 
