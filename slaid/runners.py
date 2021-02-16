@@ -19,8 +19,8 @@ class SerialRunner:
     @classmethod
     def run(cls,
             input_path,
-            output_dir,
             *,
+            output_dir: 'o',
             model: 'm',
             n_batch: ('b', int) = 1,
             extraction_level: ('l', int) = 2,
@@ -155,8 +155,8 @@ class ParallelRunner(SerialRunner):
     @classmethod
     def run(cls,
             input_path,
-            output_dir,
             *,
+            output_dir: 'o',
             model: 'm',
             n_batch: ('b', int) = 1,
             processes: 'p' = False,

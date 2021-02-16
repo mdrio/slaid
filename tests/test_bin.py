@@ -61,7 +61,7 @@ class TestSerialEddlClassifier:
         path = str(tmp_path)
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '-l', '2', input_, path
+            '-l', '2', '-o', path, input_
         ]
         subprocess.check_call(cmd)
         logger.info('running cmd %s', ' '.join(cmd))
@@ -75,7 +75,7 @@ class TestSerialEddlClassifier:
         path = str(tmp_path)
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '--no-round', '-l', '2', input_, path
+            '--no-round', '-l', '2', '-o', path, input_
         ]
         subprocess.check_call(cmd)
         logger.info('running cmd %s', ' '.join(cmd))
@@ -90,7 +90,7 @@ class TestSerialEddlClassifier:
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             input_, '-w', 'tiledb', '-l',
-            str(level),
+            str(level), '-o',
             str(tmp_path)
         ]
         logger.info('cmd %s', ' '.join(cmd))
@@ -115,8 +115,15 @@ class TestSerialEddlClassifier:
         zarr_io.dump(slide, slide_path)
 
         cmd = [
-            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            slide_path, path
+            'classify.py',
+            self.cmd,
+            '-f',
+            self.feature,
+            '-m',
+            self.model,
+            '-o',
+            path,
+            slide_path,
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
@@ -133,7 +140,7 @@ class TestSerialEddlClassifier:
 
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '-w', 'tiledb', slide_path, path
+            '-w', 'tiledb', '-o', path, slide_path
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
@@ -144,7 +151,7 @@ class TestSerialEddlClassifier:
     def test_classifies_custom_args(self):
         extr_level = 1
         cmd = f'classify.py {self.cmd} -m {self.model} -f {self.feature}  -l '\
-            f' {extr_level}  -t 0.7  {input_} {OUTPUT_DIR}'
+            f' {extr_level}  -t 0.7  {input_} -o {OUTPUT_DIR}'
         subprocess.check_call(cmd.split())
         output_path = os.path.join(OUTPUT_DIR, f'{input_basename}.zarr')
         slide, output = get_input_output(output_path)
@@ -156,7 +163,7 @@ class TestSerialEddlClassifier:
         os.makedirs(output_path)
         subprocess.check_call([
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '--overwrite', input_, OUTPUT_DIR
+            '--overwrite', '-o', OUTPUT_DIR, input_
         ])
         stats = os.stat(output_path)
         assert stats.st_size > 0
@@ -184,7 +191,7 @@ class TestPatchClassifier:
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             '-l',
-            str(level), input_, path
+            str(level), input_, '-o', path
         ]
         subprocess.check_call(cmd)
         logger.info('running cmd %s', ' '.join(cmd))
@@ -208,7 +215,7 @@ class TestPatchClassifier:
         cmd = [
             'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
             '-l',
-            str(level), '--no-round', input_, path
+            str(level), '--no-round', input_, '-o', path
         ]
         subprocess.check_call(cmd)
         logger.info('running cmd %s', ' '.join(cmd))
@@ -230,7 +237,7 @@ class TestPatchClassifier:
 
 def test_n_patch(slide_path, tmp_path, model_all_ones_path):
     classifier, slides = SerialRunner.run(slide_path,
-                                          tmp_path,
+                                          output_dir=tmp_path,
                                           model=model_all_ones_path,
                                           feature='test',
                                           extraction_level=1,

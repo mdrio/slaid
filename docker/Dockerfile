@@ -1,7 +1,6 @@
 FROM  mobydick.crs4.it:5000/pylibs-toolkit:a157c06
 ARG MODEL
 ARG FEATURE
-ENV SLAID_MODEL=$MODEL
 
 COPY . /tmp/slaid
 WORKDIR /tmp/slaid
@@ -17,6 +16,7 @@ RUN pip3 install -r requirements.txt && \
 # ENV PATH="/home/slaid/.local/bin:${PATH}"
 # ENV PATH="/root/.local/bin:${PATH}"
 
+ENV SLAID_MODEL=$MODEL
 ENTRYPOINT ["classify.py"]
 
 
