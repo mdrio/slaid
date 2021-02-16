@@ -9,6 +9,8 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
+    PIL_FORMAT = False
+
     def __str__(self):
         return self.__class__.__name__
 

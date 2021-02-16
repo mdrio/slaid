@@ -1,8 +1,8 @@
 import abc
-from datetime import datetime as dt
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime as dt
 from typing import Tuple
 
 import numpy as np
@@ -91,7 +91,7 @@ class BasicClassifier(Classifier):
                  n_patch=25) -> Mask:
 
         patch_size = self.model.patch_size
-        batches = BatchIterator(slide, level, n_batch)
+        batches = BatchIterator(slide, level, n_batch, self.model.PIL_FORMAT)
         array = self._classify_patches(
             slide, patch_size, level, filter_, threshold, n_patch,
             round_to_0_100) if patch_size else self._classify_batches(
@@ -125,7 +125,8 @@ class BasicClassifier(Classifier):
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
+            Patch(slide, p[0], p[1], level, patch_size, self.model.PIL_FORMAT)
+            for p in patch_indexes
         ]
 
         # adding fake patches, workaround for
@@ -162,12 +163,12 @@ class BasicClassifier(Classifier):
         # FIXME
         filter_ = None
         array = batch.array
-        orig_shape = array.shape
+        orig_shape = batch.shape
         if filter_ is not None:
             indexes_pixel_to_process = filter_.filter(batch)
             array = array[indexes_pixel_to_process]
         else:
-            array = self._flat_array(array)
+            array = batch.flatten()
 
         prediction = self._classify_array(array, threshold, round_to_0_100)
         if filter_ is not None:
@@ -207,18 +208,44 @@ class BasicClassifier(Classifier):
     def _reshape(array, shape):
         return array.reshape(shape)
 
-    def _flat_array(self, array: np.ndarray) -> np.ndarray:
-        n_px = array.shape[0] * array.shape[1]
+    def _flat_array(self, array: np.ndarray, shape: Tuple[int,
+                                                          int]) -> np.ndarray:
+        n_px = shape[0] * shape[1]
+        array = array[:, :, :3].reshape(n_px, 3)
+        return array
+
+
+class ImageAreaMixin:
+    @property
+    def array(self):
+        if self._array is None:
+            image = self.slide.read_region(self.location[::-1], self.level,
+                                           self.size[::-1])
+            self._array = image.to_array(self.PIL_format)
+        return self._array
+
+    @property
+    def shape(self):
+        return self.array.shape[:2] if self.PIL_format \
+            else self.array.shape[1:]
+
+    def flatten(self):
+        n_px = self.shape[0] * self.shape[1]
+        if not self.PIL_format:
+            array = self.array.transpose(1, 2, 0)
+        else:
+            array = self.array
         array = array[:, :, :3].reshape(n_px, 3)
         return array
 
 
 @dataclass
-class Batch:
+class Batch(ImageAreaMixin):
     slide: Slide
     location: Tuple[int, int]
     size: Tuple[int, int]
     level: int
+    PIL_format: bool = False
 
     def __post_init__(self):
         self.downsample = self.slide.level_downsamples[self.level]
@@ -231,14 +258,6 @@ class Batch:
     @property
     def column(self):
         return int(self.location[1] // self.downsample)
-
-    @property
-    def array(self):
-        if self._array is None:
-            image = self.slide.read_region(self.location[::-1], self.level,
-                                           self.size[::-1])
-            self._array = image.to_array(True)
-        return self._array
 
     def get_patches(self,
                     patch_size: Tuple[int, int],
@@ -255,7 +274,8 @@ class Batch:
                         continue
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
-                    yield Patch(self, patch_row, patch_column, patch_size)
+                    yield Patch(self, patch_row, patch_column, patch_size,
+                                self.PIL_format)
 
         else:
             index_patches = filter_.filter(self, patch_size)
@@ -270,6 +290,7 @@ class BatchIterator:
     slide: Slide
     level: int
     n_batch: int
+    PIL_format: bool = False
 
     def __post_init__(self):
         self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
@@ -295,12 +316,13 @@ class BatchIterator:
 
 
 @dataclass
-class Patch:
+class Patch(ImageAreaMixin):
     slide: Slide
     row: int
     column: int
     level: int
     size: Tuple[int, int]
+    PIL_format: bool = False
 
     def __post_init__(self):
         self._array = None

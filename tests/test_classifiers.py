@@ -61,6 +61,8 @@ class BaseTestClassifier:
         self.assertEqual(mask.array.dtype, 'float32')
 
     def test_returns_a_mask(self):
+        #  import pudb
+        #  pudb.set_trace()
         level = 0
         slide = load('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())

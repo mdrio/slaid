@@ -5,6 +5,8 @@ import numpy as np
 
 
 class Model(abc.ABC):
+    PIL_FORMAT = False
+
     def predict(self, array: np.array) -> np.array:
         return self._model.predict(array)
 

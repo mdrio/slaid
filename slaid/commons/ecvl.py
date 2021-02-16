@@ -38,8 +38,8 @@ class Image(BaseImage):
             array = array.transpose(2, 1, 0)
             # convert to rgb
             array = array[:, :, ::-1]
-            #  array = np.flip(array, 1)
-            #  array[:, :] = np.flip(array[:, :])
+        else:
+            array = array.transpose(0, 2, 1)
         return array
 
     def to_tensor(self):
