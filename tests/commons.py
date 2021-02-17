@@ -9,25 +9,25 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
-    PIL_FORMAT = False
+    color_type = Image.COLORTYPE.BGR
+    coords = Image.COORD.YX
+    channel = Image.CHANNEL.FIRST
 
     def __str__(self):
         return self.__class__.__name__
 
 
 class GreenModel(BaseModel):
-    def __init__(self, patch_size=None, channel_first=False):
+    def __init__(self, patch_size=None):
         self.patch_size = patch_size
-        self.channel_first = channel_first
 
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
 
 
 class EddlGreenModel(BaseModel, EddlModel):
-    def __init__(self, patch_size=None, channel_first=False):
+    def __init__(self, patch_size=None):
         self.patch_size = patch_size
-        self.channel_first = channel_first
 
     @staticmethod
     def _create_net():
@@ -41,9 +41,8 @@ class EddlGreenModel(BaseModel, EddlModel):
 
 
 class EddlGreenPatchModel(BaseModel, EddlModel):
-    def __init__(self, patch_size=(256, 256), channel_first=False):
+    def __init__(self, patch_size=(256, 256)):
         self.patch_size = patch_size
-        self.channel_first = channel_first
 
     @staticmethod
     def _create_net():
@@ -59,9 +58,8 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
 
 class BaseDummyModel(BaseModel):
-    def __init__(self, patch_size=None, channel_first=False):
+    def __init__(self, patch_size=None):
         self.patch_size = patch_size
-        self.channel_first = channel_first
         self.array_predicted = []
 
     def predict(self, array):
@@ -73,9 +71,9 @@ class BaseDummyModel(BaseModel):
 
 
 class DummyModel(BaseDummyModel):
-    def __init__(self, func, patch_size=None, channel_first=False):
+    def __init__(self, func, patch_size=None):
         self.func = func
-        super().__init__(patch_size, channel_first)
+        super().__init__(patch_size)
 
     def _predict(self, array):
         return self.func(array.shape[0])

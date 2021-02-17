@@ -7,6 +7,7 @@ import tiledb
 from slaid.commons import Mask, Slide
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.openslide import Slide as OpenSlide
 
 IMAGE = 'tests/data/test.tif'
 
@@ -18,20 +19,28 @@ class BaseTestSlide:
     def test_returns_dimensions(self):
         self.assertEqual(self.slide.dimensions, (512, 1024))
 
-    def test_converts_to_array(self):
-        region = self.slide.read_region((0, 0), 0, (256, 256))
-        array = region.to_array()
-        self.assertEqual(array.shape, (3, 256, 256))
+    def test_converts_to_array_xy_channel_first(self):
+        region = self.slide.read_region((0, 0), 0, (10, 20))
+        array = region.to_array('bgr', 'xy', 'first')
+        self.assertEqual(array.shape, (3, 10, 20))
 
-    def test_converts_array_as_PIL(self):
-        region = self.slide.read_region((0, 0), 0, (256, 256))
-        array = region.to_array(True)
-        self.assertEqual(array.shape, (256, 256, 3))
+    def test_converts_to_array_yx_channel_first(self):
+        region = self.slide.read_region((0, 0), 0, (10, 20))
+        array = region.to_array('bgr', 'yx', 'first')
+        self.assertEqual(array.shape, (3, 20, 10))
+
+    def test_converts_to_array_xy_channel_last(self):
+        region = self.slide.read_region((0, 0), 0, (10, 20))
+        array = region.to_array('bgr', 'xy', 'last')
+        self.assertEqual(array.shape, (10, 20, 3))
 
 
 class TestEcvlSlide(unittest.TestCase, BaseTestSlide):
     slide = EcvlSlide(IMAGE)
-    slide_cls = EcvlSlide
+
+
+class TestOpenSlide(unittest.TestCase, BaseTestSlide):
+    slide = OpenSlide(IMAGE)
 
 
 class TestImage(unittest.TestCase):

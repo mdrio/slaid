@@ -7,7 +7,7 @@ import numpy as np
 import pyeddl.eddl as eddl
 import stringcase
 from pyeddl.tensor import Tensor
-
+from slaid.commons.base import Image
 from slaid.models import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
@@ -15,7 +15,9 @@ logger = logging.getLogger('eddl-models')
 
 class Model(BaseModel, ABC):
     patch_size = None
-    PIL_FORMAT = False
+    channel = Image.CHANNEL.FIRST
+    coord = Image.COORD.YX
+    color_type = Image.COLORTYPE.BGR
     normalization_factor = 1
     index_prediction = 1
 
@@ -94,7 +96,6 @@ class TissueModel(Model):
 
 class TumorModel(Model):
     patch_size = (256, 256)
-    channel_first = True
     normalization_factor = 255
 
     @staticmethod
