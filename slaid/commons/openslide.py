@@ -66,3 +66,8 @@ class Slide(BaseSlide):
     @property
     def level_downsamples(self):
         return self._slide.level_downsamples
+
+
+def load(filename: str):
+    slide = Slide(filename)
+    return slide

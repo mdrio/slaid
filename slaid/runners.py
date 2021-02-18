@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+from importlib import import_module
 from typing import List
 
 import numpy as np
@@ -55,6 +56,8 @@ class SerialRunner:
             no_round: bool = False,
             n_patch: int = 25,
             filter_slide: str = None,
+            slide_reader: ('r', parameters.one_of('ecvl',
+                                                  'openslide')) = 'ecvl',
             dry_run: bool = False):
         if dry_run:
             args = dict(locals())
@@ -69,7 +72,7 @@ class SerialRunner:
                                          n_batch, extraction_level, threshold,
                                          writer, filter_,
                                          overwrite_output_if_exists, no_round,
-                                         n_patch, filter_slide)
+                                         n_patch, filter_slide, slide_reader)
             return classifier, slides
 
     @classmethod
@@ -95,7 +98,9 @@ class SerialRunner:
         os.makedirs(output_dir, exist_ok=True)
 
     @staticmethod
-    def get_slides(input_path):
+    def get_slides(input_path, slide_reader):
+
+        slide_reader = import_module(f'slaid.commons.{slide_reader}')
         inputs = [
             os.path.abspath(os.path.join(input_path, f))
             for f in os.listdir(input_path)
@@ -109,10 +114,10 @@ class SerialRunner:
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
                         extraction_level, threshold, writer, filter_,
                         overwrite_output_if_exists, no_round, n_patch,
-                        filter_slide):
+                        filter_slide, slide_reader):
 
         slides = []
-        for slide in cls.get_slides(input_path):
+        for slide in cls.get_slides(input_path, slide_reader):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
                                extraction_level, threshold, writer, filter_,
                                overwrite_output_if_exists, no_round, n_patch,
@@ -195,12 +200,13 @@ class ParallelRunner(SerialRunner):
             no_round: bool = False,
             n_patch: int = 25,
             filter_slide: str = None,
+            slide_reader: ('r', parameters.one_of('ecvl',
+                                                  'openslide')) = 'ecvl',
             dry_run: bool = False):
         kwargs = dict(locals())
         for key in ('cls', '__class__', 'processes', 'scheduler'):
             kwargs.pop(key)
         cls._init_client(scheduler, processes)
-        print(kwargs)
         return super().run(**kwargs)
 
     @staticmethod
