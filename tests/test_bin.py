@@ -249,5 +249,28 @@ def test_n_patch(slide_path, tmp_path, model_all_ones_path):
     assert model.array_predicted[0].shape[0] == 2
 
 
+def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
+                                tmpdir):
+    path = f'{tmp_path}.zarr'
+    slide = slide_with_mask(np.ones)
+    condition = 'mask>2'
+    zarr_io.dump(slide, path)
+
+    cmd = [
+        'classify.py',
+        'serial',
+        '-f',
+        'test',
+        '-m',
+        model_all_ones_path,
+        '-o',
+        tmpdir,
+        '-F',
+        f'{condition}@{path}',
+        slide.filename,
+    ]
+    subprocess.check_call(cmd)
+
+
 if __name__ == '__main__':
     unittest.main()

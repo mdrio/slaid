@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+from typing import Tuple
 
 from clize import parameters
 
@@ -9,10 +10,27 @@ import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier, do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
+from slaid.commons.base import Slide
 from slaid.commons.dask import init_client
 from slaid.models.eddl import load_model
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
+
+
+def get_slide(path):
+    slide_ext_with_dot = os.path.splitext(path)[-1]
+    slide_ext = slide_ext_with_dot[1:]
+    try:
+        return STORAGE.get(slide_ext, ecvl).load(path)
+    except Exception as ex:
+        logging.error('an error occurs with file %s: %s', path, ex)
+
+
+def parse_filter(filter_: str, separator: str = '@') -> Tuple[Slide, str]:
+    if separator not in filter_:
+        return None, filter_
+    filter_condition, slide_path = filter_.split(separator)
+    return get_slide(slide_path), filter_condition
 
 
 class SerialRunner:
@@ -74,20 +92,7 @@ class SerialRunner:
             input_path)[-1][1:] not in STORAGE.keys() else [input_path]
         logging.info('processing inputs %s', inputs)
         for f in inputs:
-            slide_ext_with_dot = os.path.splitext(f)[-1]
-            slide_ext = slide_ext_with_dot[1:]
-            try:
-                slide = STORAGE.get(slide_ext, ecvl).load(f)
-
-            except Exception as ex:
-                logging.error(f'an error occurs with file {f}: {ex}')
-            else:
-                yield slide
-
-        #  return [
-        #      os.path.join(input_path, f) for f in os.listdir(input_path)
-        #  ] if os.path.isdir(input_path) and os.path.splitext(
-        #      input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+            yield get_slide(f)
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -116,7 +121,10 @@ class SerialRunner:
                        no_round: bool = False,
                        n_patch=25):
 
-        filter_ = do_filter(slide, filter_) if filter_ else None
+        if filter_:
+            filter_slide, filter_condition = parse_filter(filter_)
+            filter_slide = filter_slide if filter_slide is not None else slide
+            filter_ = do_filter(filter_slide, filter_condition)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
         if classifier.feature in slide.masks or STORAGE[writer].mask_exists(
