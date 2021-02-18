@@ -50,7 +50,7 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         prob_green = [
-            np.sum(p[:, :, 1] / 255) / (p.shape[0] * p.shape[1]) for p in array
+            np.sum(p[1, :, :] / 255) / (p.shape[1] * p.shape[2]) for p in array
         ]
         array = np.array([(0, prob) for prob in prob_green])
         tensor = Tensor.fromarray(array)

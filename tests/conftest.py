@@ -50,3 +50,8 @@ def slide_path():
 @pytest.fixture
 def model_all_ones_path():
     return 'tests/models/all_one_by_patch.pkl'
+
+
+@pytest.fixture
+def patch_path(request):
+    return 'tests/data/patch.png'

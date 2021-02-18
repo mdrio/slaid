@@ -127,8 +127,8 @@ class BasicClassifier(Classifier):
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size, self.model.PIL_FORMAT)
-            for p in patch_indexes
+            Patch(slide, p[0], p[1], level, patch_size, self.model.color_type,
+                  self.model.coords, self.model.channel) for p in patch_indexes
         ]
 
         # adding fake patches, workaround for

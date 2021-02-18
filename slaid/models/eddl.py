@@ -16,7 +16,7 @@ logger = logging.getLogger('eddl-models')
 class Model(BaseModel, ABC):
     patch_size = None
     channel = Image.CHANNEL.FIRST
-    coord = Image.COORD.YX
+    coords = Image.COORD.YX
     color_type = Image.COLORTYPE.BGR
     normalization_factor = 1
     index_prediction = 1
@@ -80,7 +80,7 @@ class Model(BaseModel, ABC):
 
 
 class TissueModel(Model):
-    index_prediction = 0
+    index_prediction = 1
 
     @staticmethod
     def _create_net():
@@ -97,6 +97,7 @@ class TissueModel(Model):
 class TumorModel(Model):
     patch_size = (256, 256)
     normalization_factor = 255
+    index_prediction = 0
 
     @staticmethod
     def _create_net():

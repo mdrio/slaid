@@ -8,6 +8,8 @@ from slaid.classifiers import BasicClassifier, Filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
 from slaid.commons.ecvl import load
+from slaid.commons.openslide import Slide as OpenSlide
+from slaid.models.eddl import TumorModel
 
 
 class BaseTestClassifier:
@@ -117,7 +119,6 @@ class TestEddlPatchClassifier(unittest.TestCase):
     def test_classifies_by_patch_at_level_0(self, n_batch=1):
         level = 0
         slide = load('tests/data/test.tif')
-        print(slide.level_dimensions[level])
         patch_size = (100, 256)
         classifier = self.get_classifier(self.get_model(patch_size))
         mask = classifier.classify(slide, level=level, n_batch=n_batch)
@@ -182,6 +183,15 @@ class TestFilter(unittest.TestCase):
         filtered = Filter(mask).filter('__gt__', 0.5)
 
         self.assertTrue((filtered == indexes_ones).all())
+
+
+def test_patch(patch_path):
+    slide = OpenSlide(patch_path)
+    model = TumorModel(
+        'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin')
+    classifier = BasicClassifier(model, 'tumor')
+    mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
 
 
 if __name__ == '__main__':
