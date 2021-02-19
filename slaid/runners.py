@@ -1,7 +1,9 @@
 import logging
 import os
 import pickle
+from typing import List
 
+import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
@@ -27,6 +29,14 @@ def get_slide(path):
 class SerialRunner:
     CLASSIFIER = BasicClassifier
 
+    @staticmethod
+    def convert_gpu_params(gpu: List[int]) -> List[int]:
+        if gpu:
+            res = np.zeros(max(gpu) + 1, dtype='uint8')
+            np.put(res, gpu, 1)
+            return list(res)
+        return gpu
+
     @classmethod
     def run(cls,
             input_path,
@@ -37,7 +47,7 @@ class SerialRunner:
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu: (int, parameters.multi()),
+            gpu: (int, parameters.multi()) = None,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,
@@ -51,6 +61,7 @@ class SerialRunner:
             args.pop('cls')
             print(args)
         else:
+            gpu = cls.convert_gpu_params(gpu)
             classifier = cls.get_classifier(model, feature, gpu)
             cls.prepare_output_dir(output_dir)
 
@@ -176,7 +187,7 @@ class ParallelRunner(SerialRunner):
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu: (int, parameters.multi()),
+            gpu: (int, parameters.multi()) = None,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,

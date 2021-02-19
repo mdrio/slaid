@@ -238,7 +238,6 @@ def test_n_patch(slide_path, tmp_path, model_all_ones_path):
                                           model=model_all_ones_path,
                                           feature='test',
                                           extraction_level=1,
-                                          gpu=False,
                                           n_patch=2,
                                           writer='zarr')
     model = classifier.model
