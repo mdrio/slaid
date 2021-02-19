@@ -176,9 +176,6 @@ class TestParallelEddlClassifier(TestSerialEddlClassifier):
     #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
     cmd = 'parallel'
 
-    def test_classifies_by_patch(self):
-        pass
-
 
 class TestPatchClassifier:
     model = 'tests/models/all_one_by_patch.pkl'
