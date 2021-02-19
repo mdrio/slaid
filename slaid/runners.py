@@ -1,7 +1,6 @@
 import logging
 import os
 import pickle
-from typing import Tuple
 
 from clize import parameters
 
@@ -10,7 +9,6 @@ import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier, do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons.base import Slide
 from slaid.commons.dask import init_client
 from slaid.models.eddl import load_model
 
@@ -27,6 +25,8 @@ def get_slide(path):
 
 
 class SerialRunner:
+    CLASSIFIER = BasicClassifier
+
     @classmethod
     def run(cls,
             input_path,
@@ -37,28 +37,34 @@ class SerialRunner:
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu=False,
+            gpu: (int, parameters.multi()),
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             n_patch: int = 25,
-            filter_slide: str = None):
-        classifier = cls.get_classifier(model, feature, gpu)
-        cls.prepare_output_dir(output_dir)
+            filter_slide: str = None,
+            dry_run: bool = False):
+        if dry_run:
+            args = dict(locals())
+            args.pop('cls')
+            print(args)
+        else:
+            classifier = cls.get_classifier(model, feature, gpu)
+            cls.prepare_output_dir(output_dir)
 
-        slides = cls.classify_slides(input_path, output_dir, classifier,
-                                     n_batch, extraction_level, threshold,
-                                     writer, filter_,
-                                     overwrite_output_if_exists, no_round,
-                                     n_patch, filter_slide)
-        return classifier, slides
+            slides = cls.classify_slides(input_path, output_dir, classifier,
+                                         n_batch, extraction_level, threshold,
+                                         writer, filter_,
+                                         overwrite_output_if_exists, no_round,
+                                         n_patch, filter_slide)
+            return classifier, slides
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
         model = cls.get_model(model, gpu)
-        return BasicClassifier(model, feature)
+        return cls.CLASSIFIER(model, feature)
 
     @staticmethod
     def get_model(filename, gpu):
@@ -156,37 +162,36 @@ class SerialRunner:
 
 
 class ParallelRunner(SerialRunner):
+    CLASSIFIER = DaskClassifier
+
     @classmethod
     def run(cls,
             input_path,
             *,
+            processes: 'p' = False,
+            scheduler: str = None,
             output_dir: 'o',
             model: 'm',
             n_batch: ('b', int) = 1,
-            processes: 'p' = False,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu=False,
+            gpu: (int, parameters.multi()),
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             n_patch: int = 25,
-            filter_slide: str = None):
-        classifier = cls.get_classifier(model, feature, gpu, processes)
-        cls.prepare_output_dir(output_dir)
+            filter_slide: str = None,
+            dry_run: bool = False):
+        kwargs = dict(locals())
+        for key in ('cls', '__class__', 'processes', 'scheduler'):
+            kwargs.pop(key)
+        cls._init_client(scheduler, processes)
+        print(kwargs)
+        return super().run(**kwargs)
 
-        slides = cls.classify_slides(input_path, output_dir, classifier,
-                                     n_batch, extraction_level, threshold,
-                                     writer, filter_,
-                                     overwrite_output_if_exists, no_round,
-                                     n_patch, filter_slide)
-        return classifier, slides
-
-    @classmethod
-    def get_classifier(cls, model, feature, gpu, processes):
-        model = cls.get_model(model, gpu)
-        init_client(processes=processes)
-        return DaskClassifier(model, feature)
+    @staticmethod
+    def _init_client(scheduler, processes):
+        init_client(address=scheduler, processes=processes)

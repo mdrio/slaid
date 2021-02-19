@@ -19,18 +19,25 @@ class Model(BaseModel, ABC):
     normalization_factor = 1
     index_prediction = 1
 
-    def __init__(self, weight_filename, gpu=False):
+    def __init__(self, weight_filename, gpu: List = None):
         self._weight_filename = weight_filename
-        self.gpu = gpu
+        self._gpu = gpu
+        self._model_ = None
+
+    @property
+    def _model(self):
+        if self._model_ is None:
+            self._create_model()
+        return self._model_
 
     def __str__(self):
         return self._weight_filename
 
-    def _set_gpu(self, value: bool):
+    def _set_gpu(self, value: List):
         self._gpu = value
         self._create_model()
 
-    def _get_gpu(self) -> bool:
+    def _get_gpu(self) -> List:
         return self._gpu
 
     gpu = property(_get_gpu, _set_gpu)
@@ -40,9 +47,10 @@ class Model(BaseModel, ABC):
         eddl.build(
             net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
             ["categorical_accuracy"],
-            eddl.CS_GPU([1], mem="low_mem") if self.gpu else eddl.CS_CPU())
+            eddl.CS_GPU(self.gpu, mem="low_mem")
+            if self.gpu else eddl.CS_CPU())
         eddl.load(net, self._weight_filename, "bin")
-        self._model = net
+        self._model_ = net
 
     @abstractstaticmethod
     def _create_net():
