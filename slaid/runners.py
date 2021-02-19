@@ -18,11 +18,11 @@ from slaid.models.eddl import load_model
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
 
-def get_slide(path):
+def get_slide(path, slide_reader):
     slide_ext_with_dot = os.path.splitext(path)[-1]
     slide_ext = slide_ext_with_dot[1:]
     try:
-        return STORAGE.get(slide_ext, ecvl).load(path)
+        return STORAGE.get(slide_ext, slide_reader).load(path)
     except Exception as ex:
         logging.error('an error occurs with file %s: %s', path, ex)
 
@@ -100,7 +100,6 @@ class SerialRunner:
     @staticmethod
     def get_slides(input_path, slide_reader):
 
-        slide_reader = import_module(f'slaid.commons.{slide_reader}')
         inputs = [
             os.path.abspath(os.path.join(input_path, f))
             for f in os.listdir(input_path)
@@ -108,7 +107,7 @@ class SerialRunner:
             input_path)[-1][1:] not in STORAGE.keys() else [input_path]
         logging.info('processing inputs %s', inputs)
         for f in inputs:
-            yield get_slide(f)
+            yield get_slide(f, slide_reader)
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
@@ -117,11 +116,12 @@ class SerialRunner:
                         filter_slide, slide_reader):
 
         slides = []
+        slide_reader = import_module(f'slaid.commons.{slide_reader}')
         for slide in cls.get_slides(input_path, slide_reader):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
-                               extraction_level, threshold, writer, filter_,
-                               overwrite_output_if_exists, no_round, n_patch,
-                               filter_slide)
+                               extraction_level, slide_reader, threshold,
+                               writer, filter_, overwrite_output_if_exists,
+                               no_round, n_patch, filter_slide)
             slides.append(slide)
         return slides
 
@@ -132,6 +132,7 @@ class SerialRunner:
                        classifier,
                        n_batch,
                        extraction_level,
+                       slide_reader,
                        threshold=None,
                        writer=list(STORAGE.keys())[0],
                        filter_=None,
@@ -141,7 +142,8 @@ class SerialRunner:
                        filter_slide=None):
 
         if filter_:
-            filter_slide = get_slide(filter_slide) if filter_slide else slide
+            filter_slide = get_slide(filter_slide,
+                                     slide_reader) if filter_slide else slide
             filter_ = do_filter(filter_slide, filter_)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
