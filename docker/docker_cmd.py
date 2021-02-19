@@ -67,7 +67,7 @@ def push(image='slaid', lib_version='', repo='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for model_path, model_name, feature in get_models():
+    for model_path, model_name in get_models():
         kwargs_list.append(
             dict(image=image,
                  tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
@@ -93,7 +93,7 @@ def tag(repo, image='slaid', lib_version='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for _, model_name, _ in get_models():
+    for _, model_name in get_models():
         kwargs_list.append(
             dict(repo=repo,
                  image=image,
