@@ -266,7 +266,9 @@ def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
         '-o',
         tmpdir,
         '-F',
-        f'{condition}@{path}',
+        condition,
+        '--filter-slide',
+        path,
         slide.filename,
     ]
     subprocess.check_call(cmd)

@@ -26,13 +26,6 @@ def get_slide(path):
         logging.error('an error occurs with file %s: %s', path, ex)
 
 
-def parse_filter(filter_: str, separator: str = '@') -> Tuple[Slide, str]:
-    if separator not in filter_:
-        return None, filter_
-    filter_condition, slide_path = filter_.split(separator)
-    return get_slide(slide_path), filter_condition
-
-
 class SerialRunner:
     @classmethod
     def run(cls,
@@ -50,7 +43,8 @@ class SerialRunner:
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25):
+            n_patch: int = 25,
+            filter_slide: str = None):
         classifier = cls.get_classifier(model, feature, gpu)
         cls.prepare_output_dir(output_dir)
 
@@ -58,7 +52,7 @@ class SerialRunner:
                                      n_batch, extraction_level, threshold,
                                      writer, filter_,
                                      overwrite_output_if_exists, no_round,
-                                     n_patch)
+                                     n_patch, filter_slide)
         return classifier, slides
 
     @classmethod
@@ -97,13 +91,15 @@ class SerialRunner:
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
                         extraction_level, threshold, writer, filter_,
-                        overwrite_output_if_exists, no_round, n_patch):
+                        overwrite_output_if_exists, no_round, n_patch,
+                        filter_slide):
 
         slides = []
         for slide in cls.get_slides(input_path):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
                                extraction_level, threshold, writer, filter_,
-                               overwrite_output_if_exists, no_round, n_patch)
+                               overwrite_output_if_exists, no_round, n_patch,
+                               filter_slide)
             slides.append(slide)
         return slides
 
@@ -119,12 +115,12 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       n_patch=25):
+                       n_patch=25,
+                       filter_slide=None):
 
         if filter_:
-            filter_slide, filter_condition = parse_filter(filter_)
-            filter_slide = filter_slide if filter_slide is not None else slide
-            filter_ = do_filter(filter_slide, filter_condition)
+            filter_slide = get_slide(filter_slide) if filter_slide else slide
+            filter_ = do_filter(filter_slide, filter_)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
         if classifier.feature in slide.masks or STORAGE[writer].mask_exists(
@@ -177,7 +173,8 @@ class ParallelRunner(SerialRunner):
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25):
+            n_patch: int = 25,
+            filter_slide: str = None):
         classifier = cls.get_classifier(model, feature, gpu, processes)
         cls.prepare_output_dir(output_dir)
 
@@ -185,7 +182,7 @@ class ParallelRunner(SerialRunner):
                                      n_batch, extraction_level, threshold,
                                      writer, filter_,
                                      overwrite_output_if_exists, no_round,
-                                     n_patch)
+                                     n_patch, filter_slide)
         return classifier, slides
 
     @classmethod
