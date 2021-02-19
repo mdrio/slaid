@@ -9,9 +9,9 @@ pyeddl
 clize
 dask[complete]==2.27.0
 zarr
-scipy
 dataclasses
 opencv-python
 shapely
 tiledb==0.7.0
 progress
+stringcase

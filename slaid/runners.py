@@ -1,7 +1,9 @@
 import logging
 import os
 import pickle
+from typing import List
 
+import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
@@ -10,47 +12,81 @@ import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier, do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.dask import init_client
+from slaid.models.eddl import load_model
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
 
+def get_slide(path):
+    slide_ext_with_dot = os.path.splitext(path)[-1]
+    slide_ext = slide_ext_with_dot[1:]
+    try:
+        return STORAGE.get(slide_ext, ecvl).load(path)
+    except Exception as ex:
+        logging.error('an error occurs with file %s: %s', path, ex)
+
+
 class SerialRunner:
+    CLASSIFIER = BasicClassifier
+
+    @staticmethod
+    def convert_gpu_params(gpu: List[int]) -> List[int]:
+        if gpu:
+            res = np.zeros(max(gpu) + 1, dtype='uint8')
+            np.put(res, gpu, 1)
+            return list(res)
+        return gpu
+
     @classmethod
     def run(cls,
             input_path,
-            output_dir,
             *,
+            output_dir: 'o',
             model: 'm',
             n_batch: ('b', int) = 1,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu=False,
+            gpu: (int, parameters.multi()) = None,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25):
-        classifier = cls.get_classifier(model, feature, gpu)
-        cls.prepare_output_dir(output_dir)
+            n_patch: int = 25,
+            filter_slide: str = None,
+            dry_run: bool = False):
+        if dry_run:
+            args = dict(locals())
+            args.pop('cls')
+            print(args)
+        else:
+            gpu = cls.convert_gpu_params(gpu)
+            classifier = cls.get_classifier(model, feature, gpu)
+            cls.prepare_output_dir(output_dir)
 
-        slides = cls.classify_slides(input_path, output_dir, classifier,
-                                     n_batch, extraction_level, threshold,
-                                     writer, filter_,
-                                     overwrite_output_if_exists, no_round,
-                                     n_patch)
-        return classifier, slides
+            slides = cls.classify_slides(input_path, output_dir, classifier,
+                                         n_batch, extraction_level, threshold,
+                                         writer, filter_,
+                                         overwrite_output_if_exists, no_round,
+                                         n_patch, filter_slide)
+            return classifier, slides
 
     @classmethod
     def get_classifier(cls, model, feature, gpu):
         model = cls.get_model(model, gpu)
-        return BasicClassifier(model, feature)
+        return cls.CLASSIFIER(model, feature)
 
     @staticmethod
     def get_model(filename, gpu):
-        with open(filename, 'rb') as f:
-            model = pickle.load(f)
+        ext = os.path.splitext(filename)[-1]
+        if ext in ('.pkl', '.pickle'):
+            with open(filename, 'rb') as f:
+                model = pickle.load(f)
+        elif ext == '.bin':
+            model = load_model(filename)
+        else:
+            raise NotImplementedError(f'unsupported model type {ext}')
         model.gpu = gpu
         return model
 
@@ -67,31 +103,20 @@ class SerialRunner:
             input_path)[-1][1:] not in STORAGE.keys() else [input_path]
         logging.info('processing inputs %s', inputs)
         for f in inputs:
-            slide_ext_with_dot = os.path.splitext(f)[-1]
-            slide_ext = slide_ext_with_dot[1:]
-            try:
-                slide = STORAGE.get(slide_ext, ecvl).load(f)
-
-            except Exception as ex:
-                logging.error(f'an error occurs with file {f}: {ex}')
-            else:
-                yield slide
-
-        #  return [
-        #      os.path.join(input_path, f) for f in os.listdir(input_path)
-        #  ] if os.path.isdir(input_path) and os.path.splitext(
-        #      input_path)[-1][1:] not in STORAGE.keys() else [input_path]
+            yield get_slide(f)
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier, n_batch,
                         extraction_level, threshold, writer, filter_,
-                        overwrite_output_if_exists, no_round, n_patch):
+                        overwrite_output_if_exists, no_round, n_patch,
+                        filter_slide):
 
         slides = []
         for slide in cls.get_slides(input_path):
             cls.classify_slide(slide, output_dir, classifier, n_batch,
                                extraction_level, threshold, writer, filter_,
-                               overwrite_output_if_exists, no_round, n_patch)
+                               overwrite_output_if_exists, no_round, n_patch,
+                               filter_slide)
             slides.append(slide)
         return slides
 
@@ -107,9 +132,12 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       n_patch=25):
+                       n_patch=25,
+                       filter_slide=None):
 
-        filter_ = do_filter(slide, filter_) if filter_ else None
+        if filter_:
+            filter_slide = get_slide(filter_slide) if filter_slide else slide
+            filter_ = do_filter(filter_slide, filter_)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
         if classifier.feature in slide.masks or STORAGE[writer].mask_exists(
@@ -145,36 +173,36 @@ class SerialRunner:
 
 
 class ParallelRunner(SerialRunner):
+    CLASSIFIER = DaskClassifier
+
     @classmethod
     def run(cls,
             input_path,
-            output_dir,
             *,
+            processes: 'p' = False,
+            scheduler: str = None,
+            output_dir: 'o',
             model: 'm',
             n_batch: ('b', int) = 1,
-            processes: 'p' = False,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
-            gpu=False,
+            gpu: (int, parameters.multi()) = None,
             writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
                 STORAGE.keys())[0],
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25):
-        classifier = cls.get_classifier(model, feature, gpu, processes)
-        cls.prepare_output_dir(output_dir)
+            n_patch: int = 25,
+            filter_slide: str = None,
+            dry_run: bool = False):
+        kwargs = dict(locals())
+        for key in ('cls', '__class__', 'processes', 'scheduler'):
+            kwargs.pop(key)
+        cls._init_client(scheduler, processes)
+        print(kwargs)
+        return super().run(**kwargs)
 
-        slides = cls.classify_slides(input_path, output_dir, classifier,
-                                     n_batch, extraction_level, threshold,
-                                     writer, filter_,
-                                     overwrite_output_if_exists, no_round,
-                                     n_patch)
-        return classifier, slides
-
-    @classmethod
-    def get_classifier(cls, model, feature, gpu, processes):
-        model = cls.get_model(model, gpu)
-        init_client(processes=processes)
-        return DaskClassifier(model, feature)
+    @staticmethod
+    def _init_client(scheduler, processes):
+        init_client(address=scheduler, processes=processes)

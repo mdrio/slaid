@@ -29,7 +29,7 @@ def build(image='slaid',
              docker_args=docker_args)
     ]
 
-    for model_path, model_name, feature in get_models():
+    for model_path, model_name in get_models():
         kwargs_list.append(
             dict(build_dir=docker_build_dir,
                  image=image,
@@ -67,7 +67,7 @@ def push(image='slaid', lib_version='', repo='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for model_path, model_name, feature in get_models():
+    for model_path, model_name in get_models():
         kwargs_list.append(
             dict(image=image,
                  tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
@@ -93,7 +93,7 @@ def tag(repo, image='slaid', lib_version='', docker_args=''):
              docker_args=docker_args)
     ]
 
-    for _, model_name, _ in get_models():
+    for _, model_name in get_models():
         kwargs_list.append(
             dict(repo=repo,
                  image=image,
@@ -112,12 +112,11 @@ def docker_tag(repo, image, tag, docker_args=''):
 
 
 def get_models():
-    models = glob.glob('../slaid/resources/models/*.pkl')
+    models = glob.glob('../slaid/resources/models/*.bin')
     for model in models:
         model_path = os.path.basename(model)
         model_name = os.path.splitext(model_path)[0]
-        feature = model_name.split('_')[1]
-        yield model_path, model_name, feature
+        yield model_path, model_name
 
 
 if __name__ == '__main__':

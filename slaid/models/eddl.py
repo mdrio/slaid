@@ -1,10 +1,13 @@
 import logging
+import os
+from abc import ABC, abstractstaticmethod
 from typing import List
 
 import numpy as np
 import pyeddl.eddl as eddl
+import stringcase
 from pyeddl.tensor import Tensor
-from abc import ABC, abstractstaticmethod
+
 from slaid.models import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
@@ -12,21 +15,29 @@ logger = logging.getLogger('eddl-models')
 
 class Model(BaseModel, ABC):
     patch_size = None
-    channel_first = False
+    PIL_FORMAT = False
     normalization_factor = 1
+    index_prediction = 1
 
-    def __init__(self, weight_filename, gpu=True):
+    def __init__(self, weight_filename, gpu: List = None):
         self._weight_filename = weight_filename
-        self.gpu = gpu
+        self._gpu = gpu
+        self._model_ = None
+
+    @property
+    def _model(self):
+        if self._model_ is None:
+            self._create_model()
+        return self._model_
 
     def __str__(self):
         return self._weight_filename
 
-    def _set_gpu(self, value: bool):
+    def _set_gpu(self, value: List):
         self._gpu = value
         self._create_model()
 
-    def _get_gpu(self) -> bool:
+    def _get_gpu(self) -> List:
         return self._gpu
 
     gpu = property(_get_gpu, _set_gpu)
@@ -36,9 +47,10 @@ class Model(BaseModel, ABC):
         eddl.build(
             net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
             ["categorical_accuracy"],
-            eddl.CS_GPU([1], mem="low_mem") if self.gpu else eddl.CS_CPU())
+            eddl.CS_GPU(self.gpu, mem="low_mem")
+            if self.gpu else eddl.CS_CPU())
         eddl.load(net, self._weight_filename, "bin")
-        self._model = net
+        self._model_ = net
 
     @abstractstaticmethod
     def _create_net():
@@ -49,17 +61,13 @@ class Model(BaseModel, ABC):
         temp_mask = []
         for prob_T in predictions:
             output_np = prob_T.getdata()
-            temp_mask.append(output_np[:, 1])
+            temp_mask.append(output_np[:, self.index_prediction])
 
         flat_mask = np.vstack(temp_mask).flatten()
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        if self.channel_first:
-            array = array.transpose(0, 3, 2, 1)
         tensor = Tensor.fromarray(array / self.normalization_factor)
-        #  if self.patch_size:
-        #      tensor = Tensor.unsqueeze(tensor)
         return eddl.predict(self._model, [tensor])
 
     def __getstate__(self):
@@ -70,6 +78,8 @@ class Model(BaseModel, ABC):
 
 
 class TissueModel(Model):
+    index_prediction = 0
+
     @staticmethod
     def _create_net():
         in_ = eddl.Input([3])
@@ -121,3 +131,10 @@ class TumorModel(Model):
         x = eddl.ReLu(init(eddl.Dense(x, 256), seed))
         x = eddl.Softmax(eddl.Dense(x, num_classes))
         return x
+
+
+def load_model(weight_filename: str) -> Model:
+    basename = os.path.basename(weight_filename)
+    cls_name = basename.split('-')[0]
+    cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+    return globals()[cls_name](weight_filename)
