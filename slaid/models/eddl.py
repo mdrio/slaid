@@ -81,6 +81,8 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
+    color_type = Image.COLORTYPE.RGB
+    channel = Image.CHANNEL.LAST
 
     @staticmethod
     def _create_net():
