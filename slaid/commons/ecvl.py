@@ -24,7 +24,7 @@ class Image(BaseImage):
                  channel: 'Image.CHANNEL') -> np.ndarray:
         array = np.array(self._image)  # cxy, BGR
         if self.COLORTYPE(colortype) == self.COLORTYPE.RGB:
-            array = array[..., ::-1]
+            array = array[::-1, ...]
         if self.COORD(coords) == self.COORD.YX:
             array = np.transpose(array, [0, 2, 1])
         if self.CHANNEL(channel) == self.CHANNEL.LAST:
