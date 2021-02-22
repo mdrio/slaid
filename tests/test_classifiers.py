@@ -8,6 +8,8 @@ from slaid.classifiers import BasicClassifier, Filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
 from slaid.commons.ecvl import load
+from slaid.models.eddl import TumorModel
+from slaid.models.eddl import TissueModel
 
 
 class BaseTestClassifier:
@@ -61,6 +63,8 @@ class BaseTestClassifier:
         self.assertEqual(mask.array.dtype, 'float32')
 
     def test_returns_a_mask(self):
+        #  import pudb
+        #  pudb.set_trace()
         level = 0
         slide = load('tests/data/test.tif')
         tissue_detector = self.get_classifier(self.get_model())
@@ -115,7 +119,6 @@ class TestEddlPatchClassifier(unittest.TestCase):
     def test_classifies_by_patch_at_level_0(self, n_batch=1):
         level = 0
         slide = load('tests/data/test.tif')
-        print(slide.level_dimensions[level])
         patch_size = (100, 256)
         classifier = self.get_classifier(self.get_model(patch_size))
         mask = classifier.classify(slide, level=level, n_batch=n_batch)
@@ -180,6 +183,24 @@ class TestFilter(unittest.TestCase):
         filtered = Filter(mask).filter('__gt__', 0.5)
 
         self.assertTrue((filtered == indexes_ones).all())
+
+
+def test_classifies_tumor(patch_path, slide_reader):
+    slide = slide_reader(patch_path)
+    model = TumorModel(
+        'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin')
+    classifier = BasicClassifier(model, 'tumor')
+    mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
+
+
+def test_classifies_tissue(patch_path, slide_reader, patch_tissue_mask):
+    slide = slide_reader(patch_path)
+    model = TissueModel(
+        'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+    classifier = BasicClassifier(model, 'tissue')
+    mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert (mask.array == patch_tissue_mask).all()
 
 
 if __name__ == '__main__':

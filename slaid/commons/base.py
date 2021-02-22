@@ -6,6 +6,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime as dt
+from enum import Enum
 from typing import Dict, List, Tuple
 
 import cv2
@@ -26,23 +27,26 @@ def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
-class Tensor(abc.ABC):
-    @abc.abstractmethod
-    def getdata() -> np.ndarray:
-        pass
-
-
 class Image(abc.ABC):
+    class COLORTYPE(Enum):
+        RGB = 'rgb'
+        BGR = 'bgr'
+
+    class COORD(Enum):
+        XY = 'xy'
+        YX = 'yx'
+
+    class CHANNEL(Enum):
+        FIRST = 'first'
+        LAST = 'last'
+
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
 
     @abc.abstractmethod
-    def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
-        pass
-
-    @abc.abstractmethod
-    def to_tensor(self):
+    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
+                 channel: 'Image.CHANNEL') -> np.ndarray:
         pass
 
 
@@ -222,7 +226,7 @@ class Slide(abc.ABC):
         return self._filename
 
     @abc.abstractmethod
-    def read_region(self, location: Tuple[int, int],
+    def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> Image:
         pass
 

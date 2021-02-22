@@ -1,14 +1,15 @@
 import abc
-from datetime import datetime as dt
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime as dt
 from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
 
 from slaid.commons import Mask, Slide
+from slaid.commons.base import Image
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
@@ -91,7 +92,8 @@ class BasicClassifier(Classifier):
                  n_patch=25) -> Mask:
 
         patch_size = self.model.patch_size
-        batches = BatchIterator(slide, level, n_batch)
+        batches = BatchIterator(slide, level, n_batch, self.model.color_type,
+                                self.model.coords, self.model.channel)
         array = self._classify_patches(
             slide, patch_size, level, filter_, threshold, n_patch,
             round_to_0_100) if patch_size else self._classify_batches(
@@ -125,7 +127,8 @@ class BasicClassifier(Classifier):
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
+            Patch(slide, p[0], p[1], level, patch_size, self.model.color_type,
+                  self.model.coords, self.model.channel) for p in patch_indexes
         ]
 
         # adding fake patches, workaround for
@@ -162,12 +165,12 @@ class BasicClassifier(Classifier):
         # FIXME
         filter_ = None
         array = batch.array
-        orig_shape = array.shape
+        orig_shape = batch.shape
         if filter_ is not None:
             indexes_pixel_to_process = filter_.filter(batch)
             array = array[indexes_pixel_to_process]
         else:
-            array = self._flat_array(array)
+            array = batch.flatten()
 
         prediction = self._classify_array(array, threshold, round_to_0_100)
         if filter_ is not None:
@@ -207,38 +210,65 @@ class BasicClassifier(Classifier):
     def _reshape(array, shape):
         return array.reshape(shape)
 
-    def _flat_array(self, array: np.ndarray) -> np.ndarray:
-        n_px = array.shape[0] * array.shape[1]
+    def _flat_array(self, array: np.ndarray, shape: Tuple[int,
+                                                          int]) -> np.ndarray:
+        n_px = shape[0] * shape[1]
         array = array[:, :, :3].reshape(n_px, 3)
         return array
 
 
 @dataclass
-class Batch:
+class ImageArea:
     slide: Slide
-    location: Tuple[int, int]
-    size: Tuple[int, int]
+    row: int
+    column: int
     level: int
+    size: Tuple[int, int]
+    color_type: Image.COLORTYPE = Image.COLORTYPE.BGR
+    coords: Image.COORD = Image.COORD.YX
+    channel: Image.CHANNEL = Image.CHANNEL.FIRST
 
     def __post_init__(self):
-        self.downsample = self.slide.level_downsamples[self.level]
         self._array = None
 
     @property
-    def row(self):
-        return int(self.location[0] // self.downsample)
-
-    @property
-    def column(self):
-        return int(self.location[1] // self.downsample)
+    def top_level_location(self):
+        raise NotImplementedError
 
     @property
     def array(self):
         if self._array is None:
-            image = self.slide.read_region(self.location[::-1], self.level,
-                                           self.size[::-1])
-            self._array = image.to_array(True)
+            image = self.slide.read_region(self.top_level_location[::-1],
+                                           self.level, self.size[::-1])
+            self._array = image.to_array(self.color_type, self.coords,
+                                         self.channel)
         return self._array
+
+    @property
+    def shape(self):
+        return self.array.shape[:2] if self.channel == Image.CHANNEL.LAST \
+            else self.array.shape[1:]
+
+    def flatten(self):
+        n_px = self.shape[0] * self.shape[1]
+        if self.channel == Image.CHANNEL.FIRST:
+            array = self.array.transpose(1, 2, 0)
+        else:
+            array = self.array
+        array = array[:, :, :3].reshape(n_px, 3)
+        return array
+
+
+@dataclass
+class Batch(ImageArea):
+    def __post_init__(self):
+        super().__post_init__()
+        self.downsample = self.slide.level_downsamples[self.level]
+
+    @property
+    def top_level_location(self):
+        return (round(self.row * self.downsample),
+                round(self.column * self.downsample))
 
     def get_patches(self,
                     patch_size: Tuple[int, int],
@@ -246,21 +276,22 @@ class Batch:
         dimensions = self.slide.level_dimensions[self.level][::-1]
         if filter_ is None:
             for row in range(0, self.size[0], patch_size[0]):
-                if self.row // self.downsample + row + patch_size[
-                        0] > dimensions[0]:
+                if self.row + row + patch_size[0] > dimensions[0]:
                     continue
                 for col in range(0, self.size[1], patch_size[1]):
-                    if self.column // self.downsample + col + patch_size[
-                            1] > dimensions[1]:
+                    if self.column + col + patch_size[1] > dimensions[1]:
                         continue
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
-                    yield Patch(self, patch_row, patch_column, patch_size)
+                    yield Patch(self.slide, patch_row, patch_column,
+                                patch_size, self.color_type, self.coords,
+                                self.channel)
 
         else:
             index_patches = filter_.filter(self, patch_size)
             for p in np.argwhere(index_patches):
-                patch = Patch(self, p[0], p[1], patch_size)
+                patch = Patch(self.slide, p[0], p[1], patch_size,
+                              self.color_type, self.coords, self.channel)
                 logger.debug('yielding patch %s', patch)
                 yield patch
 
@@ -270,6 +301,9 @@ class BatchIterator:
     slide: Slide
     level: int
     n_batch: int
+    color_type: Image.COLORTYPE = Image.COLORTYPE.BGR
+    coords: Image.COORD = Image.COORD.YX
+    channel: Image.CHANNEL = Image.CHANNEL.FIRST
 
     def __post_init__(self):
         self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
@@ -285,31 +319,25 @@ class BatchIterator:
                 size = (size_0,
                         min(self._batch_size[1],
                             self._level_dimensions[1] - j))
-                yield Batch(
-                    self.slide,
-                    (round(i * self._downsample), round(j * self._downsample)),
-                    size, self.level)
+                yield Batch(self.slide, i, j, self.level, size,
+                            self.color_type, self.coords, self.channel)
 
     def __len__(self):
         return self._level_dimensions[0] // self._batch_size[0]
 
 
 @dataclass
-class Patch:
+class Patch(ImageArea):
     slide: Slide
     row: int
     column: int
     level: int
     size: Tuple[int, int]
+    PIL_format: bool = False
 
     def __post_init__(self):
         self._array = None
 
     @property
-    def array(self):
-        if self._array is None:
-            location = (self.row * self.size[0], self.column * self.size[1])
-            image = self.slide.read_region(location[::-1], self.level,
-                                           self.size)
-            self._array = image.to_array(True)
-        return self._array
+    def top_level_location(self):
+        return (self.row * self.size[0], self.column * self.size[1])

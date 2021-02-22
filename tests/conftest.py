@@ -4,6 +4,8 @@ import dask.array as da
 import numpy as np
 import pytest
 import tiledb
+from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.openslide import Slide as OpenSlide
 
 from slaid.commons import Mask
 
@@ -50,3 +52,18 @@ def slide_path():
 @pytest.fixture
 def model_all_ones_path():
     return 'tests/models/all_one_by_patch.pkl'
+
+
+@pytest.fixture
+def patch_path(request):
+    return 'tests/data/patch.tif'
+
+
+@pytest.fixture(params=[OpenSlide, EcvlSlide])
+def slide_reader(request):
+    return request.param
+
+
+@pytest.fixture
+def patch_tissue_mask(request):
+    return np.load('tests/data/tissue_mask_prob.npy')

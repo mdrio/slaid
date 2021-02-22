@@ -2,25 +2,14 @@ import logging
 from typing import List, Tuple
 
 import numpy as np
-import pyecvl.ecvl as ecvl
 from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
-from pyeddl.tensor import Tensor as EddlTensor
 
 from slaid.commons import Image as BaseImage
 from slaid.commons import Slide as BaseSlide
-from slaid.commons import Tensor as BaseTensor
 
 logger = logging.getLogger('ecvl')
-
-
-class Tensor(BaseTensor):
-    def __init__(self, tensor: EddlTensor):
-        self._tensor = tensor
-
-    def getdata(self):
-        return self._tensor.getdata()
 
 
 class Image(BaseImage):
@@ -31,19 +20,16 @@ class Image(BaseImage):
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._image.dims_)
 
-    def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
-        array = np.array(self._image)
-        if PIL_FORMAT:
-            # convert to channel last
-            array = array.transpose(2, 1, 0)
-            # convert to rgb
-            array = array[:, :, ::-1]
-            #  array = np.flip(array, 1)
-            #  array[:, :] = np.flip(array[:, :])
+    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
+                 channel: 'Image.CHANNEL') -> np.ndarray:
+        array = np.array(self._image)  # cxy, BGR
+        if self.COLORTYPE(colortype) == self.COLORTYPE.RGB:
+            array = array[::-1, ...]
+        if self.COORD(coords) == self.COORD.YX:
+            array = np.transpose(array, [0, 2, 1])
+        if self.CHANNEL(channel) == self.CHANNEL.LAST:
+            array = np.transpose(array, [1, 2, 0])
         return array
-
-    def to_tensor(self):
-        return ecvl.ImageToTensor(self._image)
 
 
 class Slide(BaseSlide):
