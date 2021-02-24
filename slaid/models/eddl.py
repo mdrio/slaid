@@ -7,6 +7,7 @@ import numpy as np
 import pyeddl.eddl as eddl
 import stringcase
 from pyeddl.tensor import Tensor
+
 from slaid.commons.base import Image
 from slaid.models import Model as BaseModel
 
@@ -26,18 +27,22 @@ class Model(BaseModel, ABC):
         self._gpu = gpu
         self._model_ = None
 
-    @property
-    def _model(self):
+    def _get_model(self):
         if self._model_ is None:
             self._create_model()
         return self._model_
+
+    def _set_model(self, value):
+        self._model_ = value
+
+    _model = property(_get_model, _set_model)
 
     def __str__(self):
         return self._weight_filename
 
     def _set_gpu(self, value: List):
         self._gpu = value
-        self._create_model()
+        self._model = None
 
     def _get_gpu(self) -> List:
         return self._gpu
