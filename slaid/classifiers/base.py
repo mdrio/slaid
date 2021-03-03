@@ -91,6 +91,8 @@ class BasicClassifier(Classifier):
                  round_to_0_100: bool = True,
                  n_patch=25) -> Mask:
 
+        logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
+                    filter_, threshold, level, n_batch, round_to_0_100)
         patch_size = self.model.patch_size
         batches = BatchIterator(slide, level, n_batch, self.model.color_type,
                                 self.model.coords, self.model.channel)

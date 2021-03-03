@@ -1,7 +1,6 @@
 import logging
 import os
 
-import dask
 import dask.array as da
 import tiledb
 import zarr
@@ -12,13 +11,11 @@ from slaid.commons import Mask as BaseMask
 logger = logging.getLogger()
 
 
-def init_client(*args, **kwargs):
-    logger.debug('init dask client with %s, %s', args, kwargs)
-    return Client(*args, **kwargs)
-
-
-#  import dask
-#  dask.config.set(scheduler='synchronous')
+def init_client(address=None, processes=False):
+    if address:
+        return Client(address)
+    else:
+        return Client(processes=processes)
 
 
 class Mask(BaseMask):
