@@ -32,7 +32,8 @@ class Batch(BaseBatch):
 
 class Classifier(BasicClassifier):
     MASK_CLASS = Mask
-    lock = threading.Lock()
+
+    #  lock = threading.Lock()
 
     def __init__(self, model: Model, feature: str):
         super().__init__(model, feature)
@@ -52,6 +53,7 @@ class Classifier(BasicClassifier):
         c = 0
         for batch in batches:
             logger.debug('batch %s of %s', c, batches.n_batch)
+            logger.debug('batch size %s', batch.size)
             predictions.append(
                 da.from_delayed(self._classify_batch(batch, threshold,
                                                      round_to_0_100),
@@ -121,6 +123,7 @@ class Classifier(BasicClassifier):
     def _reshape(array, shape):
         return da.reshape(array, shape)
 
-    def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
-        with self.lock:
-            return super()._classify_array(array, threshold, round_to_0_100)
+    #  def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
+    #      with self.lock:
+    #          print('locked classify array')
+    #          return super()._classify_array(array, threshold, round_to_0_100)

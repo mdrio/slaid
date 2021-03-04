@@ -81,10 +81,14 @@ class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self.model = model
         self.feature = feature
-        self._patch_size = self.model.patch_size
-        self._color_type = model.color_type
-        self._coords = model.coords
-        self._channel = model.channel
+        #  self._patch_size = self.model.patch_size
+        #  self._color_type = model.color_type
+        #  self._coords = model.coords
+        #  self._channel = model.channel
+        self._patch_size = None
+        self._color_type = Image.COLORTYPE.RGB
+        self._coords = Image.COORD.YX
+        self._channel = Image.CHANNEL.LAST
 
     def classify(self,
                  slide: Slide,
@@ -328,6 +332,8 @@ class BatchIterator:
     def __iter__(self):
         for i in range(0, self._level_dimensions[0], self._batch_size[0]):
             size_0 = min(self._batch_size[0], self._level_dimensions[0] - i)
+            #  if self._level_dimensions[0] - i < self._batch_size[0]:
+            #      continue
             for j in range(0, self._level_dimensions[1], self._batch_size[1]):
                 size = (size_0,
                         min(self._batch_size[1],

@@ -10,6 +10,7 @@ from pyeddl.tensor import Tensor
 
 from slaid.commons.base import Image
 from slaid.models import Model as BaseModel
+from dask.distributed import Lock
 
 logger = logging.getLogger('eddl-models')
 
@@ -79,7 +80,11 @@ class Model(BaseModel, ABC):
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         tensor = Tensor.fromarray(array / self.normalization_factor)
-        return eddl.predict(self._model, [tensor])
+        lock = Lock('pred')
+        lock.acquire()
+        prediction = eddl.predict(self._model, [tensor])
+        lock.release()
+        return prediction
 
     def __getstate__(self):
         return dict(weight_filename=self._weight_filename, gpu=self._gpu)
