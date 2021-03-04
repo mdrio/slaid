@@ -81,6 +81,10 @@ class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self.model = model
         self.feature = feature
+        self._patch_size = self.model.patch_size
+        self._color_type = model.color_type
+        self._coords = model.coords
+        self._channel = model.channel
 
     def classify(self,
                  slide: Slide,
@@ -93,12 +97,11 @@ class BasicClassifier(Classifier):
 
         logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
                     filter_, threshold, level, n_batch, round_to_0_100)
-        patch_size = self.model.patch_size
-        batches = BatchIterator(slide, level, n_batch, self.model.color_type,
-                                self.model.coords, self.model.channel)
+        batches = BatchIterator(slide, level, n_batch, self._color_type,
+                                self._coords, self._channel)
         array = self._classify_patches(
-            slide, patch_size, level, filter_, threshold, n_patch,
-            round_to_0_100) if patch_size else self._classify_batches(
+            slide, self._patch_size, level, filter_, threshold, n_patch,
+            round_to_0_100) if self._patch_size else self._classify_batches(
                 batches, threshold, round_to_0_100)
 
         return self._get_mask(array, level, slide.level_downsamples[level],

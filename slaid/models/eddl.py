@@ -27,6 +27,10 @@ class Model(BaseModel, ABC):
         self._gpu = gpu
         self._model_ = None
 
+    @property
+    def weight_filename(self):
+        return self._weight_filename
+
     def _get_model(self):
         if self._model_ is None:
             self._create_model()
@@ -142,8 +146,8 @@ class TumorModel(Model):
         return x
 
 
-def load_model(weight_filename: str) -> Model:
+def load_model(weight_filename: str, gpu: List[int] = None) -> Model:
     basename = os.path.basename(weight_filename)
     cls_name = basename.split('-')[0]
     cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-    return globals()[cls_name](weight_filename)
+    return globals()[cls_name](weight_filename, gpu)

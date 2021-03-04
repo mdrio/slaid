@@ -9,6 +9,9 @@ from slaid.classifiers.base import (BasicClassifier, BatchIterator, Filter,
                                     Patch)
 from slaid.commons import Slide
 from slaid.commons.dask import Mask
+from slaid.models.base import Model
+from slaid.models.eddl import Model as EddlModel
+from slaid.models.eddl import load_model
 
 logger = logging.getLogger('dask')
 
@@ -17,13 +20,19 @@ class Classifier(BasicClassifier):
     MASK_CLASS = Mask
     lock = threading.Lock()
 
+    def __init__(self, model: Model, feature: str):
+        super().__init__(model, feature)
+        self.model = delayed(load_model)(
+            model.weight_filename, model.gpu) if isinstance(
+                model, EddlModel) else delayed(lambda: model)()
+
     def _classify_batches(self, batches: BatchIterator, threshold: float,
                           round_to_0_100: bool) -> Mask:
         predictions = []
         for batch in batches:
             predictions.append(
-                da.from_delayed(delayed(self._classify_batch)(batch, threshold,
-                                                              round_to_0_100),
+                da.from_delayed(self._classify_batch(batch, threshold,
+                                                     round_to_0_100),
                                 batch.size,
                                 dtype='uint8'
                                 if threshold or round_to_0_100 else 'float32'))
@@ -59,9 +68,8 @@ class Classifier(BasicClassifier):
                                 dtype=dtype) for p in patches
             ])
             predictions.append(
-                da.from_delayed(delayed(self._classify_array)(input_array,
-                                                              threshold,
-                                                              round_to_0_100),
+                da.from_delayed(self._classify_array(input_array, threshold,
+                                                     round_to_0_100),
                                 shape=(len(patches), ),
                                 dtype=dtype))
         if predictions:
