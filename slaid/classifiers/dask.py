@@ -5,15 +5,29 @@ import dask.array as da
 import numpy as np
 from dask import delayed
 
-from slaid.classifiers.base import (BasicClassifier, BatchIterator, Filter,
-                                    Patch)
+from slaid.classifiers.base import BasicClassifier
+from slaid.classifiers.base import Batch as BaseBatch
+from slaid.classifiers.base import BatchIterator
+from slaid.classifiers.base import Filter, Model
+from slaid.classifiers.base import Patch as BasePatch
 from slaid.commons import Slide
 from slaid.commons.dask import Mask
-from slaid.models.base import Model
 from slaid.models.eddl import Model as EddlModel
 from slaid.models.eddl import load_model
 
 logger = logging.getLogger('dask')
+
+
+class Patch(BasePatch):
+    @property
+    def array(self):
+        return delayed(super().array)
+
+
+class Batch(BaseBatch):
+    @property
+    def array(self):
+        return delayed(super().array)
 
 
 class Classifier(BasicClassifier):
@@ -26,16 +40,25 @@ class Classifier(BasicClassifier):
             model.weight_filename, model.gpu) if isinstance(
                 model, EddlModel) else delayed(lambda: model)()
 
+    @staticmethod
+    def _get_batch_iterator(slide, level, n_batch, color_type, coords,
+                            channel):
+        return BatchIterator(slide, level, n_batch, color_type, coords,
+                             channel, Batch)
+
     def _classify_batches(self, batches: BatchIterator, threshold: float,
                           round_to_0_100: bool) -> Mask:
         predictions = []
+        c = 0
         for batch in batches:
+            logger.debug('batch %s of %s', c, batches.n_batch)
             predictions.append(
                 da.from_delayed(self._classify_batch(batch, threshold,
                                                      round_to_0_100),
                                 batch.size,
                                 dtype='uint8'
                                 if threshold or round_to_0_100 else 'float32'))
+            c += 1
         return self._concatenate(predictions, axis=0)
 
     def _classify_patches(self,
@@ -63,7 +86,7 @@ class Classifier(BasicClassifier):
         for i in range(0, len(patches_to_predict), n_patch):
             patches = patches_to_predict[i:i + n_patch]
             input_array = da.stack([
-                da.from_delayed(delayed(getattr)(p, 'array'),
+                da.from_delayed(p.array,
                                 shape=(p.size[0], p.size[1], 3),
                                 dtype=dtype) for p in patches
             ])

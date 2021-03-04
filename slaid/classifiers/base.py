@@ -3,7 +3,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime as dt
-from typing import Tuple
+from typing import Callable, Tuple
 
 import numpy as np
 from progress.bar import Bar
@@ -97,8 +97,9 @@ class BasicClassifier(Classifier):
 
         logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
                     filter_, threshold, level, n_batch, round_to_0_100)
-        batches = BatchIterator(slide, level, n_batch, self._color_type,
-                                self._coords, self._channel)
+        batches = self._get_batch_iterator(slide, level, n_batch,
+                                           self._color_type, self._coords,
+                                           self._channel)
         array = self._classify_patches(
             slide, self._patch_size, level, filter_, threshold, n_patch,
             round_to_0_100) if self._patch_size else self._classify_batches(
@@ -106,6 +107,12 @@ class BasicClassifier(Classifier):
 
         return self._get_mask(array, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
+
+    @staticmethod
+    def _get_batch_iterator(slide, level, n_batch, color_type, coords,
+                            channel):
+        return BatchIterator(slide, level, n_batch, color_type, coords,
+                             channel)
 
     def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
         return self.MASK_CLASS(array,
@@ -309,6 +316,7 @@ class BatchIterator:
     color_type: Image.COLORTYPE = Image.COLORTYPE.BGR
     coords: Image.COORD = Image.COORD.YX
     channel: Image.CHANNEL = Image.CHANNEL.FIRST
+    batch_cls: Callable = Batch
 
     def __post_init__(self):
         self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
