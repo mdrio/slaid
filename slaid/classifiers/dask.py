@@ -1,8 +1,10 @@
 import logging
+from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
 from dask import delayed
+from pyecvl.ecvl import OpenSlideRead
 
 from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.base import Batch as BaseBatch
@@ -17,15 +19,17 @@ logger = logging.getLogger('dask')
 
 
 class Patch(BasePatch):
-    @property
-    def array(self):
-        return delayed(super().array)
+    pass
+    #  @property
+    #  def array(self):
+    #      return delayed(super().array)
 
 
 class Batch(BaseBatch):
-    @property
-    def array(self):
-        return delayed(super().array)
+    pass
+    #  @property
+    #  def array(self):
+    #      return delayed(super().array)
 
 
 class Classifier(BasicClassifier):
@@ -33,11 +37,11 @@ class Classifier(BasicClassifier):
 
     #  lock = threading.Lock()
 
-    def __init__(self, model: Model, feature: str):
-        super().__init__(model, feature)
-        self.model = delayed(load_model)(
-            model.weight_filename, model.gpu) if isinstance(
-                model, EddlModel) else delayed(lambda: model)()
+    @property
+    def model(self):
+        return load_model(self._model.weight_filename,
+                          self._model.gpu) if isinstance(
+                              self._model, EddlModel) else self._model
 
     @staticmethod
     def _get_batch_iterator(slide, level, n_batch, color_type, coords,
@@ -50,8 +54,8 @@ class Classifier(BasicClassifier):
         predictions = []
         for batch in batches:
             predictions.append(
-                da.from_delayed(self._classify_batch(batch, threshold,
-                                                     round_to_0_100),
+                da.from_delayed(delayed(self._classify_batch)(batch, threshold,
+                                                              round_to_0_100),
                                 batch.size,
                                 dtype='uint8'
                                 if threshold or round_to_0_100 else 'float32'))
@@ -95,7 +99,7 @@ class Classifier(BasicClassifier):
             predictions = da.concatenate(predictions)
 
         logger.debug('predictions %s', predictions)
-        predictions = predictions.compute(rerun_exceptions_locally=True)
+        predictions = predictions.compute()
         res = np.zeros(
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
             dtype=dtype)
@@ -121,3 +125,97 @@ class Classifier(BasicClassifier):
     #      with self.lock:
     #          print('locked classify array')
     #          return super()._classify_array(array, threshold, round_to_0_100)
+
+
+def _classify_batch(slide_path: str, model_path: str, level: int):
+    pass
+
+
+@delayed
+def get_array(slide_path, level, dims):
+    image = OpenSlideRead(slide_path, level, dims)
+    return np.array(image)
+
+
+#  def classify(
+#      slide_path: str,
+#      model_path: str,
+#      gpu: List[int],
+#      level: int,
+#      threshold: float,
+#      round_to_0_100: bool,
+#      n_batch: int,
+#  ):
+#      model = delayed(load_model)(model_path, gpu)
+#      dimensions_0 = slide.dimensions[::-1]
+#      dimensions = slide.level_dimensions[level][::-1]
+#      step = dimensions_0[0] // n_batch
+#      predictions = []
+#      for i in range(0, dimensions_0[0], step):
+#          array = da.from_delayed(get_array(
+#              slide_path, level,
+#              (0, i, dimensions[1], step // slide.level_dimensions[level][1])),
+#                                  shape=(3, dimensions[1], step //
+#                                         slide.level_dimensions[level][1]),
+#                                  dtype='uint8')
+#          array = array.transpose((1, 2, 0))
+#          array = array[:, :, ::-1]
+#          n_px = array.shape[0] * array.shape[1]
+#          array_reshaped = array.reshape((n_px, 3))
+#          prediction = da.from_delayed(model.predict(array_reshaped),
+#                                       shape=(n_px, ),
+#                                       dtype='float32')
+#          prediction.reshape(array.shape[0], array.shape[1])
+#          predictions.append(
+#              da.from_delayed(model.predict(array),
+#                              shape=(n_px, ),
+#                              dtype='float32'))
+#
+#      return da.concatenate(predictions, 0)
+#  def classify(self,
+#               slide: Slide,
+#               filter_=None,
+#               threshold: float = None,
+#               level: int = 2,
+#               n_batch: int = 1,
+#               round_to_0_100: bool = True,
+#               n_patch=25) -> Mask:
+#      dimensions_0 = slide.dimensions[::-1]
+#      dimensions = slide.level_dimensions[level][::-1]
+#      step = dimensions_0[0] // n_batch
+#      predictions = []
+#      for i in range(0, dimensions_0[0], step):
+#          array = da.from_delayed(
+#              get_array(slide.filename, level,
+#                        (0, i, dimensions[1],
+#                         step // slide.level_dimensions[level][1])),
+#              shape=(3, dimensions[1],
+#                     step // slide.level_dimensions[level][1]),
+#              dtype='uint8')
+#          array = array.transpose((1, 2, 0))
+#          array = array[:, :, ::-1]
+#          n_px = array.shape[0] * array.shape[1]
+#          array_reshaped = array.reshape((n_px, 3))
+#          prediction = da.from_delayed(self.model.predict(array_reshaped),
+#                                       shape=(n_px, ),
+#                                       dtype='float32')
+#          prediction.reshape(array.shape[0], array.shape[1])
+#          predictions.append(prediction)
+#
+#      res = da.concatenate(predictions, 0)
+#      return self._get_mask(res, level, slide.level_downsamples[level],
+#                            dt.now(), round_to_0_100)
+
+#  def _classify_batches(self, batches: BatchIterator, threshold: float,
+#                        round_to_0_100: bool) -> Mask:
+#      return classify(self.slide.filename, self.model.weight_filename, None,
+#                      batches.level, True, batches.n_batch)
+#  predictions = []
+#  for batch in batches:
+#      predictions.append(
+#          da.from_delayed(self._classify_batch(batch, threshold,
+#                                               round_to_0_100),
+#                          batch.size,
+#                          dtype='uint8'
+#                          if threshold or round_to_0_100 else 'float32'))
+#  return self._concatenate(predictions, axis=0)

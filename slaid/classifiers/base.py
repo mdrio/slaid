@@ -79,12 +79,16 @@ class BasicClassifier(Classifier):
     MASK_CLASS = Mask
 
     def __init__(self, model: "Model", feature: str):
-        self.model = model
+        self._model = model
         self.feature = feature
-        self._patch_size = self.model.patch_size
+        self._patch_size = self._model.patch_size
         self._color_type = model.color_type
         self._coords = model.coords
         self._channel = model.channel
+
+    @property
+    def model(self):
+        return self._model
 
     def classify(self,
                  slide: Slide,
@@ -120,7 +124,7 @@ class BasicClassifier(Classifier):
                                downsample,
                                datetime,
                                round_to_0_100,
-                               model=str(self.model))
+                               model=str(self._model))
 
     def _classify_patches(self,
                           slide: Slide,
@@ -139,8 +143,9 @@ class BasicClassifier(Classifier):
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size, self.model.color_type,
-                  self.model.coords, self.model.channel) for p in patch_indexes
+            Patch(slide, p[0], p[1], level, patch_size, self._model.color_type,
+                  self._model.coords, self._model.channel)
+            for p in patch_indexes
         ]
 
         # adding fake patches, workaround for
