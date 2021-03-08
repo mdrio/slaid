@@ -81,14 +81,10 @@ class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self.model = model
         self.feature = feature
-        #  self._patch_size = self.model.patch_size
-        #  self._color_type = model.color_type
-        #  self._coords = model.coords
-        #  self._channel = model.channel
-        self._patch_size = None
-        self._color_type = Image.COLORTYPE.RGB
-        self._coords = Image.COORD.YX
-        self._channel = Image.CHANNEL.LAST
+        self._patch_size = self.model.patch_size
+        self._color_type = model.color_type
+        self._coords = model.coords
+        self._channel = model.channel
 
     def classify(self,
                  slide: Slide,
