@@ -1,5 +1,4 @@
 import logging
-import threading
 
 import dask.array as da
 import numpy as np
@@ -7,8 +6,7 @@ from dask import delayed
 
 from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.base import Batch as BaseBatch
-from slaid.classifiers.base import BatchIterator
-from slaid.classifiers.base import Filter, Model
+from slaid.classifiers.base import BatchIterator, Filter, Model
 from slaid.classifiers.base import Patch as BasePatch
 from slaid.commons import Slide
 from slaid.commons.dask import Mask
