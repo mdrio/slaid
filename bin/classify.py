@@ -30,7 +30,8 @@ def set_feature(func, feature):
 
 
 def get_parallel_classifier(model, feature):
-    from slaid.classifiers.dask import Classifier, init_client
+    from slaid.classifiers.dask import Classifier
+    from slaid.commons.dask import init_client
     init_client()
     return Classifier(model, feature)
 

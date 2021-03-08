@@ -48,17 +48,13 @@ class Classifier(BasicClassifier):
     def _classify_batches(self, batches: BatchIterator, threshold: float,
                           round_to_0_100: bool) -> Mask:
         predictions = []
-        c = 0
         for batch in batches:
-            logger.debug('batch %s of %s', c, batches.n_batch)
-            logger.debug('batch size %s', batch.size)
             predictions.append(
                 da.from_delayed(self._classify_batch(batch, threshold,
                                                      round_to_0_100),
                                 batch.size,
                                 dtype='uint8'
                                 if threshold or round_to_0_100 else 'float32'))
-            c += 1
         return self._concatenate(predictions, axis=0)
 
     def _classify_patches(self,
@@ -86,7 +82,7 @@ class Classifier(BasicClassifier):
         for i in range(0, len(patches_to_predict), n_patch):
             patches = patches_to_predict[i:i + n_patch]
             input_array = da.stack([
-                da.from_delayed(p.array,
+                da.from_delayed(p.array(),
                                 shape=(p.size[0], p.size[1], 3),
                                 dtype=dtype) for p in patches
             ])
@@ -99,7 +95,7 @@ class Classifier(BasicClassifier):
             predictions = da.concatenate(predictions)
 
         logger.debug('predictions %s', predictions)
-        predictions = predictions.compute()
+        predictions = predictions.compute(rerun_exceptions_locally=True)
         res = np.zeros(
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
             dtype=dtype)

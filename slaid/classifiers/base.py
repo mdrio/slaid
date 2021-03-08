@@ -154,8 +154,9 @@ class BasicClassifier(Classifier):
             for i in range(0, len(patches_to_predict), n_patch):
                 patches = patches_to_predict[i:i + n_patch]
                 predictions.append(
-                    self._classify_array(np.stack([p.array for p in patches]),
-                                         threshold, round_to_0_100))
+                    self._classify_array(
+                        np.stack([p.array() for p in patches]), threshold,
+                        round_to_0_100))
                 predict_bar.next()
         if predictions:
             predictions = np.concatenate(predictions)
@@ -176,7 +177,7 @@ class BasicClassifier(Classifier):
     def _classify_batch(self, batch, threshold, round_to_0_100):
         # FIXME
         filter_ = None
-        array = batch.array
+        array = batch.array()
         orig_shape = batch.shape
         if filter_ is not None:
             indexes_pixel_to_process = filter_.filter(batch)
@@ -247,7 +248,6 @@ class ImageArea:
     def top_level_location(self):
         raise NotImplementedError
 
-    @property
     def array(self):
         if self._array is None:
             image = self.slide.read_region(self.top_level_location[::-1],
@@ -258,15 +258,15 @@ class ImageArea:
 
     @property
     def shape(self):
-        return self.array.shape[:2] if self.channel == Image.CHANNEL.LAST \
-            else self.array.shape[1:]
+        return self.array().shape[:2] if self.channel == Image.CHANNEL.LAST \
+            else self.array().shape[1:]
 
     def flatten(self):
         n_px = self.shape[0] * self.shape[1]
         if self.channel == Image.CHANNEL.FIRST:
-            array = self.array.transpose(1, 2, 0)
+            array = self.array().transpose(1, 2, 0)
         else:
-            array = self.array
+            array = self.array()
         array = array[:, :, :3].reshape(n_px, 3)
         return array
 
@@ -326,16 +326,21 @@ class BatchIterator:
         self._batch_size = (batch_size_0, self._level_dimensions[1])
 
     def __iter__(self):
-        for i in range(0, self._level_dimensions[0], self._batch_size[0]):
-            size_0 = min(self._batch_size[0], self._level_dimensions[0] - i)
-            #  if self._level_dimensions[0] - i < self._batch_size[0]:
-            #      continue
-            for j in range(0, self._level_dimensions[1], self._batch_size[1]):
-                size = (size_0,
-                        min(self._batch_size[1],
-                            self._level_dimensions[1] - j))
-                yield Batch(self.slide, i, j, self.level, size,
-                            self.color_type, self.coords, self.channel)
+        with Bar('collect batch') as bar:
+            for i in range(0, self._level_dimensions[0], self._batch_size[0]):
+                size_0 = min(self._batch_size[0],
+                             self._level_dimensions[0] - i)
+                #  if self._level_dimensions[0] - i < self._batch_size[0]:
+                #      continue
+                #  for j in range(0, self._level_dimensions[1], self._batch_size[1]):
+                #      size = (size_0,
+                #              min(self._batch_size[1],
+                #                  self._level_dimensions[1] - j))
+                bar.next()
+                yield self.batch_cls(self.slide, i, 0, self.level,
+                                     (size_0, self._level_dimensions[1]),
+                                     self.color_type, self.coords,
+                                     self.channel)
 
     def __len__(self):
         return self._level_dimensions[0] // self._batch_size[0]
