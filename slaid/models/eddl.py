@@ -80,10 +80,15 @@ class Model(BaseModel, ABC):
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         tensor = Tensor.fromarray(array / self.normalization_factor)
-        lock = Lock('pred')
-        lock.acquire()
-        prediction = eddl.predict(self._model, [tensor])
-        lock.release()
+
+        try:
+            lock = Lock('prediction')
+            lock.acquire()
+            prediction = eddl.predict(self._model, [tensor])
+            lock.release()
+        except Exception as ex:
+            logger.error('cannot create lock, not using dask? error %s', ex)
+            prediction = eddl.predict(self._model, [tensor])
         return prediction
 
     def __getstate__(self):
