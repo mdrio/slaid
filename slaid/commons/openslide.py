@@ -1,6 +1,8 @@
 from typing import Tuple
 
 import numpy as np
+import zarr
+from napari_lazy_openslide import OpenSlideStore
 from openslide import open_slide
 from PIL import Image as PIL_Image
 
@@ -37,12 +39,19 @@ class Image(BaseImage):
 
 
 class Slide(BaseSlide):
+    def __init__(self, filename: str):
+        super().__init__(filename)
+        slide = open_slide(filename)  # not serializable...
+        self._dimensions = slide.dimensions
+        self._level_dimensions = slide.level_dimensions
+        self._level_downsamples = slide.level_dimensions
+
     def __eq__(self, other):
         return self._filename == other.filename and self.masks == other.masks
 
     @property
     def dimensions(self) -> Tuple[int, int]:
-        return open_slide(self.filename).dimensions
+        return self._dimensions
 
     @property
     def filename(self):
@@ -59,11 +68,19 @@ class Slide(BaseSlide):
 
     @property
     def level_dimensions(self):
-        return open_slide(self.filename).level_dimensions
+        return self._level_dimensions
 
     @property
     def level_downsamples(self):
-        return open_slide(self.filename).level_downsamples
+        return self.level_downsamples
+
+    def to_array(self, level):
+        store = OpenSlideStore(self.filename)
+        grp = zarr.open(store, mode="r")
+        datasets = grp.attrs["multiscales"][0]["datasets"]
+
+        pyramid = [grp.get(d["path"]) for d in datasets]
+        return pyramid[level]
 
 
 def load(filename: str):

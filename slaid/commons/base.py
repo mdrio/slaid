@@ -242,6 +242,10 @@ class Slide(abc.ABC):
     def level_downsamples(self):
         pass
 
+    @abc.abstractmethod
+    def to_array(self, level):
+        pass
+
 
 def round_to_patch(coordinates, patch_size):
     res = []

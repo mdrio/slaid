@@ -2,6 +2,8 @@ import logging
 from typing import List, Tuple
 
 import numpy as np
+import zarr
+from napari_lazy_openslide import OpenSlideStore
 from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
@@ -59,6 +61,15 @@ class Slide(BaseSlide):
     @property
     def level_downsamples(self):
         return open_slide(self._filename).level_downsamples
+
+    def to_array(self, level):
+        # FIXME
+        store = OpenSlideStore(self.filename)
+        grp = zarr.open(store, mode="r")
+        datasets = grp.attrs["multiscales"][0]["datasets"]
+
+        pyramid = [grp.get(d["path"]) for d in datasets]
+        return pyramid[level]
 
 
 def load(filename: str):

@@ -33,14 +33,11 @@ from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
-import zarr
 from dask import delayed
-from napari_lazy_openslide import OpenSlideStore
-from pyecvl.ecvl import OpenSlideRead
 
 from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.base import Batch as BaseBatch
-from slaid.classifiers.base import BatchIterator, Filter, Model
+from slaid.classifiers.base import BatchIterator, Filter
 from slaid.classifiers.base import Patch as BasePatch
 from slaid.commons import Slide
 from slaid.commons.dask import Mask
@@ -99,7 +96,7 @@ class Classifier(BasicClassifier):
                                            round_to_0_100)
         else:
             slide_array = da.from_delayed(
-                delayed(get_slide)(slide.filename, level),
+                delayed(slide.to_array)(level),
                 shape=list(slide.level_dimensions[level][::-1]) + [4],
                 dtype='uint8')
             predictions = []
@@ -124,18 +121,6 @@ class Classifier(BasicClassifier):
         return self._get_mask(array, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
 
-    def _classify_batches(self, batches: BatchIterator, threshold: float,
-                          round_to_0_100: bool) -> Mask:
-        predictions = []
-        for batch in batches:
-            predictions.append(
-                da.from_delayed(delayed(self._classify_batch)(batch, threshold,
-                                                              round_to_0_100),
-                                batch.size,
-                                dtype='uint8'
-                                if threshold or round_to_0_100 else 'float32'))
-        return self._concatenate(predictions, axis=0)
-
     def _classify_patches(self,
                           slide: Slide,
                           patch_size,
@@ -146,28 +131,24 @@ class Classifier(BasicClassifier):
                           round_to_0_100: bool = True) -> Mask:
         dimensions = slide.level_dimensions[level][::-1]
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        patch_indexes = filter_ if filter_ is not None else np.ndindex(
+        patches_to_predict = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
-        patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size) for p in patch_indexes
-        ]
+        slide_array = da.from_delayed(
+            delayed(slide.to_array)(level),
+            shape=list(slide.level_dimensions[level][::-1]) + [4],
+            dtype='uint8')
 
-        # adding fake patches, workaround for
-        # https://github.com/deephealthproject/eddl/issues/236
-        #  for _ in range(patch_to_add):
-        #      patches_to_predict.append(patches_to_predict[0])
-
+        model = delayed(self.model)
         predictions = []
+        patches_to_predict = list(patches_to_predict)
         for i in range(0, len(patches_to_predict), n_patch):
             patches = patches_to_predict[i:i + n_patch]
             input_array = da.stack([
-                da.from_delayed(p.array(),
-                                shape=(p.size[0], p.size[1], 3),
-                                dtype=dtype) for p in patches
+                slide_array[p[0]:p[0] + self._patch_size[0],
+                            p[1]:p[1] + self._patch_size[1]] for p in patches
             ])
             predictions.append(
-                da.from_delayed(self._classify_array(input_array, threshold,
-                                                     round_to_0_100),
+                da.from_delayed(model.predict(input_array),
                                 shape=(len(patches), ),
                                 dtype=dtype))
         if predictions:
@@ -180,7 +161,7 @@ class Classifier(BasicClassifier):
             dtype=dtype)
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
-            res[patch.row, patch.column] = p
+            res[patch[0], patch[1]] = p
         return da.array(res, dtype=dtype)
 
     @staticmethod
@@ -197,109 +178,6 @@ class Classifier(BasicClassifier):
     def _reshape(array, shape):
         return da.reshape(array, shape)
 
-    #  def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
-    #      with self.lock:
-    #          print('locked classify array')
-    #          return super()._classify_array(array, threshold, round_to_0_100)
-
 
 def _classify_batch(slide_path: str, model_path: str, level: int):
     pass
-
-
-@delayed
-def get_array(slide_path, level, dims):
-    image = OpenSlideRead(slide_path, level, dims)
-    return np.array(image)
-
-
-#  def classify(
-#      slide_path: str,
-#      model_path: str,
-#      gpu: List[int],
-#      level: int,
-#      threshold: float,
-#      round_to_0_100: bool,
-#      n_batch: int,
-#  ):
-#      model = delayed(load_model)(model_path, gpu)
-#      dimensions_0 = slide.dimensions[::-1]
-#      dimensions = slide.level_dimensions[level][::-1]
-#      step = dimensions_0[0] // n_batch
-#      predictions = []
-#      for i in range(0, dimensions_0[0], step):
-#          array = da.from_delayed(get_array(
-#              slide_path, level,
-#              (0, i, dimensions[1], step // slide.level_dimensions[level][1])),
-#                                  shape=(3, dimensions[1], step //
-#                                         slide.level_dimensions[level][1]),
-#                                  dtype='uint8')
-#          array = array.transpose((1, 2, 0))
-#          array = array[:, :, ::-1]
-#          n_px = array.shape[0] * array.shape[1]
-#          array_reshaped = array.reshape((n_px, 3))
-#          prediction = da.from_delayed(model.predict(array_reshaped),
-#                                       shape=(n_px, ),
-#                                       dtype='float32')
-#          prediction.reshape(array.shape[0], array.shape[1])
-#          predictions.append(
-#              da.from_delayed(model.predict(array),
-#                              shape=(n_px, ),
-#                              dtype='float32'))
-#
-#      return da.concatenate(predictions, 0)
-#  def classify(self,
-#               slide: Slide,
-#               filter_=None,
-#               threshold: float = None,
-#               level: int = 2,
-#               n_batch: int = 1,
-#               round_to_0_100: bool = True,
-#               n_patch=25) -> Mask:
-#      dimensions_0 = slide.dimensions[::-1]
-#      dimensions = slide.level_dimensions[level][::-1]
-#      step = dimensions_0[0] // n_batch
-#      predictions = []
-#      for i in range(0, dimensions_0[0], step):
-#          array = da.from_delayed(
-#              get_array(slide.filename, level,
-#                        (0, i, dimensions[1],
-#                         step // slide.level_dimensions[level][1])),
-#              shape=(3, dimensions[1],
-#                     step // slide.level_dimensions[level][1]),
-#              dtype='uint8')
-#          array = array.transpose((1, 2, 0))
-#          array = array[:, :, ::-1]
-#          n_px = array.shape[0] * array.shape[1]
-#          array_reshaped = array.reshape((n_px, 3))
-#          prediction = da.from_delayed(self.model.predict(array_reshaped),
-#                                       shape=(n_px, ),
-#                                       dtype='float32')
-#          prediction.reshape(array.shape[0], array.shape[1])
-#          predictions.append(prediction)
-#
-#      res = da.concatenate(predictions, 0)
-#      return self._get_mask(res, level, slide.level_downsamples[level],
-#                            dt.now(), round_to_0_100)
-
-
-#  def _classify_batches(self, batches: BatchIterator, threshold: float,
-#                        round_to_0_100: bool) -> Mask:
-#      return classify(self.slide.filename, self.model.weight_filename, None,
-#                      batches.level, True, batches.n_batch)
-#  predictions = []
-#  for batch in batches:
-#      predictions.append(
-#          da.from_delayed(self._classify_batch(batch, threshold,
-#                                               round_to_0_100),
-#                          batch.size,
-#                          dtype='uint8'
-#                          if threshold or round_to_0_100 else 'float32'))
-#  return self._concatenate(predictions, axis=0)
-def get_slide(path, level):
-    store = OpenSlideStore(path)
-    grp = zarr.open(store, mode="r")
-    datasets = grp.attrs["multiscales"][0]["datasets"]
-
-    pyramid = [grp.get(d["path"]) for d in datasets]
-    return pyramid[level]

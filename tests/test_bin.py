@@ -173,7 +173,6 @@ class TestSerialEddlClassifier:
 
 
 class TestParallelEddlClassifier(TestSerialEddlClassifier):
-    #  model = 'slaid/resources/models/extract_tissue_eddl_1.1.tgz'
     cmd = 'parallel'
 
 
