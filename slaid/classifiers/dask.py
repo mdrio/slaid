@@ -91,35 +91,52 @@ class Classifier(BasicClassifier):
         #                                     self._color_type, self._coords,
         #                                     self._channel)
         if self._patch_size:
-            array = self._classify_patches(slide, self._patch_size, level,
-                                           filter_, threshold, n_patch,
-                                           round_to_0_100)
+            predictions = self._classify_patches(slide, self._patch_size,
+                                                 level, filter_, threshold,
+                                                 n_patch, round_to_0_100)
         else:
-            slide_array = da.from_delayed(
-                delayed(slide.to_array)(level),
-                shape=list(slide.level_dimensions[level][::-1]) + [4],
-                dtype='uint8')
-            predictions = []
-            n_steps = n_batch
-            step = slide_array.shape[0] // n_steps
-            logger.debug('step %s, n_steps %s', step, n_steps)
-            model = delayed(self.model)
-            for i in range(0, n_steps, step):
-                area = slide_array[i:i + step, :, :3]
-                n_px = area.shape[0] * area.shape[1]
-                area_reshaped = area.reshape((n_px, 3))
+            predictions = self._classify_batches(slide, level, n_batch,
+                                                 threshold, round_to_0_100)
+        predictions = self._threshold(predictions, threshold)
+        predictions = self._round_to_0_100(predictions, round_to_0_100)
+        return self._get_mask(predictions, level,
+                              slide.level_downsamples[level], dt.now(),
+                              round_to_0_100)
 
-                prediction = da.from_delayed(model.predict(area_reshaped),
-                                             shape=(area_reshaped.shape[0], ),
-                                             dtype='float32')
-                prediction = prediction.reshape(area.shape[0], area.shape[1])
-                predictions.append(prediction)
-            array = da.concatenate(predictions, 0)
-            if round_to_0_100:
-                array = (array * 100).astype('uint8')
+    def _classify_batches(self, slide, level, n_batch, threshold,
+                          round_to_0_100):
+        slide_array = da.from_delayed(
+            delayed(slide.to_array)(level),
+            shape=list(slide.level_dimensions[level][::-1]) + [4],
+            dtype='uint8')
+        predictions = []
+        n_steps = n_batch
+        step = slide_array.shape[0] // n_steps
+        logger.debug('step %s, n_steps %s', step, n_steps)
+        model = delayed(self.model)
+        for i in range(0, n_steps, step):
+            area = slide_array[i:i + step, :, :3]
+            n_px = area.shape[0] * area.shape[1]
+            area_reshaped = area.reshape((n_px, 3))
 
-        return self._get_mask(array, level, slide.level_downsamples[level],
-                              dt.now(), round_to_0_100)
+            prediction = da.from_delayed(model.predict(area_reshaped),
+                                         shape=(area_reshaped.shape[0], ),
+                                         dtype='float32')
+            prediction = prediction.reshape(area.shape[0], area.shape[1])
+            predictions.append(prediction)
+        return da.concatenate(predictions, 0)
+
+    @staticmethod
+    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
+        return (array * 100).astype('uint8') if round_ else array
+
+    @staticmethod
+    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
+        if threshold is not None:
+            array[array >= threshold] = 1
+            array[array < threshold] = 0
+            return array.astype('uint8')
+        return array
 
     def _classify_patches(self,
                           slide: Slide,

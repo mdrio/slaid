@@ -44,7 +44,7 @@ class Slide(BaseSlide):
         slide = open_slide(filename)  # not serializable...
         self._dimensions = slide.dimensions
         self._level_dimensions = slide.level_dimensions
-        self._level_downsamples = slide.level_dimensions
+        self._level_downsamples = slide.level_downsamples
 
     def __eq__(self, other):
         return self._filename == other.filename and self.masks == other.masks
@@ -72,7 +72,7 @@ class Slide(BaseSlide):
 
     @property
     def level_downsamples(self):
-        return self.level_downsamples
+        return self._level_downsamples
 
     def to_array(self, level):
         store = OpenSlideStore(self.filename)

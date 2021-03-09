@@ -15,3 +15,4 @@ shapely
 tiledb==0.7.0
 progress
 stringcase
+napari-lazy-openslide

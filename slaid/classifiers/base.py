@@ -203,11 +203,14 @@ class BasicClassifier(Classifier):
             array = batch.flatten()
 
         logger.debug('start predictions')
-        prediction = np.concatenate([
-            self._classify_array(_, threshold, round_to_0_100)
-            for _ in np.array_split(array, 10000)
-        ])
-        logger.debug('end predictions')
+        prediction = self._classify_array(array, threshold, round_to_0_100)
+        #      self._classify_array(_, threshold, round_to_0_100)
+        #  prediction = np.concatenate([
+        #      self._classify_array(_, threshold, round_to_0_100)
+        #      for _ in np.array_split(array, 10000)
+        #  ])
+        #  logger.debug('end predictions')
+        #      self._classify_array(_, threshold, round_to_0_100)
         if filter_ is not None:
             res = np.zeros(orig_shape[:2], dtype=prediction.dtype)
             res[indexes_pixel_to_process] = prediction
@@ -303,6 +306,7 @@ class Batch(ImageArea):
 
     @property
     def top_level_location(self):
+        print(self.row, self.column, self.downsample)
         return (round(self.row * self.downsample),
                 round(self.column * self.downsample))
 
