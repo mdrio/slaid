@@ -13,6 +13,8 @@ from slaid.models import Model as BaseModel
 from dask.distributed import Lock
 
 logger = logging.getLogger('eddl-models')
+fh = logging.FileHandler('/tmp/eddl.log')
+logger.addHandler(fh)
 
 
 class Model(BaseModel, ABC):
@@ -79,6 +81,7 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
+        logger.info('array %s', array)
         tensor = Tensor.fromarray(array / self.normalization_factor)
 
         try:

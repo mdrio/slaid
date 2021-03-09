@@ -13,6 +13,8 @@ from slaid.commons.base import Image
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
+fh = logging.FileHandler('/tmp/base-classifier.log')
+logger.addHandler(fh)
 
 
 class Classifier(abc.ABC):
@@ -81,10 +83,17 @@ class BasicClassifier(Classifier):
     def __init__(self, model: "Model", feature: str):
         self._model = model
         self.feature = feature
-        self._patch_size = self._model.patch_size
-        self._color_type = model.color_type
-        self._coords = model.coords
-        self._channel = model.channel
+        try:
+            self._patch_size = self._model.patch_size
+            self._color_type = model.color_type
+            self._coords = model.coords
+            self._channel = model.channel
+        except AttributeError as ex:
+            logger.error(ex)
+            self._patch_size = None
+            self._color_type = Image.COLORTYPE('rgb')
+            self._coords = Image.COORD('yx')
+            self._channel = Image.CHANNEL('last')
 
     @property
     def model(self):
@@ -180,17 +189,25 @@ class BasicClassifier(Classifier):
         return self._concatenate(predictions, axis=0)
 
     def _classify_batch(self, batch, threshold, round_to_0_100):
+        logger.debug('classify batch %s', batch)
         # FIXME
         filter_ = None
         array = batch.array()
+        logger.debug('get array')
         orig_shape = batch.shape
         if filter_ is not None:
             indexes_pixel_to_process = filter_.filter(batch)
             array = array[indexes_pixel_to_process]
         else:
+            logger.debug('flattening batch')
             array = batch.flatten()
 
-        prediction = self._classify_array(array, threshold, round_to_0_100)
+        logger.debug('start predictions')
+        prediction = np.concatenate([
+            self._classify_array(_, threshold, round_to_0_100)
+            for _ in np.array_split(array, 10000)
+        ])
+        logger.debug('end predictions')
         if filter_ is not None:
             res = np.zeros(orig_shape[:2], dtype=prediction.dtype)
             res[indexes_pixel_to_process] = prediction
@@ -199,6 +216,7 @@ class BasicClassifier(Classifier):
         return res
 
     def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
+        logger.debug('classify array')
         prediction = self.model.predict(array)
         if round_to_0_100:
             prediction = prediction * 100
@@ -254,6 +272,7 @@ class ImageArea:
         raise NotImplementedError
 
     def array(self):
+        logger.debug('reading array of %s', self)
         if self._array is None:
             image = self.slide.read_region(self.top_level_location[::-1],
                                            self.level, self.size[::-1])

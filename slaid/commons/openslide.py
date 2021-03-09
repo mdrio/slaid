@@ -37,16 +37,12 @@ class Image(BaseImage):
 
 
 class Slide(BaseSlide):
-    def __init__(self, filename: str):
-        super().__init__(filename)
-        self._slide = open_slide(filename)
-
     def __eq__(self, other):
         return self._filename == other.filename and self.masks == other.masks
 
     @property
     def dimensions(self) -> Tuple[int, int]:
-        return self._slide.dimensions
+        return open_slide(self.filename).dimensions
 
     @property
     def filename(self):
@@ -54,18 +50,20 @@ class Slide(BaseSlide):
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> BaseImage:
-        return Image(self._slide.read_region(location, level, size))
+        return Image(
+            open_slide(self.filename).read_region(location, level, size))
 
     def get_best_level_for_downsample(self, downsample: int):
-        return self._slide.get_best_level_for_downsample(downsample)
+        return open_slide(
+            self.filename).get_best_level_for_downsample(downsample)
 
     @property
     def level_dimensions(self):
-        return self._slide.level_dimensions
+        return open_slide(self.filename).level_dimensions
 
     @property
     def level_downsamples(self):
-        return self._slide.level_downsamples
+        return open_slide(self.filename).level_downsamples
 
 
 def load(filename: str):
