@@ -27,6 +27,25 @@ def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
+@dataclass
+class ImageInfo(abc.ABC):
+    class COLORTYPE(Enum):
+        RGB = 'rgb'
+        BGR = 'bgr'
+
+    class COORD(Enum):
+        XY = 'xy'
+        YX = 'yx'
+
+    class CHANNEL(Enum):
+        FIRST = 'first'
+        LAST = 'last'
+
+    color_type: COLORTYPE
+    coord: COORD
+    channel: CHANNEL
+
+
 class Image(abc.ABC):
     class COLORTYPE(Enum):
         RGB = 'rgb'
@@ -45,8 +64,7 @@ class Image(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
-                 channel: 'Image.CHANNEL') -> np.ndarray:
+    def to_array(self, image_info: ImageInfo) -> np.ndarray:
         pass
 
 

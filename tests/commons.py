@@ -4,14 +4,13 @@ import numpy as np
 from pyeddl.tensor import Tensor
 
 from slaid.commons import Slide
-from slaid.commons.base import Image
+from slaid.commons.base import Image, ImageInfo
 from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
-    color_type = Image.COLORTYPE.BGR
-    coords = Image.COORD.YX
-    channel = Image.CHANNEL.FIRST
+    image_info = ImageInfo(Image.COLORTYPE.BGR, ImageInfo.COORD.YX,
+                           ImageInfo.CHANNEL.FIRST)
 
     def __str__(self):
         return self.__class__.__name__

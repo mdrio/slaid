@@ -6,11 +6,11 @@ from typing import List
 import numpy as np
 import pyeddl.eddl as eddl
 import stringcase
+from dask.distributed import Lock
 from pyeddl.tensor import Tensor
 
-from slaid.commons.base import Image
+from slaid.commons.base import Image, ImageInfo
 from slaid.models import Model as BaseModel
-from dask.distributed import Lock
 
 logger = logging.getLogger('eddl-models')
 fh = logging.FileHandler('/tmp/eddl.log')
@@ -19,9 +19,8 @@ logger.addHandler(fh)
 
 class Model(BaseModel, ABC):
     patch_size = None
-    channel = Image.CHANNEL.FIRST
-    coords = Image.COORD.YX
-    color_type = Image.COLORTYPE.BGR
+    image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
+                           ImageInfo.CHANNEL.FIRST)
     normalization_factor = 1
     index_prediction = 1
 
@@ -103,8 +102,8 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
-    color_type = Image.COLORTYPE.RGB
-    channel = Image.CHANNEL.LAST
+    image_info = ImageInfo(ImageInfo.COLORTYPE.RGB, ImageInfo.COORD.YX,
+                           ImageInfo.CHANNEL.LAST)
 
     @staticmethod
     def _create_net():

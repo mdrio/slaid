@@ -35,7 +35,7 @@ from napari_lazy_openslide import OpenSlideStore
 from openslide import open_slide
 from PIL import Image as PIL_Image
 
-from slaid.commons.base import Image as BaseImage
+from slaid.commons.base import Image as BaseImage, ImageInfo
 from slaid.commons.base import Slide as BaseSlide
 
 
@@ -47,15 +47,14 @@ class Image(BaseImage):
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._image.size)
 
-    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
-                 channel: 'Image.CHANNEL') -> np.ndarray:
+    def to_array(self, image_info: ImageInfo) -> np.ndarray:
         array = np.array(self._image)  # yxc, RGB
         array = array[:, :, :3]
-        if self.COLORTYPE(colortype) == self.COLORTYPE.BGR:
+        if image_info.color_type == ImageInfo.COLORTYPE.BGR:
             array = array[..., ::-1]
-        if self.COORD(coords) == self.COORD.XY:
+        if image_info.coord == ImageInfo.COORD.XY:
             array = np.transpose(array, [1, 0, 2])
-        if self.CHANNEL(channel) == self.CHANNEL.FIRST:
+        if image_info.channel == ImageInfo.CHANNEL.FIRST:
             array = np.transpose(array, [2, 0, 1])
         return array
         #  if PIL_FORMAT:

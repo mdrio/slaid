@@ -8,6 +8,7 @@ from slaid.commons import Mask, Slide
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import Slide as EcvlSlide
 from slaid.commons.openslide import Slide as OpenSlide
+from slaid.commons.base import ImageInfo
 
 IMAGE = 'tests/data/test.tif'
 
@@ -21,17 +22,23 @@ class BaseTestSlide:
 
     def test_converts_to_array_xy_channel_first(self):
         region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array('bgr', 'xy', 'first')
+        array = region.to_array(
+            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.XY,
+                      ImageInfo.CHANNEL.FIRST))
         self.assertEqual(array.shape, (3, 10, 20))
 
     def test_converts_to_array_yx_channel_first(self):
         region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array('bgr', 'yx', 'first')
+        array = region.to_array(
+            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
+                      ImageInfo.CHANNEL.FIRST))
         self.assertEqual(array.shape, (3, 20, 10))
 
     def test_converts_to_array_xy_channel_last(self):
         region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array('bgr', 'xy', 'last')
+        array = region.to_array(
+            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.XY,
+                      ImageInfo.CHANNEL.LAST))
         self.assertEqual(array.shape, (10, 20, 3))
 
 

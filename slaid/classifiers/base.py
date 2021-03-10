@@ -9,7 +9,7 @@ import numpy as np
 from progress.bar import Bar
 
 from slaid.commons import Mask, Slide
-from slaid.commons.base import Image
+from slaid.commons.base import Image, ImageInfo
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
@@ -85,15 +85,13 @@ class BasicClassifier(Classifier):
         self.feature = feature
         try:
             self._patch_size = self._model.patch_size
-            self._color_type = model.color_type
-            self._coords = model.coords
-            self._channel = model.channel
+            self._image_info = model.image_info
         except AttributeError as ex:
             logger.error(ex)
             self._patch_size = None
-            self._color_type = Image.COLORTYPE('rgb')
-            self._coords = Image.COORD('yx')
-            self._channel = Image.CHANNEL('last')
+            self._image_info = ImageInfo(ImageInfo.COLORTYPE('rgb'),
+                                         ImageInfo.COORD('yx'),
+                                         ImageInfo.CHANNEL('last'))
 
     @property
     def model(self):
@@ -110,9 +108,7 @@ class BasicClassifier(Classifier):
 
         logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
                     filter_, threshold, level, n_batch, round_to_0_100)
-        batches = self._get_batch_iterator(slide, level, n_batch,
-                                           self._color_type, self._coords,
-                                           self._channel)
+        batches = self._get_batch_iterator(slide, level, n_batch)
         array = self._classify_patches(
             slide, self._patch_size, level, filter_, threshold, n_patch,
             round_to_0_100) if self._patch_size else self._classify_batches(
@@ -121,11 +117,8 @@ class BasicClassifier(Classifier):
         return self._get_mask(array, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
 
-    @staticmethod
-    def _get_batch_iterator(slide, level, n_batch, color_type, coords,
-                            channel):
-        return BatchIterator(slide, level, n_batch, color_type, coords,
-                             channel)
+    def _get_batch_iterator(self, slide, level, n_batch):
+        return BatchIterator(slide, level, n_batch, self._image_info)
 
     def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
         return self.MASK_CLASS(array,
@@ -152,8 +145,7 @@ class BasicClassifier(Classifier):
         patch_indexes = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
         patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size, self._model.color_type,
-                  self._model.coords, self._model.channel)
+            Patch(slide, p[0], p[1], level, patch_size, self._image_info)
             for p in patch_indexes
         ]
 
@@ -263,9 +255,8 @@ class ImageArea:
     column: int
     level: int
     size: Tuple[int, int]
-    color_type: Image.COLORTYPE = Image.COLORTYPE.BGR
-    coords: Image.COORD = Image.COORD.YX
-    channel: Image.CHANNEL = Image.CHANNEL.FIRST
+    image_info: ImageInfo = ImageInfo(Image.COLORTYPE.BGR, Image.COORD.YX,
+                                      Image.CHANNEL.FIRST)
 
     def __post_init__(self):
         self._array = None
@@ -279,18 +270,17 @@ class ImageArea:
         if self._array is None:
             image = self.slide.read_region(self.top_level_location[::-1],
                                            self.level, self.size[::-1])
-            self._array = image.to_array(self.color_type, self.coords,
-                                         self.channel)
+            self._array = image.to_array(self.image_info)
         return self._array
 
     @property
     def shape(self):
-        return self.array().shape[:2] if self.channel == Image.CHANNEL.LAST \
+        return self.array().shape[:2] if self.image_info.channel == ImageInfo.CHANNEL.LAST \
             else self.array().shape[1:]
 
     def flatten(self):
         n_px = self.shape[0] * self.shape[1]
-        if self.channel == Image.CHANNEL.FIRST:
+        if self.image_info.channel == ImageInfo.CHANNEL.FIRST:
             array = self.array().transpose(1, 2, 0)
         else:
             array = self.array()
@@ -324,14 +314,13 @@ class Batch(ImageArea):
                     patch_row = int(row // patch_size[0])
                     patch_column = int(col // patch_size[1])
                     yield Patch(self.slide, patch_row, patch_column,
-                                patch_size, self.color_type, self.coords,
-                                self.channel)
+                                patch_size, self.image_info)
 
         else:
             index_patches = filter_.filter(self, patch_size)
             for p in np.argwhere(index_patches):
                 patch = Patch(self.slide, p[0], p[1], patch_size,
-                              self.color_type, self.coords, self.channel)
+                              self.image_info)
                 logger.debug('yielding patch %s', patch)
                 yield patch
 
@@ -341,9 +330,7 @@ class BatchIterator:
     slide: Slide
     level: int
     n_batch: int
-    color_type: Image.COLORTYPE = Image.COLORTYPE.BGR
-    coords: Image.COORD = Image.COORD.YX
-    channel: Image.CHANNEL = Image.CHANNEL.FIRST
+    image_info: ImageInfo
     batch_cls: Callable = Batch
 
     def __post_init__(self):
@@ -367,8 +354,7 @@ class BatchIterator:
                 bar.next()
                 yield self.batch_cls(self.slide, i, 0, self.level,
                                      (size_0, self._level_dimensions[1]),
-                                     self.color_type, self.coords,
-                                     self.channel)
+                                     self.image_info)
 
     def __len__(self):
         return self._level_dimensions[0] // self._batch_size[0]

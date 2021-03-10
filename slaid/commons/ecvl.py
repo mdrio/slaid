@@ -33,11 +33,14 @@ from typing import List, Tuple
 import numpy as np
 import zarr
 from napari_lazy_openslide import OpenSlideStore
+from napari_lazy_openslide.store import (ArgumentError, _parse_chunk_path,
+                                         create_meta_store)
 from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
 
 from slaid.commons import Image as BaseImage
+from slaid.commons import ImageInfo
 from slaid.commons import Slide as BaseSlide
 
 logger = logging.getLogger('ecvl')
@@ -51,16 +54,47 @@ class Image(BaseImage):
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._image.dims_)
 
-    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
-                 channel: 'Image.CHANNEL') -> np.ndarray:
+    def to_array(self, image_info: ImageInfo) -> np.ndarray:
         array = np.array(self._image)  # cxy, BGR
-        if self.COLORTYPE(colortype) == self.COLORTYPE.RGB:
+        if image_info.color_type == ImageInfo.COLORTYPE.RGB:
             array = array[::-1, ...]
-        if self.COORD(coords) == self.COORD.YX:
+        if image_info.coord == ImageInfo.COORD.YX:
             array = np.transpose(array, [0, 2, 1])
-        if self.CHANNEL(channel) == self.CHANNEL.LAST:
+        if image_info.channel == ImageInfo.CHANNEL.LAST:
             array = np.transpose(array, [1, 2, 0])
         return array
+
+
+class EcvlStore(OpenSlideStore):
+    def __init__(self, path: str, tilesize: int = 512):
+        #  image_info: ImageInfo = None):
+        self._path = Slide(path)
+        self._tilesize = tilesize
+        self._store = create_meta_store(self._slide, tilesize)
+        #  self._image_info = image_info if image_info else ImageInfo()
+
+    def __getitem__(self, key: str):
+        if key in self._store:
+            # key is for metadata
+            return self._store[key]
+
+        # key should now be a path to an array chunk
+        # e.g '3/4.5.0' -> '<level>/<chunk_key>'
+        try:
+            x, y, level = _parse_chunk_path(key)
+            location = self._ref_pos(x, y, level)
+            size = (self._tilesize, self._tilesize)
+            tile = self._slide.read_region(location, level, size)
+        except ArgumentError as err:
+            # Can occur if trying to read a closed slide
+            raise err
+        except:
+            # TODO: probably need better error handling.
+            # If anything goes wrong, we just signal the chunk
+            # is missing from the store.
+            raise KeyError(key)
+
+        return np.array(tile).tobytes()
 
 
 class Slide(BaseSlide):
