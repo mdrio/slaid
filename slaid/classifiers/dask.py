@@ -1,39 +1,11 @@
-# NAPARI LAZY OPENSLIDE
-#  Copyright (c) 2020, Trevor Manz
-#  All rights reserved.
-#
-#  Redistribution and use in source and binary forms, with or without
-#  modification, are permitted provided that the following conditions are met:
-#
-#  * Redistributions of source code must retain the above copyright notice, this
-#    list of conditions and the following disclaimer.
-#
-#  * Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-#
-#  * Neither the name of napari-lazy-openslide nor the names of its
-#    contributors may be used to endorse or promote products derived from
-#    this software without specific prior written permission.
-#
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-
 import logging
+from collections import defaultdict
 from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
 from dask import delayed
+from progress.bar import Bar
 
 from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.base import Batch as BaseBatch
@@ -96,7 +68,8 @@ class Classifier(BasicClassifier):
                                                  n_patch, round_to_0_100)
         else:
             predictions = self._classify_batches(slide, level, n_batch,
-                                                 threshold, round_to_0_100)
+                                                 threshold, round_to_0_100,
+                                                 filter_)
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)
         return self._get_mask(predictions, level,
@@ -104,27 +77,90 @@ class Classifier(BasicClassifier):
                               round_to_0_100)
 
     def _classify_batches(self, slide, level, n_batch, threshold,
-                          round_to_0_100):
+                          round_to_0_100, filter_):
         slide_array = da.from_delayed(
             delayed(slide.to_array)(level),
             shape=list(slide.level_dimensions[level][::-1]) + [4],
             dtype='uint8')
-        predictions = []
-        n_steps = n_batch
-        step = slide_array.shape[0] // n_steps
-        logger.debug('step %s, n_steps %s', step, n_steps)
-        model = delayed(self.model)
-        for i in range(0, n_steps, step):
-            area = slide_array[i:i + step, :, :3]
-            n_px = area.shape[0] * area.shape[1]
-            area_reshaped = area.reshape((n_px, 3))
 
-            prediction = da.from_delayed(model.predict(area_reshaped),
-                                         shape=(area_reshaped.shape[0], ),
-                                         dtype='float32')
-            prediction = prediction.reshape(area.shape[0], area.shape[1])
-            predictions.append(prediction)
-        return da.concatenate(predictions, 0)
+        scale_factor = 256  # FIXME
+        model = delayed(self.model)
+        if filter_ is not None:
+            #  predictions = np.zeros(slide.dimensions[::-1], dtype='float32')
+            predictions = []
+            area_by_row = defaultdict(list)
+            for pixel in filter_:
+                pixel = pixel * scale_factor
+
+                area = slide_array[pixel[0]:pixel[0] + scale_factor,
+                                   pixel[1]:pixel[1] + scale_factor, :3]
+                n_px = area.shape[0] * area.shape[1]
+                area_reshaped = area.reshape((n_px, 3))
+                area_by_row[pixel[0]].append((pixel[1], area_reshaped))
+
+            for row, areas in area_by_row.items():
+                row_predictions = []
+                prev_y = 0
+                for y, area in areas:
+                    logger.debug('y %s', y)
+                    pad_0 = y - prev_y
+                    if pad_0 > 0:
+                        logger.debug('pad_0 %s', pad_0)
+                        row_predictions.append(
+                            da.zeros((256, pad_0), dtype='float32'))
+
+                    prediction = da.from_delayed(model.predict(area),
+                                                 shape=(area.shape[0], ),
+                                                 dtype='float32')
+                    row_predictions.append(
+                        prediction.reshape(scale_factor, scale_factor))
+                    prev_y = y + scale_factor
+
+                y = slide_array.shape[1]
+                pad_0 = y - prev_y
+                if pad_0:
+                    row_predictions.append(
+                        da.zeros((256, pad_0), dtype='float32'))
+
+                row_predictions = da.concatenate(row_predictions, 1)
+                logger.debug('row_predictions shape %s, expected %s',
+                             row_predictions.shape,
+                             (256, slide_array.shape[1]))
+                assert row_predictions.shape == (256, slide_array.shape[1])
+
+                predictions.append(row_predictions)
+            predictions = da.concatenate(predictions, 0)
+            logger.debug('predictions shape %s', predictions.shape)
+            return da.rechunk(predictions)
+
+            #  res = da.concatenate(res)
+            #  logger.debug(
+            #      'dif shapes %s',
+            #      res.shape[0] - slide_array.shape[0] * slide_array.shape[1])
+            #  assert res.shape[0] == slide_array.shape[0] * slide_array.shape[1]
+            #  logger.debug('res shape %s, slide_array shape %s', res.shape,
+            #               slide_array.shape)
+            #  return res.reshape((slide_array.shape[0], slide_array.shape[1]))
+
+        else:
+            predictions = []
+            step = slide_array.shape[0] // n_batch
+            logger.debug('n_batch %s, step %s', n_batch, step)
+            with Bar('batches', max=n_batch) as bar:
+                for i in range(0, slide_array.shape[0], step):
+                    bar.next()
+                    area = slide_array[i:i + step, :, :3]
+                    n_px = area.shape[0] * area.shape[1]
+                    area_reshaped = area.reshape((n_px, 3))
+
+                    prediction = da.from_delayed(
+                        model.predict(area_reshaped),
+                        shape=(area_reshaped.shape[0], ),
+                        dtype='float32')
+                    prediction = prediction.reshape(area.shape[0],
+                                                    area.shape[1])
+                    predictions.append(prediction)
+            return da.concatenate(predictions, 0)
 
     @staticmethod
     def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:

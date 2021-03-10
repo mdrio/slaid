@@ -35,7 +35,10 @@ class Mask(BaseMask):
         group = zarr.open_group(os.path.dirname(path))
         if overwrite and name in group:
             del group[name]
-        da.to_zarr(self.array, path, compute=True)
+        if isinstance(self.array, da.Array):
+            da.to_zarr(self.array, path, compute=True)
+        else:
+            zarr.save(path, self.array)
         array = group[os.path.basename(path)]
         for attr, value in self._get_attributes().items():
             logger.info('writing attr %s %s', attr, value)
