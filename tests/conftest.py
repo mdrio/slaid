@@ -4,10 +4,11 @@ import dask.array as da
 import numpy as np
 import pytest
 import tiledb
-from slaid.commons.ecvl import Slide as EcvlSlide
-from slaid.commons.openslide import Slide as OpenSlide
 
 from slaid.commons import Mask
+from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.openslide import Slide as OpenSlide
+from slaid.models.eddl import load_model
 
 
 @pytest.fixture
@@ -67,3 +68,9 @@ def slide_reader(request):
 @pytest.fixture
 def patch_tissue_mask(request):
     return np.load('tests/data/tissue_mask_prob.npy')
+
+
+@pytest.fixture
+def tissue_model():
+    return load_model(
+        'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')

@@ -2,6 +2,7 @@ import abc
 import inspect
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -130,7 +131,31 @@ class Mask:
     threshold: float = None
     model: str = None
 
+    def _filter(self, operator: str, value: float) -> np.ndarray:
+        mask = np.array(self.array)
+        if self.round_to_0_100:
+            mask = mask / 100
+        index_patches = getattr(mask, operator)(value)
+        return np.argwhere(index_patches)
+
+    def __gt__(self, value):
+        return Filter(self, self._filter('__gt__', value))
+
+    def __ge__(self, value):
+        return Filter(self, self._filter('__ge__', value))
+
+    def __lt__(self, value):
+        return Filter(self, self._filter('__lt__', value))
+
+    def __le__(self, value):
+        return Filter(self, self._filter('__le__', value))
+
+    def __ne__(self, value):
+        return Filter(self, self._filter('__ne__', value))
+
     def __eq__(self, other):
+        if isinstance(other, float):
+            return Filter(self, self._filter('__eq__', other))
         check_array = (np.array(self.array) == np.array(other.array)).all()
         return self.extraction_level == other.extraction_level \
             and self.level_downsample == other.level_downsample \
@@ -222,6 +247,36 @@ class Mask:
         except KeyError:
             res = None
         return res
+
+
+@dataclass
+class Filter:
+    mask: Mask
+    indices: np.ndarray
+
+    def __iter__(self):
+        return iter(self.indices)
+
+
+def do_filter(slide: "Slide", condition: str) -> "Filter":
+    operator_mapping = {
+        '>': '__gt__',
+        '>=': '__ge__',
+        '<': '__lt__',
+        '<=': '__le__',
+        '==': '__eq__',
+        '!=': '__ne__',
+    }
+    parsed = re.match(
+        r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
+        condition).groupdict()
+    mask = slide.masks[parsed['mask']]
+    operator = operator_mapping[parsed['operator']]
+    value = float(parsed['value'])
+    return getattr(mask, operator)(value)
+
+
+TILESIZE = 512
 
 
 class Slide(abc.ABC):

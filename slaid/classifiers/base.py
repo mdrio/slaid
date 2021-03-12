@@ -1,6 +1,5 @@
 import abc
 import logging
-import re
 from dataclasses import dataclass
 from datetime import datetime as dt
 from typing import Callable, Tuple
@@ -32,49 +31,6 @@ class Classifier(abc.ABC):
 @dataclass
 class Filter:
     mask: Mask
-
-    def filter(self, operator: str, value: float) -> np.ndarray:
-        mask = np.array(self.mask.array)
-        if self.mask.round_to_0_100:
-            mask = mask / 100
-        index_patches = getattr(mask, operator)(value)
-        return np.argwhere(index_patches)
-
-    def __gt__(self, value):
-        return self.filter('__gt__', value)
-
-    def __ge__(self, value):
-        return self.filter('__ge__', value)
-
-    def __lt__(self, value):
-        return self.filter('__lt__', value)
-
-    def __le__(self, value):
-        return self.filter('__le__', value)
-
-    def __eq__(self, value):
-        return self.filter('__eq__', value)
-
-    def __ne__(self, value):
-        return self.filter('__ne__', value)
-
-
-def do_filter(slide: Slide, condition: str) -> "Filter":
-    operator_mapping = {
-        '>': '__gt__',
-        '>=': '__ge__',
-        '<': '__lt__',
-        '<=': '__le__',
-        '==': '__eq__',
-        '!=': '__ne__',
-    }
-    parsed = re.match(
-        r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
-        condition).groupdict()
-    mask = slide.masks[parsed['mask']]
-    operator = operator_mapping[parsed['operator']]
-    value = float(parsed['value'])
-    return Filter(mask).filter(operator, value)
 
 
 class BasicClassifier(Classifier):

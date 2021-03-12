@@ -10,7 +10,8 @@ from clize import parameters
 import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
-from slaid.classifiers import BasicClassifier, do_filter
+from slaid.classifiers import BasicClassifier
+from slaid.commons.base import do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.dask import init_client
 from slaid.models.eddl import load_model

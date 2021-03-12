@@ -2,14 +2,14 @@ import unittest
 from datetime import datetime as dt
 
 import numpy as np
+import pytest
 from commons import DummyModel, EddlGreenModel, EddlGreenPatchModel, GreenModel
 
 from slaid.classifiers import BasicClassifier, Filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
 from slaid.commons.ecvl import load
-from slaid.models.eddl import TumorModel
-from slaid.models.eddl import TissueModel
+from slaid.models.eddl import TissueModel, TumorModel, load_model
 
 
 class BaseTestClassifier:
@@ -103,6 +103,20 @@ class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
     def get_model():
         return GreenModel()
 
+    #  def test_filter(self):
+    #      slide = load('tests/data/PH10023-1.thumb.tif')
+    #      model = load_model(
+    #          'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+    #      classifier = self.get_classifier(model, 'low_level_tissue')
+    #      low_level_tissue = classifier.classify(slide, level=2)
+    #      filter_ = Filter(low_level_tissue)
+    #      high_level_tissue = self.get_classifier(
+    #          model, 'high_level_tissue').classify(slide,
+    #                                               level=1,
+    #                                               filter_=filter_.filter(
+    #                                                   '__gt__', 0.1))
+    #
+
 
 class TestEddlClassifier(BasicClassifierTest):
     @staticmethod
@@ -150,9 +164,7 @@ class TestEddlPatchClassifier(unittest.TestCase):
 
         slide.masks['tissue'] = filter_mask
         classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
-        mask = classifier.classify(slide,
-                                   level=level,
-                                   filter_=Filter(filter_mask) > 0)
+        mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
 
         self.assertTrue((mask.array / 100 == filter_mask.array).all())
 
@@ -168,9 +180,7 @@ class TestEddlPatchClassifier(unittest.TestCase):
 
         slide.masks['tissue'] = filter_mask
         classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
-        mask = classifier.classify(slide,
-                                   level=level,
-                                   filter_=Filter(filter_mask) > 0)
+        mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
 
         self.assertEqual(mask.array.shape, filter_mask.array.shape)
         print(mask.array)
@@ -183,9 +193,9 @@ class TestFilter(unittest.TestCase):
         indexes_ones = (0, 0)
         array[indexes_ones] = 1
         mask = Mask(array, 0, 1, dt.now(), False)
-        filtered = Filter(mask).filter('__gt__', 0.5)
+        filtered = mask > 0.5
 
-        self.assertTrue((filtered == indexes_ones).all())
+        self.assertTrue((filtered.indices == indexes_ones).all())
 
 
 def test_classifies_tumor(patch_path, slide_reader):
