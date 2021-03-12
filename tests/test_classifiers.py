@@ -103,19 +103,20 @@ class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
     def get_model():
         return GreenModel()
 
-    #  def test_filter(self):
-    #      slide = load('tests/data/PH10023-1.thumb.tif')
-    #      model = load_model(
-    #          'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
-    #      classifier = self.get_classifier(model, 'low_level_tissue')
-    #      low_level_tissue = classifier.classify(slide, level=2)
-    #      filter_ = Filter(low_level_tissue)
-    #      high_level_tissue = self.get_classifier(
-    #          model, 'high_level_tissue').classify(slide,
-    #                                               level=1,
-    #                                               filter_=filter_.filter(
-    #                                                   '__gt__', 0.1))
-    #
+    def test_filter(self):
+        slide = load('tests/data/PH10023-1.thumb.tif')
+        model = load_model(
+            'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+        classifier = self.get_classifier(model, 'low_level_tissue')
+        low_level_tissue = classifier.classify(slide, level=2)
+        level = 1
+        high_level_tissue = self.get_classifier(
+            model,
+            'high_level_tissue').classify(slide,
+                                          level=level,
+                                          filter_=low_level_tissue > 0.1)
+        self.assertEqual(high_level_tissue.array.shape[::-1],
+                         slide.level_dimensions[level])
 
 
 class TestEddlClassifier(BasicClassifierTest):

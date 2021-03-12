@@ -83,10 +83,12 @@ class Classifier(BasicClassifier):
             shape=list(slide.level_dimensions[level][::-1]) + [4],
             dtype='uint8')
 
-        scale_factor = 256  # FIXME
         model = delayed(self.model)
         if filter_ is not None:
-            #  predictions = np.zeros(slide.dimensions[::-1], dtype='float32')
+            scale_factor = round(slide.level_downsamples[
+                filter_.mask.extraction_level]) // round(
+                    slide.level_downsamples[level])
+
             predictions = []
             area_by_row = defaultdict(list)
             for pixel in filter_:
@@ -98,35 +100,38 @@ class Classifier(BasicClassifier):
                 area_reshaped = area.reshape((n_px, 3))
                 area_by_row[pixel[0]].append((pixel[1], area_reshaped))
 
-            for row, areas in area_by_row.items():
+            for row in range(0, slide_array.shape[0], scale_factor):
+                step = scale_factor if row + scale_factor < slide_array.shape[
+                    0] else slide_array.shape[0] - row
+
                 row_predictions = []
-                prev_y = 0
-                for y, area in areas:
-                    logger.debug('y %s', y)
-                    pad_0 = y - prev_y
-                    if pad_0 > 0:
-                        logger.debug('pad_0 %s', pad_0)
+                if row not in area_by_row:
+                    row_predictions = da.zeros((step, slide_array.shape[1]),
+                                               dtype='float32')
+                else:
+                    areas = area_by_row[row]
+                    prev_y = 0
+                    for y, area in areas:
+                        pad_0 = y - prev_y
+                        if pad_0 > 0:
+                            row_predictions.append(
+                                da.zeros((scale_factor, pad_0),
+                                         dtype='float32'))
+
+                        prediction = da.from_delayed(model.predict(area),
+                                                     shape=(area.shape[0], ),
+                                                     dtype='float32')
                         row_predictions.append(
-                            da.zeros((256, pad_0), dtype='float32'))
+                            prediction.reshape(scale_factor, scale_factor))
+                        prev_y = y + scale_factor
 
-                    prediction = da.from_delayed(model.predict(area),
-                                                 shape=(area.shape[0], ),
-                                                 dtype='float32')
-                    row_predictions.append(
-                        prediction.reshape(scale_factor, scale_factor))
-                    prev_y = y + scale_factor
+                    y = slide_array.shape[1]
+                    pad_0 = y - prev_y
+                    if pad_0:
+                        row_predictions.append(
+                            da.zeros((scale_factor, pad_0), dtype='float32'))
 
-                y = slide_array.shape[1]
-                pad_0 = y - prev_y
-                if pad_0:
-                    row_predictions.append(
-                        da.zeros((256, pad_0), dtype='float32'))
-
-                row_predictions = da.concatenate(row_predictions, 1)
-                logger.debug('row_predictions shape %s, expected %s',
-                             row_predictions.shape,
-                             (256, slide_array.shape[1]))
-                assert row_predictions.shape == (256, slide_array.shape[1])
+                    row_predictions = da.concatenate(row_predictions, 1)
 
                 predictions.append(row_predictions)
             predictions = da.concatenate(predictions, 0)
