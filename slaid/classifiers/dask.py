@@ -17,6 +17,8 @@ from slaid.models.eddl import Model as EddlModel
 from slaid.models.eddl import load_model
 
 logger = logging.getLogger('dask')
+fh = logging.FileHandler('/tmp/dask.log')
+logger.addHandler(fh)
 
 
 class Patch(BasePatch):
@@ -203,7 +205,8 @@ class Classifier(BasicClassifier):
             patches = patches_to_predict[i:i + n_patch]
             input_array = da.stack([
                 slide_array[p[0]:p[0] + self._patch_size[0],
-                            p[1]:p[1] + self._patch_size[1]] for p in patches
+                            p[1]:p[1] + self._patch_size[1], :3]
+                for p in patches
             ])
             predictions.append(
                 da.from_delayed(model.predict(input_array),
@@ -212,15 +215,14 @@ class Classifier(BasicClassifier):
         if predictions:
             predictions = da.concatenate(predictions)
 
-        logger.debug('predictions %s', predictions)
         predictions = predictions.compute()
         res = np.zeros(
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
-            dtype=dtype)
+            dtype='float32')
         for i, p in enumerate(predictions):
             patch = patches_to_predict[i]
             res[patch[0], patch[1]] = p
-        return da.array(res, dtype=dtype)
+        return da.array(res, dtype='float32')
 
     @staticmethod
     def _get_zeros(size, dtype):
