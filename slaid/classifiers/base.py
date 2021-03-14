@@ -8,7 +8,7 @@ import numpy as np
 from progress.bar import Bar
 
 from slaid.commons import Mask, Slide
-from slaid.commons.base import Image, ImageInfo
+from slaid.commons.base import Filter, Image, ImageInfo
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
@@ -26,11 +26,6 @@ class Classifier(abc.ABC):
                  n_batch: int = 1,
                  round_to_0_100: bool = True) -> Mask:
         pass
-
-
-@dataclass
-class Filter:
-    mask: Mask
 
 
 class BasicClassifier(Classifier):
