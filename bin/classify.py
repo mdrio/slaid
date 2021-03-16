@@ -2,227 +2,56 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
-import pickle
 
 import pkg_resources
+import tiledb
+from clize import run
 
-from slaid.classifiers import BasicClassifier
-from slaid.commons import PATCH_SIZE
-from slaid.commons.ecvl import create_slide
-from slaid.renderers import to_json
+from slaid.runners import ParallelRunner, SerialRunner
 
-logging.basicConfig(level=logging.INFO)
-
-
-def pickle_dump(obj, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump(obj, f)
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
+                    '[%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%Y-%m-%d:%H:%M:%S',
+                    level=logging.DEBUG)
 
 
-WRITERS = {'json': to_json, 'pkl': pickle_dump}
+def set_model(func, model):
+    def wrapper(*args, **kwargs):
+        return func(*args, model=model, **kwargs)
+
+    return wrapper
 
 
-def main(input_path,
-         output_dir,
-         model_filename,
-         feature,
-         extraction_level,
-         pixel_threshold=0.8,
-         patch_threshold=0.5,
-         no_mask=False,
-         patch_size=PATCH_SIZE,
-         gpu=False,
-         only_mask=False,
-         writer='json',
-         filter_=None,
-         overwrite_output_if_exists=True,
-         skip_output_if_exist=False):
+def set_feature(func, feature):
+    def wrapper(*args, **kwargs):
+        return func(*args, feature=feature, **kwargs)
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    slides = [os.path.join(input_path, f) for f in os.listdir(input_path)
-              ] if os.path.isdir(input_path) else [input_path]
-
-    for slide in slides:
-        classify_slide(slide, output_dir, model_filename, feature,
-                       extraction_level, pixel_threshold, patch_threshold,
-                       no_mask, patch_size, gpu, only_mask, writer, filter_,
-                       overwrite_output_if_exists, skip_output_if_exist)
+    return wrapper
 
 
-def classify_slide(slide_filename,
-                   output_dir,
-                   model_filename,
-                   feature,
-                   extraction_level,
-                   pixel_threshold=0.8,
-                   patch_threshold=0.5,
-                   no_mask=False,
-                   patch_size=PATCH_SIZE,
-                   gpu=False,
-                   only_mask=False,
-                   writer='pkl',
-                   filter_=None,
-                   overwrite_output_if_exists=True,
-                   skip_output_if_exist=False):
-
-    output_filename = get_output_filename(slide_filename, output_dir, writer)
-    if os.path.exists(output_filename):
-        if skip_output_if_exist:
-            logging.debug(f"""
-                Skipping classification of slide {slide_filename},
-                already exists.
-                """)
-            return
-
-        elif not overwrite_output_if_exists:
-            raise RuntimeError(f"""
-                output for slide {slide_filename} already exists.
-                Set parameter skip_output_if_exist to skip
-                this slide classification or
-                overwrite_output_if_exists to overwrite.
-                """)
-
-    slide_ext_with_dot = os.path.splitext(slide_filename)[-1]
-    slide_ext = slide_ext_with_dot[1:]
-    if slide_ext == 'pkl' or slide_ext == 'pickle':
-        with open(slide_filename, 'rb') as f:
-            slide = pickle.load(f)
-    else:
-        slide = create_slide(slide_filename,
-                             extraction_level=extraction_level,
-                             patch_size=patch_size)
-
-    if os.path.splitext(model_filename)[-1] in ('.pkl', '.pickle'):
-        from slaid.classifiers import Model
-        model = Model(model_filename)
-    else:
-        from slaid.classifiers.eddl import Model
-        model = Model(model_filename, gpu)
-
-    tissue_classifier = BasicClassifier(model, feature)
-
-    tissue_classifier.classify(slide,
-                               patch_filter=filter_,
-                               mask_threshold=pixel_threshold,
-                               patch_threshold=patch_threshold,
-                               include_mask=(not no_mask or only_mask))
-
-    if only_mask:
-        data_to_dump = {
-            'filename': slide_filename,
-            'dimensions': slide.dimensions,
-            'extraction_level': extraction_level,
-            'mask': slide.masks[feature]
-        }
-
-    else:
-        data_to_dump = slide
-
-    WRITERS[writer](data_to_dump, output_filename)
-    logging.info(output_filename)
+def get_parallel_classifier(model, feature):
+    from slaid.classifiers.dask import Classifier, init_client
+    init_client()
+    return Classifier(model, feature)
 
 
-def get_output_filename(slide_filename, output_dir, ext):
-    slide_basename = os.path.basename(slide_filename)
-    slide_basename_no_ext = os.path.splitext(slide_basename)[0]
-    output_filename = f'{slide_basename_no_ext}.{feature}.{ext}'
-    output_filename = os.path.join(output_dir, output_filename)
-    return output_filename
+def load_config_file(config_file: str, backend: str):
+    if config_file is None:
+        return
+    if backend == 'tiledb':
+        config = tiledb.Config.load(config_file)
+        tiledb.Ctx(config)
+        tiledb.VFS(config)
 
 
 if __name__ == '__main__':
-    import argparse
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input_path')
-    parser.add_argument('output_dir')
-    # workaround since is not possible to pass env variable
-    # to Docker CMD
+    runners = {'serial': SerialRunner.run, 'parallel': ParallelRunner.run}
     model = os.environ.get("SLAID_MODEL")
-    if model is None:
-        parser.add_argument(
-            '-m',
-            dest='model_filename',
-            help='path to model',
-        )
-    else:
-        model = pkg_resources.resource_filename('slaid', f'models/{model}')
+    if model:
+        model = pkg_resources.resource_filename('slaid',
+                                                f'resources/models/{model}')
+        for k, v in runners.items():
+            runners[k] = set_model(v, model)
 
-    feature = os.environ.get("SLAID_FEATURE")
-    if feature is None:
-        parser.add_argument('-f',
-                            '--feature',
-                            dest='feature',
-                            help="feature label")
-
-    parser.add_argument('--patch-size', dest='patch_size', default=PATCH_SIZE)
-    parser.add_argument('-l',
-                        '--level',
-                        dest='extraction_level',
-                        help='extraction_level',
-                        default=2,
-                        type=int)
-    parser.add_argument('-t',
-                        '--pixel-threshold',
-                        dest='pixel_threshold',
-                        default=0.8,
-                        help="pixel pixel threshold",
-                        type=float)
-    parser.add_argument('-T',
-                        '--patch-threshold',
-                        dest='patch_threshold',
-                        default=0.1,
-                        help="patch threshold",
-                        type=float)
-    parser.add_argument('--no-mask',
-                        dest='no_mask',
-                        default=False,
-                        help="Not include tissue mask",
-                        action='store_true')
-    parser.add_argument('--only-mask',
-                        dest='only_mask',
-                        default=False,
-                        help="only tissue mask is returned",
-                        action='store_true')
-    parser.add_argument('--gpu',
-                        dest='gpu',
-                        default=False,
-                        help="use gpu",
-                        action='store_true')
-    parser.add_argument('-w',
-                        '--writer',
-                        dest='writer',
-                        default='pkl',
-                        help="writer for serializing the resulting output",
-                        choices=WRITERS.keys())
-
-    parser.add_argument(
-        '-F',
-        dest='filter_',
-        default=None,
-        help="filter by patch feature",
-    )
-    parser.add_argument(
-        '--skip',
-        dest='skip_output_if_exist',
-        default=False,
-        action='store_true',
-        help="Skip slide classification if output already exists",
-    )
-    parser.add_argument(
-        '--overwrite',
-        dest='overwrite_output_if_exists',
-        default=False,
-        action='store_true',
-        help="Skip slide classification if output already exists",
-    )
-
-    args = parser.parse_args()
-    model = model or args.model_filename
-    feature = feature or args.feature
-    kwargs = dict(model_filename=model, feature=feature)
-    kwargs.update(vars(args))
-
-    main(**kwargs)
+    run(runners)

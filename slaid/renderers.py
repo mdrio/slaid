@@ -1,79 +1,68 @@
 import abc
 import json
-from typing import Any, Callable, Dict, List, Union
+import logging
+import os
+from typing import Any, Tuple, Union
 
 import numpy as np
-from tifffile import imwrite
+import tifffile
+import tiledb
+import zarr
 
-from slaid.commons import Patch, Slide
+from slaid.commons import Mask, Slide
+from slaid.commons.base import Polygon
+from slaid.commons.ecvl import Slide as EcvlSlide
+
+logger = logging.getLogger(__file__)
 
 
 class Renderer(abc.ABC):
     @abc.abstractmethod
     def render(
         self,
-        filename: str,
-        slide: Slide,
-    ):
-        pass
-
-    @abc.abstractmethod
-    def render_patch(
-        self,
-        patch: Patch,
+        array: np.ndarray,
         filename: str,
     ):
         pass
 
 
-def convert_to_heatmap(patches: List[Patch], feature: str) -> np.array:
-    def _rgb_convert(patch: Patch) -> np.array:
-        cancer_percentage = patch.features[feature]
-        cancer_percentage = 0 if cancer_percentage is None\
-             else cancer_percentage
-        mask_value = int(round(cancer_percentage * 255))
-        return (mask_value, 0, 0, 255) if cancer_percentage > 0 else (0, 0, 0,
-                                                                      0)
+class TiffRenderer(Renderer):
+    def __init__(self,
+                 tile_size: Tuple[int, int] = (256, 256),
+                 rgb: bool = True,
+                 bigtiff=True):
+        self.tile_size = tile_size
+        self.channels = 4 if rgb else 2
+        self.rgb = rgb
+        self.bigtiff = bigtiff
 
-    for patch in patches:
-        data = _rgb_convert(patch)
-        yield np.full(patch.size + (4, ), data, 'uint8')
+    def _tiles(self, data: np.ndarray) -> np.ndarray:
+        for y in range(0, data.shape[0], self.tile_size[0]):
+            for x in range(0, data.shape[1], self.tile_size[1]):
+                tile = data[y:y + self.tile_size[0], x:x + self.tile_size[1]]
+                if tile.shape[:2] != self.tile_size:
+                    pad = (
+                        (0, self.tile_size[0] - tile.shape[0]),
+                        (0, self.tile_size[1] - tile.shape[1]),
+                    )
+                    tile = np.pad(tile, pad, 'constant')
+                final_tile = np.zeros(
+                    (tile.shape[0], tile.shape[1], self.channels),
+                    dtype='uint8')
 
+                final_tile[:, :, 0] = tile * 255
+                final_tile[final_tile[:, :, 0] > 255 / 10,
+                           self.channels - 1] = 255
+                yield final_tile
 
-class BasicFeatureTIFFRenderer(Renderer):
-    def __init__(
-        self,
-        rgb_convert: Callable = None,
-    ):
-        self._rgb_convert = rgb_convert or convert_to_heatmap
-
-    def render(self,
-               filename: str,
-               slide: Slide,
-               feature: str,
-               one_file_per_patch: bool = False):
-        if one_file_per_patch:
-            raise NotImplementedError()
-        shape = slide.dimensions_at_extraction_level
-        imwrite(filename,
-                self._rgb_convert(slide.patches, feature),
-                dtype='uint8',
-                shape=(shape[1], shape[0], 4),
-                photometric='rgb',
-                tile=slide.patches.patch_size,
-                extrasamples=('ASSOCALPHA', ))
-
-    def render_patch(
-        self,
-        filename: str,
-        patch: Patch,
-        feature: str,
-    ):
-        data = list(self._rgb_convert([patch], feature))[0]
-        imwrite(filename,
-                data,
-                photometric='rgb',
-                extrasamples=('ASSOCALPHA', ))
+    def render(self, array: np.ndarray, filename: str):
+        with tifffile.TiffWriter(filename, bigtiff=self.bigtiff) as tif:
+            tif.save(self._tiles(array),
+                     dtype='uint8',
+                     shape=(array.shape[0], array.shape[1], self.channels),
+                     tile=self.tile_size,
+                     photometric='rgb' if self.rgb else 'minisblack',
+                     extrasamples=('ASSOCALPHA', ))
 
 
 class BaseJSONEncoder(abc.ABC):
@@ -85,21 +74,6 @@ class BaseJSONEncoder(abc.ABC):
         pass
 
 
-class PatchJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Patch
-
-    def encode(self, patch: Patch):
-        return {
-            'slide': patch.slide.ID,
-            'x': patch.x,
-            'y': patch.y,
-            'size': patch.size,
-            'features': patch.features
-        }
-
-
 class NumpyArrayJSONEncoder(BaseJSONEncoder):
     @property
     def target(self):
@@ -107,6 +81,15 @@ class NumpyArrayJSONEncoder(BaseJSONEncoder):
 
     def encode(self, array: np.ndarray):
         return array.tolist()
+
+
+class PolygonJSONEncoder(BaseJSONEncoder):
+    @property
+    def target(self):
+        return Polygon
+
+    def encode(self, obj: Polygon):
+        return obj.coords
 
 
 class Int64JSONEncoder(BaseJSONEncoder):
@@ -142,36 +125,8 @@ def convert_numpy_types(obj):
     return obj
 
 
-class SlideJSONEncoder(BaseJSONEncoder):
-    @property
-    def target(self):
-        return Slide
-
-    def encode(
-        self,
-        slide: Slide,
-    ) -> Union[List, Dict]:
-        dct = dict(filename=slide.ID,
-                   patch_size=slide.patches.patch_size,
-                   extraction_level=slide.patches.extraction_level,
-                   downsample_factor=slide.level_downsamples[
-                       slide.patches.extraction_level],
-                   features=[])
-
-        for p in slide.patches:
-            patch_info = dict(x=p.x, y=p.y)
-            for f, v in p.features.items():
-                patch_info[f] = convert_numpy_types(v)
-            dct['features'].append(patch_info)
-        return dct
-
-
 class JSONEncoder(json.JSONEncoder):
-    encoders = [
-        PatchJSONEncoder(),
-        NumpyArrayJSONEncoder(),
-        SlideJSONEncoder(),
-    ]
+    encoders = [NumpyArrayJSONEncoder(), PolygonJSONEncoder()]
 
     def default(self, obj):
         encoded = None

@@ -1,73 +1,234 @@
 import abc
 import inspect
+import logging
+import os
 import sys
-from collections import OrderedDict, defaultdict
-from typing import Any, Dict, List, Tuple, Union
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime as dt
+from enum import Enum
+from typing import Dict, List, Tuple
 
+import cv2
 import numpy as np
-import pandas as pd
+import PIL
+import shapely
+import tiledb
+import zarr
+from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
+from shapely.geometry import Polygon as ShapelyPolygon
 
 PATCH_SIZE = (256, 256)
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 
 def get_class(name, module):
     return dict(inspect.getmembers(sys.modules[module], inspect.isclass))[name]
 
 
-class Tensor(abc.ABC):
-    @abc.abstractmethod
-    def getdata() -> np.ndarray:
-        pass
-
-
 class Image(abc.ABC):
+    class COLORTYPE(Enum):
+        RGB = 'rgb'
+        BGR = 'bgr'
+
+    class COORD(Enum):
+        XY = 'xy'
+        YX = 'yx'
+
+    class CHANNEL(Enum):
+        FIRST = 'first'
+        LAST = 'last'
+
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
 
     @abc.abstractmethod
-    def to_array(self, PIL_FORMAT: bool = False) -> np.ndarray:
+    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
+                 channel: 'Image.CHANNEL') -> np.ndarray:
         pass
 
-    @abc.abstractmethod
-    def to_tensor(self):
-        pass
+
+@dataclass
+class Polygon:
+    coords: List[Tuple[int, int]]
+
+
+def apply_threshold(array, threshold: float) -> np.ndarray:
+    array = np.array(array)
+    array[array > threshold] = 1
+    array[array <= threshold] = 0
+    array = array.astype('uint8')
+    return array
+
+
+def mask_to_polygons(mask, epsilon=10., min_area=10.):
+    """
+    https://stackoverflow.com/questions/60971260/how-to-transform-contours-obtained-from-opencv-to-shp-file-polygons
+
+    the original source of these helpers was a Kaggle
+    post by Konstantin Lopuhin here - you'll need
+    to be logged into Kaggle to see it
+    """
+    # first, find contours with cv2: it's much faster than shapely
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP,
+                                           cv2.CHAIN_APPROX_NONE)
+    if not contours:
+        return ShapelyMultiPolygon()
+    # now messy stuff to associate parent and child contours
+    cnt_children = defaultdict(list)
+    child_contours = set()
+    assert hierarchy.shape[0] == 1
+    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
+    for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
+        if parent_idx != -1:
+            child_contours.add(idx)
+            cnt_children[parent_idx].append(contours[idx])
+    # create actual polygons filtering by area (removes artifacts)
+    all_polygons = []
+    for idx, cnt in enumerate(contours):
+        if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
+            assert cnt.shape[1] == 1
+            poly = ShapelyPolygon(shell=cnt[:, 0, :],
+                                  holes=[
+                                      c[:, 0, :]
+                                      for c in cnt_children.get(idx, [])
+                                      if cv2.contourArea(c) >= min_area
+                                  ])
+            all_polygons.append(poly)
+    all_polygons = ShapelyMultiPolygon(all_polygons)
+
+    return all_polygons
+
+
+@dataclass
+class Mask:
+    array: np.ndarray
+    extraction_level: int
+    level_downsample: int
+    datetime: dt = None
+    round_to_0_100: bool = False
+    threshold: float = None
+    model: str = None
+
+    def __eq__(self, other):
+        check_array = (np.array(self.array) == np.array(other.array)).all()
+        return self.extraction_level == other.extraction_level \
+            and self.level_downsample == other.level_downsample \
+            and self.threshold == other.threshold \
+            and self.model == other.model \
+            and self.round_to_0_100 == other.round_to_0_100 \
+            and self.datetime == other.datetime \
+            and check_array
+
+    def to_image(self, downsample: int = 1, threshold: float = None):
+        array = self.array[::downsample, ::downsample]
+        if self.round_to_0_100:
+            array = array / 100
+        if threshold:
+            array = apply_threshold(array, threshold)
+        return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
+
+    def to_polygons(self,
+                    threshold: float = None,
+                    downsample: int = 1,
+                    n_batch: int = 1) -> List[Polygon]:
+        array = np.array(self.array[::downsample, ::downsample])
+        if threshold:
+            array[array > threshold] = 1
+            array[array <= threshold] = 0
+            array = array.astype('uint8')
+            polygons = mask_to_polygons(array)
+        return [
+            Polygon(
+                list(
+                    shapely.affinity.scale(p,
+                                           downsample,
+                                           downsample,
+                                           origin=(0, 0)).exterior.coords))
+            for p in polygons
+        ]
+
+    def to_zarr(self, path: str, overwrite: bool = False, **kwargs):
+        logger.info('dumping mask to zarr on path %s', path)
+        name = os.path.basename(path)
+        group = zarr.open_group(os.path.dirname(path))
+        if overwrite and name in group:
+            del group[name]
+        array = group.array(name, self.array)
+        for attr, value in self._get_attributes().items():
+            logger.info('writing attr %s %s', attr, value)
+            array.attrs[attr] = value
+
+    def _get_attributes(self):
+        attrs = {}
+        attrs['extraction_level'] = self.extraction_level
+        attrs['level_downsample'] = self.level_downsample
+        attrs['datetime'] = self.datetime.timestamp()
+        attrs['round_to_0_100'] = self.round_to_0_100
+        if self.threshold:
+            attrs['threshold'] = self.threshold
+        if self.model:
+            attrs['model'] = self.model
+        return attrs
+
+    def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
+        logger.info('dumping mask to tiledb on path %s', path)
+        if os.path.isdir(path) and overwrite:
+            tiledb.remove(path, ctx=ctx)
+        tiledb.from_numpy(path, self.array, ctx=ctx)
+        self._write_meta_tiledb(path, ctx=ctx)
+
+    def _write_meta_tiledb(self, path, ctx: tiledb.Ctx = None):
+        with tiledb.open(path, 'w', ctx=ctx) as array:
+            array.meta['extraction_level'] = self.extraction_level
+            array.meta['level_downsample'] = self.level_downsample
+            if self.threshold:
+                array.meta['threshold'] = self.threshold
+            if self.model:
+                array.meta['model'] = self.model
+
+    @classmethod
+    def from_tiledb(cls, path, ctx: tiledb.Ctx = None):
+        array = tiledb.open(path, ctx=ctx)
+        return Mask(array, array.meta['extraction_level'],
+                    array.meta['level_downsample'],
+                    cls._get_meta(array, 'threshold'),
+                    cls._get_meta(array, 'model'))
+
+    @staticmethod
+    def _get_meta(array, attr):
+        try:
+            res = array.meta[attr]
+        except KeyError:
+            res = None
+        return res
 
 
 class Slide(abc.ABC):
-    def __init__(self, filename: str, extraction_level=2):
+    class InvalidFile(Exception):
+        pass
+
+    def __init__(self, filename: str):
         self._filename = filename
-        self._extraction_level = extraction_level
-        self.patches: PatchCollection = None
-        self.masks: Dict[str, np.ndarray] = {}
+        self.masks: Dict[str, Mask] = {}
 
     def __eq__(self, other):
-        return self._filename == other._filename and\
-            self.features == other.features and self.patches == other.patches
+        return self._filename == other.filename and self.masks == other.masks
 
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
 
-    @abc.abstractproperty
-    def dimensions_at_extraction_level(self) -> Tuple[int, int]:
-        pass
-
-    @abc.abstractproperty
-    def ID(self):
-        pass
+    @property
+    def filename(self):
+        return self._filename
 
     @abc.abstractmethod
-    def read_region(self, location: Tuple[int, int],
+    def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> Image:
         pass
-
-    def iterate_by_patch(self, patch_size: Tuple[int, int] = None):
-        dimensions = self.dimensions_at_extraction_level
-        patch_size = patch_size if patch_size else PATCH_SIZE
-        for y in range(0, dimensions[1], patch_size[1]):
-            for x in range(0, dimensions[0], patch_size[0]):
-                yield Patch(self, (x, y), patch_size)
 
     @abc.abstractmethod
     def get_best_level_for_downsample(self, downsample: int):
@@ -82,48 +243,6 @@ class Slide(abc.ABC):
         pass
 
 
-class SlideIterator:
-    def __init__(self, slide: Slide, patch_size: Tuple[int, int]):
-        self._slide = slide
-        self._patch_size = patch_size
-
-    def __iter__(self):
-        return self._slide.iterate_by_patch(self._patch_size)
-
-
-class Patch:
-    def __init__(self,
-                 slide: Slide,
-                 coordinates: Tuple[int, int],
-                 size: Tuple[int, int],
-                 features: Dict = None):
-        self.slide = slide
-        self.x = coordinates[0]
-        self.y = coordinates[1]
-        self.size = size
-        self.features = features or {}
-
-    def __str__(self):
-        return (f'slide: {self.slide}, x: {self.x}, '
-                f'y: {self.y}, size: {self.size}')
-
-    def __eq__(self, other):
-        def _check_features():
-            res = self.features.keys() == other.features.keys()
-            for f, v in self.features.items():
-                if isinstance(v, np.ndarray):
-                    res = res and np.array_equal(v, other.features[f])
-                else:
-                    res = res and v == other.features[f]
-                if not res:
-                    break
-            return res
-
-        return self.slide == other.slide and (self.x, self.y) == (
-            other.x,
-            other.y) and self.size == other.size and _check_features()
-
-
 def round_to_patch(coordinates, patch_size):
     res = []
     for i, c in enumerate(coordinates):
@@ -131,253 +250,3 @@ def round_to_patch(coordinates, patch_size):
         q, r = divmod(c, size)
         res.append(size * (q + round(r / size)))
     return tuple(res)
-
-
-class PatchCollection(abc.ABC):
-    class Projection(abc.ABC):
-        @abc.abstractmethod
-        def __eq__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def __lt__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def __le__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def __ne__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def __ge__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def __gt__(self, other):
-            pass
-
-        @abc.abstractmethod
-        def isnull(self):
-            pass
-
-        @abc.abstractmethod
-        def notnull(self):
-            pass
-
-    @abc.abstractclassmethod
-    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
-                    dataframe: pd.DataFrame):
-        pass
-
-    def __init__(self,
-                 slide: Slide,
-                 patch_size: Tuple[int, int] = PATCH_SIZE,
-                 extraction_level=""):
-        self._slide = slide
-        slide.patches = self
-        self._patch_size = patch_size
-        self._extraction_level = extraction_level
-
-    @property
-    def slide(self) -> Slide:
-        return self._slide
-
-    @property
-    def extraction_level(self) -> int:
-        return self._extraction_level
-
-    @property
-    def patch_size(self) -> Tuple[int, int]:
-        return self._patch_size
-
-    @abc.abstractproperty
-    def dataframe(self) -> pd.DataFrame:
-        pass
-
-    @abc.abstractmethod
-    def filter(
-        self,
-        condition: Union[str,
-                         "PatchCollection.Projection"]) -> "PatchCollection":
-        pass
-
-    @abc.abstractmethod
-    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
-        pass
-
-    @abc.abstractmethod
-    def __iter__(self):
-        pass
-
-    @abc.abstractmethod
-    def __len__(self):
-        pass
-
-    @abc.abstractmethod
-    def update_patch(self,
-                     coordinates: Tuple[int, int] = None,
-                     patch: Patch = None,
-                     features: Dict = None):
-        pass
-
-    @abc.abstractproperty
-    def features(self) -> List[str]:
-        pass
-
-    @abc.abstractmethod
-    def add_feature(self, feature: str, default_value: Any = None):
-        pass
-
-    @abc.abstractmethod
-    def update(self, other_collection: 'PatchCollection'):
-        pass
-
-    @abc.abstractmethod
-    def merge(self, other_collection: 'PatchCollection'):
-        pass
-
-
-class PandasPatchCollection(PatchCollection):
-    class Projection(PatchCollection.Projection):
-        def __init__(self, series: pd.core.series.Series):
-            self._series = series
-
-        def __eq__(self, other):
-            return PandasPatchCollection.Projection(self._series == other)
-
-        def __lt__(self, other):
-            return PandasPatchCollection.Projection(self._series < other)
-
-        def __le__(self, other):
-            return PandasPatchCollection.Projection(self._series < other)
-
-        def __ne__(self, other):
-            return PandasPatchCollection.Projection(self._series != other)
-
-        def __ge__(self, other):
-            return PandasPatchCollection.Projection(self._series >= other)
-
-        def __gt__(self, other):
-            return PandasPatchCollection.Projection(self._series > other)
-
-        def __and__(self, other):
-            return PandasPatchCollection.Projection(self._series
-                                                    & other._series)
-
-        def __or__(self, other):
-            return PandasPatchCollection.Projection(self._series
-                                                    | other._series)
-
-        def isnull(self):
-            return PandasPatchCollection.Projection(self._series.isnull())
-
-        def notnull(self):
-            return PandasPatchCollection.Projection(self._series.notnull())
-
-    class LocIndexer:
-        def __init__(self, collection: "PandasPatchCollection"):
-            self.collection = collection
-
-        def __getitem__(self, key):
-            return PandasPatchCollection.from_pandas(
-                self.collection.slide, self.collection.patch_size,
-                self.collection.dataframe.loc[key])
-
-    @classmethod
-    def from_pandas(cls, slide: Slide, patch_size: Tuple[int, int],
-                    dataframe: pd.DataFrame):
-        patch_collection = cls(slide, patch_size)
-        # TODO add some assert to verify dataframe is compatible
-        patch_collection._dataframe = dataframe
-        return patch_collection
-
-    def __init__(self,
-                 slide: Slide,
-                 patch_size: Tuple[int, int] = PATCH_SIZE,
-                 extraction_level=2):
-        super().__init__(slide, patch_size, extraction_level)
-        self._dataframe = self._init_dataframe()
-        self._loc = PandasPatchCollection.LocIndexer(self)
-
-    def _init_dataframe(self):
-        data = defaultdict(lambda: [])
-        for p in self._slide.iterate_by_patch(self._patch_size):
-            data['y'].append(p.y)
-            data['x'].append(p.x)
-        df = pd.DataFrame(data, dtype=int)
-        df.set_index(['y', 'x'], inplace=True)
-        return df
-
-    def __getitem__(self, key):
-        return PandasPatchCollection.Projection(self._dataframe[key])
-
-    def _create_patch(self, coordinates: Tuple[int, int],
-                      data: Tuple) -> Patch:
-        y, x = coordinates
-        features = dict(data)
-        return Patch(self.slide, (x, y), self.patch_size, features)
-
-    def __iter__(self):
-        for data in self._dataframe.iterrows():
-            yield self._create_patch(data[0], data[1])
-
-    def __len__(self):
-        return len(self._dataframe)
-
-    @property
-    def dataframe(self):
-        return self._dataframe
-
-    def get_patch(self, coordinates: Tuple[int, int]) -> Patch:
-        return self._create_patch(coordinates[::-1],
-                                  self._dataframe.loc[coordinates[::-1]])
-
-    @property
-    def features(self) -> List[str]:
-        return [c for c in self._dataframe.columns]
-
-    def add_feature(self, feature: str, default_value: Any = None):
-        if feature not in self.features:
-            self.dataframe.insert(len(self._dataframe.columns), feature,
-                                  default_value)
-
-    def update_patch(self,
-                     coordinates: Tuple[int, int] = None,
-                     patch: Patch = None,
-                     features: Dict = None):
-        if patch:
-            coordinates = (patch.x, patch.y)
-
-        features = OrderedDict(features)
-        if coordinates is None:
-            raise RuntimeError('coordinates and patch cannot be None')
-
-        missing_features = features.keys() - set(self._dataframe.columns)
-        for f in missing_features:
-            self.add_feature(f)
-        self._dataframe.loc[coordinates[::-1],
-                            list(features.keys())] = list(features.values())
-
-    def filter(
-        self,
-        condition: Union[str,
-                         "PatchCollection.Projection"]) -> "PatchCollection":
-        return PandasPatchCollection.from_pandas(
-            self.slide,
-            self.patch_size, self._dataframe.query(condition)) if isinstance(
-                condition, str) else self._loc[condition._series]
-
-    def update(self, other: "PandasPatchCollection"):
-        self.dataframe.update(other.dataframe)
-
-    def merge(self, other_collection: 'PandasPatchCollection'):
-        self._dataframe = self.dataframe.merge(other_collection.dataframe,
-                                               'left',
-                                               on=['y', 'x']).set_index(
-                                                   self._dataframe.index)
-
-    def __eq__(self, other):
-        return self._dataframe.equals(other._dataframe)

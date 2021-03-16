@@ -6,3 +6,12 @@ sklearn
 pandas
 pyecvl
 pyeddl
+clize
+dask[complete]==2.27.0
+zarr
+dataclasses
+opencv-python
+shapely
+tiledb==0.7.0
+progress
+stringcase
