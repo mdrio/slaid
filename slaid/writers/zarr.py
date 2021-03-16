@@ -31,11 +31,14 @@ def load(path: str) -> Slide:
     except Slide.InvalidFile:
         slide = ReducedSlide(group.attrs['filename'])
     for name, value in group.arrays():
-        logger.info('loading mask %s, %s', name, value.attrs.asdict())
-        kwargs = value.attrs.asdict()
-        if 'datetime' in kwargs:
-            kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
-        slide.masks[name] = Mask(value, **kwargs)
+        try:
+            logger.info('loading mask %s, %s', name, value.attrs.asdict())
+            kwargs = value.attrs.asdict()
+            if 'datetime' in kwargs:
+                kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
+            slide.masks[name] = Mask(value, **kwargs)
+        except Exception as ex:
+            logger.error('skipping mask %s, exception: %s ', name, ex)
     return slide
 
 
