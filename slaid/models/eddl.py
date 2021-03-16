@@ -85,12 +85,16 @@ class Model(BaseModel, ABC):
 
         try:
             lock = Lock('prediction')
-            lock.acquire()
-            prediction = eddl.predict(self._model, [tensor])
-            lock.release()
         except Exception as ex:
             logger.error('cannot create lock, not using dask? error %s', ex)
+            return eddl.predict(self._model, [tensor])
+
+        try:
+            lock.acquire()
             prediction = eddl.predict(self._model, [tensor])
+        finally:
+            lock.release()
+
         return prediction
 
     def __getstate__(self):
