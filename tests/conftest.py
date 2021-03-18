@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.commons import Mask
+from slaid.commons import ImageInfo, Mask, SlideArray
 from slaid.commons.ecvl import Slide as EcvlSlide
 from slaid.commons.openslide import Slide as OpenSlide
 from slaid.models.eddl import load_model
@@ -74,3 +74,9 @@ def patch_tissue_mask(request):
 def tissue_model():
     return load_model(
         'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+
+
+@pytest.fixture
+def slide_array():
+    return SlideArray(
+        np.arange(16 * 3).reshape(3, 4, 4), ImageInfo('bgr', 'yx', 'first'))

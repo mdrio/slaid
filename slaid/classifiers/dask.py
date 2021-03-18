@@ -1,10 +1,8 @@
 import logging
-from collections import defaultdict
 from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
-import toolz
 from dask import delayed
 from progress.bar import Bar
 
@@ -14,6 +12,7 @@ from slaid.classifiers.base import BatchIterator, Filter
 from slaid.classifiers.base import Patch as BasePatch
 from slaid.commons import Slide
 from slaid.commons.dask import Mask
+from slaid.commons.ecvl import SlideArrayFactory
 from slaid.models.eddl import Model as EddlModel
 from slaid.models.eddl import load_model
 
@@ -114,17 +113,16 @@ class Classifier(BasicClassifier):
     @delayed
     def _classify_batches_with_filter(self, slide_array, filter_,
                                       scale_factor):
-        res = np.zeros((slide_array.shape[0], slide_array.shape[1]),
-                       dtype='float32')
+        res = np.zeros(slide_array.size, dtype='float32')
         model = load_model(self._model.weight_filename,
                            self._model.gpu) if isinstance(
                                self._model, EddlModel) else self._model
         for pixel in filter_:
             pixel = pixel * scale_factor
             area = slide_array[pixel[0]:pixel[0] + scale_factor,
-                               pixel[1]:pixel[1] + scale_factor, :3]
-            n_px = area.shape[0] * area.shape[1]
-            prediction = model.predict(area.reshape(n_px, 3))
+                               pixel[1]:pixel[1] + scale_factor]
+            n_px = area.size[0] * area.size[1]
+            prediction = model.predict(area.reshape(n_px).array)
             res[pixel[0]:pixel[0] + scale_factor,
                 pixel[1]:pixel[1] + scale_factor] = prediction.reshape(
                     (scale_factor, scale_factor))
@@ -132,22 +130,17 @@ class Classifier(BasicClassifier):
 
     def _classify_batches(self, slide, level, n_batch, threshold,
                           round_to_0_100, filter_):
-        slide_array = da.from_delayed(
-            delayed(slide.to_array)(level),
-            shape=list(slide.level_dimensions[level][::-1]) + [4],
-            dtype='uint8')
-
+        slide_array = SlideArrayFactory(slide, self.model.image_info)[level]
         model = delayed(self.model)
         if filter_ is not None:
             scale_factor = round(slide.level_downsamples[
                 filter_.mask.extraction_level]) // round(
                     slide.level_downsamples[level])
 
-            predictions = da.from_delayed(
-                self._classify_batches_with_filter(slide_array, filter_,
-                                                   scale_factor),
-                shape=(slide_array.shape[0], slide_array.shape[1]),
-                dtype='float32')
+            predictions = da.from_delayed(self._classify_batches_with_filter(
+                slide_array, filter_, scale_factor),
+                                          shape=slide_array.size,
+                                          dtype='float32')
             #  predictions = da.from_delayed(
             #      self._classify_batches_with_filter(slide_array, filter_,
             #                                         scale_factor),
@@ -230,21 +223,20 @@ class Classifier(BasicClassifier):
 
         else:
             predictions = []
-            step = slide_array.shape[0] // n_batch
+            step = slide_array.size[0] // n_batch
             logger.debug('n_batch %s, step %s', n_batch, step)
             with Bar('batches', max=n_batch) as bar:
-                for i in range(0, slide_array.shape[0], step):
+                for i in range(0, slide_array.size[0], step):
                     bar.next()
-                    area = slide_array[i:i + step, :, :3]
-                    n_px = area.shape[0] * area.shape[1]
-                    area_reshaped = area.reshape((n_px, 3))
+                    area = slide_array[i:i + step, :]
+                    n_px = area.size[0] * area.size[1]
+                    area_reshaped = area.reshape((n_px, ))
 
                     prediction = da.from_delayed(
-                        model.predict(area_reshaped),
-                        shape=(area_reshaped.shape[0], ),
+                        model.predict(area_reshaped.array),
+                        shape=(area_reshaped.size[0], ),
                         dtype='float32')
-                    prediction = prediction.reshape(area.shape[0],
-                                                    area.shape[1])
+                    prediction = prediction.reshape(area.size[0], area.size[1])
                     predictions.append(prediction)
             return da.concatenate(predictions, 0)
 
@@ -272,11 +264,8 @@ class Classifier(BasicClassifier):
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         patches_to_predict = filter_ if filter_ is not None else np.ndindex(
             dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
-        slide_array = da.from_delayed(
-            delayed(slide.to_array)(level),
-            shape=list(slide.level_dimensions[level][::-1]) + [4],
-            dtype='uint8')
 
+        slide_array = SlideArrayFactory(slide, self.model.image_info)[level]
         model = delayed(self.model)
         predictions = []
         patches_to_predict = list(patches_to_predict)
@@ -284,7 +273,7 @@ class Classifier(BasicClassifier):
             patches = patches_to_predict[i:i + n_patch]
             input_array = da.stack([
                 slide_array[p[0]:p[0] + self._patch_size[0],
-                            p[1]:p[1] + self._patch_size[1], :3]
+                            p[1]:p[1] + self._patch_size[1]].array
                 for p in patches
             ])
             predictions.append(

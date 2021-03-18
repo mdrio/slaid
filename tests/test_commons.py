@@ -5,10 +5,11 @@ import pytest
 import tiledb
 
 from slaid.commons import Mask, Slide
+from slaid.commons.base import ImageInfo
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.ecvl import SlideArrayFactory
 from slaid.commons.openslide import Slide as OpenSlide
-from slaid.commons.base import ImageInfo
 
 IMAGE = 'tests/data/test.tif'
 
@@ -16,6 +17,38 @@ IMAGE = 'tests/data/test.tif'
 class BaseTestSlide:
     slide: Slide = None
     slide_cls = None
+
+    def test_to_array_level_0(self):
+        image_info = ImageInfo('bgr', 'yx', 'first')
+        array = SlideArrayFactory(self.slide, image_info)[0]
+        self.assertEqual(array.shape, self.slide.dimensions[::-1])
+
+    def test_to_array_level_1(self):
+        image_info = ImageInfo('bgr', 'yx', 'first')
+        array = SlideArrayFactory(self.slide, image_info)[1]
+        self.assertEqual(array.shape, self.slide.level_dimensions[1][::-1])
+
+    def test_array_slice_channel_first(self):
+        image_info = ImageInfo('bgr', 'yx', 'first')
+        array = SlideArrayFactory(self.slide, image_info)[1]
+
+        self.assertEqual(array[:20, :10]._array.shape, (3, 20, 10))
+
+        self.assertEqual(array[0, 0]._array.shape, (3, ))
+
+        import pudb
+        pudb.set_trace()
+        array = array[:20, :10]._array.compute()
+        expected_array = np.array(self.slide.read_region((0, 0), 1, (10, 20)))
+        print(array.shape, expected_array.shape)
+        self.assertTrue(array == expected_array)
+
+    def test_array_slice_channel_last(self):
+        array = self.slide.to_array(1, ImageInfo('rgb', 'yx', 'last'))
+        self.assertEqual(array[0, :].shape,
+                         (self.slide.level_dimensions[1][0], 3))
+        self.assertEqual(array[:20, :10].shape, (20, 10, 3))
+        self.assertEqual(array[0, 0].shape, (3, ))
 
     def test_returns_dimensions(self):
         self.assertEqual(self.slide.dimensions, (512, 1024))
@@ -84,6 +117,12 @@ class TestDaskMask(TestMask):
     @pytest.mark.skip(reason="update how mask are loaded/dumped")
     def test_dumps_to_tiledb(self, dask_array, tmp_path):
         super().test_dumps_to_tiledb(dask_array, tmp_path)
+
+
+def test_slide_array_reshape(slide_array):
+    size = slide_array.size
+    slide_array = slide_array.reshape((size[0] * size[1], 1))
+    assert slide_array.size == (size[0] * size[1], 1)
 
 
 if __name__ == '__main__':

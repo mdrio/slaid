@@ -46,20 +46,16 @@ class ImageInfo(abc.ABC):
     coord: COORD
     channel: CHANNEL
 
+    def __post_init__(self):
+        if isinstance(self.color_type, str):
+            self.color_type = ImageInfo.COLORTYPE(self.color_type)
+        if isinstance(self.coord, str):
+            self.coord = ImageInfo.COORD(self.coord)
+        if isinstance(self.channel, str):
+            self.channel = ImageInfo.CHANNEL(self.channel)
+
 
 class Image(abc.ABC):
-    class COLORTYPE(Enum):
-        RGB = 'rgb'
-        BGR = 'bgr'
-
-    class COORD(Enum):
-        XY = 'xy'
-        YX = 'yx'
-
-    class CHANNEL(Enum):
-        FIRST = 'first'
-        LAST = 'last'
-
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
@@ -315,15 +311,62 @@ class Slide(abc.ABC):
     def level_downsamples(self):
         pass
 
+    @property
+    def level_count(self):
+        return len(self.level_dimensions)
+
+
+class SlideArrayFactory(abc.ABC):
     @abc.abstractmethod
-    def to_array(self, level):
+    def __getitem__(self, key) -> "SlideArray":
         pass
 
 
-def round_to_patch(coordinates, patch_size):
-    res = []
-    for i, c in enumerate(coordinates):
-        size = patch_size[i]
-        q, r = divmod(c, size)
-        res.append(size * (q + round(r / size)))
-    return tuple(res)
+class SlideArray:
+    def __init__(self, array: np.ndarray, image_info: ImageInfo = None):
+        self._array = array
+        self._image_info = image_info
+
+    def __getitem__(self, key) -> "SlideArray":
+        if self._is_channel_first():
+            array = self._array[:, key[0], key[1]]
+        else:
+            array = self._array[key[0], key[1], :]
+        return SlideArray(array, self._image_info)
+
+    @property
+    def array(self):
+        return self._array
+
+    def _is_channel_first(self):
+        return self._image_info.channel == ImageInfo.CHANNEL.FIRST
+
+    @property
+    def size(self) -> Tuple[int, int]:
+        return self._array.shape[1:] if self._is_channel_first(
+        ) else self._array.shape[:2]
+
+    def reshape(self, shape) -> "SlideArray":
+
+        array = self._array.reshape((3, ) + shape) if self._is_channel_first(
+        ) else self._array.reshape(shape + (3, ))
+        return SlideArray(array, self._image_info)
+
+    def convert(self, image_info: ImageInfo) -> "SlideArray":
+        if self._image_info == image_info:
+            return self
+
+        array = self._array
+        if self._image_info.color_type != image_info.color_type:
+            if self._is_channel_first():
+                array = array[::-1, ...]
+            else:
+                array = array[..., ::-1]
+
+        if self._image_info.channel != image_info.channel:
+            if self._is_channel_first():
+                array = array.transpose(1, 2, 0)
+            else:
+                array = array.transpose(2, 0, 1)
+
+        return SlideArray(array, image_info)

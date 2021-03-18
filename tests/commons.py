@@ -9,14 +9,15 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
-    image_info = ImageInfo(Image.COLORTYPE.BGR, ImageInfo.COORD.YX,
-                           ImageInfo.CHANNEL.FIRST)
+    image_info = ImageInfo('bgr', 'yx', 'first')
 
     def __str__(self):
         return self.__class__.__name__
 
 
 class GreenModel(BaseModel):
+    image_info = ImageInfo('rgb', 'yx', 'last')
+
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
 
@@ -70,6 +71,8 @@ class BaseDummyModel(BaseModel):
 
 
 class DummyModel(BaseDummyModel):
+    image_info = ImageInfo('bgr', 'yx', 'last')
+
     def __init__(self, func, patch_size=None):
         self.func = func
         super().__init__(patch_size)
@@ -103,7 +106,7 @@ class DummySlide(Slide):
     def level_downsamples(self):
         return self._level_downsamples
 
-    def read_region(self, location: Tuple[int, int],
+    def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> Image:
         raise NotImplementedError()
 

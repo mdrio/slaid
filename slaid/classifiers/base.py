@@ -206,8 +206,9 @@ class ImageArea:
     column: int
     level: int
     size: Tuple[int, int]
-    image_info: ImageInfo = ImageInfo(Image.COLORTYPE.BGR, Image.COORD.YX,
-                                      Image.CHANNEL.FIRST)
+    image_info: ImageInfo = ImageInfo(ImageInfo.COLORTYPE.BGR,
+                                      ImageInfo.COORD.YX,
+                                      ImageInfo.CHANNEL.FIRST)
 
     def __post_init__(self):
         self._array = None
