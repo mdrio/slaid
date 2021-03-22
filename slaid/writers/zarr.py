@@ -4,14 +4,14 @@ from datetime import datetime as dt
 
 import zarr
 
-from slaid.commons import Mask, Slide
-from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons import Mask, BasicSlide
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.writers import ReducedSlide, _dump_masks, _get_slide_metadata
 
 logger = logging.getLogger(__file__)
 
 
-def dump(slide: Slide,
+def dump(slide: BasicSlide,
          output_path: str,
          mask: str = None,
          overwrite: bool = False,
@@ -23,12 +23,12 @@ def dump(slide: Slide,
     _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
 
 
-def load(path: str) -> Slide:
+def load(path: str) -> BasicSlide:
     logger.info('loading slide from zarr at path %s', path)
     group = zarr.open_group(path)
     try:
         slide = EcvlSlide(group.attrs['filename'])
-    except Slide.InvalidFile:
+    except BasicSlide.InvalidFile:
         slide = ReducedSlide(group.attrs['filename'])
     for name, value in group.arrays():
         try:

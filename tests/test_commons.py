@@ -4,90 +4,49 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.commons import Mask, Slide
+from slaid.commons import Mask
 from slaid.commons.base import ImageInfo
 from slaid.commons.dask import Mask as DaskMask
-from slaid.commons.ecvl import Slide as EcvlSlide
-from slaid.commons.ecvl import SlideArrayFactory
-from slaid.commons.openslide import Slide as OpenSlide
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 
 IMAGE = 'tests/data/test.tif'
 
 
-class BaseTestSlide:
-    slide: Slide = None
-    slide_cls = None
-
-    def test_to_array_level_0(self):
-        image_info = ImageInfo('bgr', 'yx', 'first')
-        array = SlideArrayFactory(self.slide, image_info)[0]
-        self.assertEqual(array.shape, self.slide.dimensions[::-1])
-
-    def test_to_array_level_1(self):
-        image_info = ImageInfo('bgr', 'yx', 'first')
-        array = SlideArrayFactory(self.slide, image_info)[1]
-        self.assertEqual(array.shape, self.slide.level_dimensions[1][::-1])
-
-    def test_array_slice_channel_first(self):
-        image_info = ImageInfo('bgr', 'yx', 'first')
-        array = SlideArrayFactory(self.slide, image_info)[1]
-
-        self.assertEqual(array[:20, :10]._array.shape, (3, 20, 10))
-
-        self.assertEqual(array[0, 0]._array.shape, (3, ))
-
-        import pudb
-        pudb.set_trace()
-        array = array[:20, :10]._array.compute()
-        expected_array = np.array(self.slide.read_region((0, 0), 1, (10, 20)))
-        print(array.shape, expected_array.shape)
-        self.assertTrue(array == expected_array)
-
-    def test_array_slice_channel_last(self):
-        array = self.slide.to_array(1, ImageInfo('rgb', 'yx', 'last'))
-        self.assertEqual(array[0, :].shape,
-                         (self.slide.level_dimensions[1][0], 3))
-        self.assertEqual(array[:20, :10].shape, (20, 10, 3))
-        self.assertEqual(array[0, 0].shape, (3, ))
-
-    def test_returns_dimensions(self):
-        self.assertEqual(self.slide.dimensions, (512, 1024))
-
-    def test_converts_to_array_xy_channel_first(self):
-        region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array(
-            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.XY,
-                      ImageInfo.CHANNEL.FIRST))
-        self.assertEqual(array.shape, (3, 10, 20))
-
-    def test_converts_to_array_yx_channel_first(self):
-        region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array(
-            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
-                      ImageInfo.CHANNEL.FIRST))
-        self.assertEqual(array.shape, (3, 20, 10))
-
-    def test_converts_to_array_xy_channel_last(self):
-        region = self.slide.read_region((0, 0), 0, (10, 20))
-        array = region.to_array(
-            ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.XY,
-                      ImageInfo.CHANNEL.LAST))
-        self.assertEqual(array.shape, (10, 20, 3))
+@pytest.mark.parametrize('image_info', [
+    ImageInfo('bgr', 'yx', 'first'),
+    ImageInfo('rgb', 'yx', 'first'),
+    ImageInfo('rgb', 'yx', 'last'),
+    ImageInfo('bgr', 'yx', 'last')
+])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+def test_slide_level(slide):
+    for i in range(slide.level_count):
+        array = slide[i]
+        assert array.size == slide.level_dimensions[i][::-1]
 
 
-class TestEcvlSlide(unittest.TestCase, BaseTestSlide):
-    slide = EcvlSlide(IMAGE)
+@pytest.mark.parametrize('image_info', [
+    ImageInfo('bgr', 'yx', 'first'),
+    ImageInfo('rgb', 'yx', 'first'),
+    ImageInfo('rgb', 'yx', 'last'),
+    ImageInfo('bgr', 'yx', 'last')
+])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+def test_slice_slide(slide):
+    for i in range(slide.level_count):
+        array = slide[i]
+        expected_shape = (
+            3, 10,
+            20) if slide.image_info.channel == ImageInfo.CHANNEL.FIRST else (
+                10, 20, 3)
+        assert array[:10, :20]._array.shape == expected_shape
 
 
-class TestOpenSlide(unittest.TestCase, BaseTestSlide):
-    slide = OpenSlide(IMAGE)
-
-
-class TestImage(unittest.TestCase):
-    def test_reads_region(self):
-        slide = EcvlSlide(IMAGE)
-        image = slide.read_region((0, 0), 0, (256, 256))
-        self.assertEqual(image.dimensions, (3, 256, 256))
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+def test_reads_region(slide):
+    image = slide.read_region((0, 0), 0, (256, 256))
+    image.dimensions == (256, 256)
 
 
 class TestMask:

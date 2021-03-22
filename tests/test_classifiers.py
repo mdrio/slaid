@@ -3,189 +3,146 @@ from datetime import datetime as dt
 
 import numpy as np
 import pytest
-from commons import DummyModel, EddlGreenModel, EddlGreenPatchModel, GreenModel
 
-from slaid.classifiers import BasicClassifier, Filter
+from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
-from slaid.commons.ecvl import load
-from slaid.models.eddl import TissueModel, TumorModel, load_model
+from slaid.commons.base import ImageInfo
+from slaid.commons.dask import init_client
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.models.eddl import TissueModel, TumorModel
 
 
-class BaseTestClassifier:
-    LEVEL = 1
-
-    @staticmethod
-    def get_classifier(model, feature='tissue'):
-        pass
-
-    @staticmethod
-    def get_model():
-        pass
-
-    def test_classifies_a_slide(self):
-        slide = load('tests/data/PH10023-1.thumb.tif')
-        model = DummyModel(np.zeros)
-        tissue_detector = self.get_classifier(model)
-        mask = tissue_detector.classify(slide, level=self.LEVEL)
-        self.assertEqual(mask.array.shape,
-                         slide.level_dimensions[self.LEVEL][::-1])
-
-    def test_return_all_zeros_if_there_is_no_tissue(self):
-        slide = load('tests/data/test.tif')
-        model = DummyModel(np.zeros)
-        tissue_detector = self.get_classifier(model)
-        mask = tissue_detector.classify(slide, level=self.LEVEL)
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[self.LEVEL])
-        self.assertEqual(mask.array.all(), 0)
-
-    def test_return_all_100_if_all_is_tissue(self):
-        slide = load('tests/data/test.tif')
-        model = DummyModel(np.ones)
-        tissue_detector = self.get_classifier(model)
-        mask = tissue_detector.classify(slide, level=self.LEVEL)
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[self.LEVEL])
-        self.assertTrue((mask.array == 100).all())
-        self.assertEqual(mask.array.dtype, 'uint8')
-
-    def test_return_all_1_if_all_is_tissue(self):
-        slide = load('tests/data/test.tif')
-        model = DummyModel(np.ones)
-        tissue_detector = self.get_classifier(model)
-        mask = tissue_detector.classify(slide,
-                                        level=self.LEVEL,
-                                        round_to_0_100=False)
-        self.assertEqual(mask.array.shape[::-1],
-                         slide.level_dimensions[self.LEVEL])
-        self.assertTrue((mask.array == 1).all())
-        self.assertEqual(mask.array.dtype, 'float32')
-
-    def test_returns_a_mask(self):
-        #  import pudb
-        #  pudb.set_trace()
-        level = 0
-        slide = load('tests/data/test.tif')
-        tissue_detector = self.get_classifier(self.get_model())
-        mask = tissue_detector.classify(slide, level=level)
-
-        self.assertEqual(mask.array.shape[::-1], slide.level_dimensions[level])
-        self.assertEqual(mask.array[:300, :].all(), 1)
-        self.assertEqual(mask.array[300:, :].all(), 0)
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
+def test_classify_slide(green_slide, green_classifier):
+    level = 0
+    mask = green_classifier.classify(green_slide, level=level)
+    assert mask.array.shape == green_slide.level_dimensions[level][::-1]
+    assert (mask.array[:300, :] == 100).all()
+    assert (mask.array[300:, :] == 0).all()
 
 
-class BasicClassifierTest(BaseTestClassifier, unittest.TestCase):
-    @staticmethod
-    def get_classifier(model, feature='tissue'):
-        return BasicClassifier(model, feature)
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
+def test_classify_with_filter(green_slide, green_classifier):
+    filter_level = 2
+    filter_downsample = green_slide.level_downsamples[filter_level]
+    filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
+    ones_row = 50
+    filter_array[:ones_row, :] = 1
+    filter_mask = Mask(filter_array, filter_level, filter_downsample)
 
-    @staticmethod
-    def get_model():
-        return GreenModel()
+    mask = green_classifier.classify(green_slide,
+                                     level=0,
+                                     filter_=filter_mask >= 1)
+
+    ones_row = round(ones_row * filter_downsample)
+    assert (mask.array[:ones_row, :] == 100).all()
+    assert (mask.array[ones_row:, :] == 0).all()
 
 
+#  class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
+#      @classmethod
+#      def setUpClass(cls):
+#          #  init_client()
+#          import dask
+#          dask.config.set(scheduler='synchronous')
 #
-
-
-class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        #  init_client()
-        import dask
-        dask.config.set(scheduler='synchronous')
-
-    @staticmethod
-    def get_classifier(model, feature='tissue'):
-        return DaskClassifier(model, feature)
-
-    @staticmethod
-    def get_model():
-        return GreenModel()
-
-    def test_filter(self):
-        slide = load('tests/data/PH10023-1.thumb.tif')
-        model = load_model(
-            'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
-        classifier = self.get_classifier(model, 'low_level_tissue')
-        low_level_tissue = classifier.classify(slide, level=2)
-        level = 1
-        high_level_tissue = self.get_classifier(
-            model,
-            'high_level_tissue').classify(slide,
-                                          level=level,
-                                          filter_=low_level_tissue > 0.1)
-        self.assertEqual(high_level_tissue.array.shape[::-1],
-                         slide.level_dimensions[level])
-
-
-class TestEddlClassifier(BasicClassifierTest):
-    @staticmethod
-    def get_model():
-        return EddlGreenModel()
-
-
-class TestEddlPatchClassifier(unittest.TestCase):
-    @staticmethod
-    def get_model(patch_size):
-        return EddlGreenPatchModel(patch_size)
-
-    @staticmethod
-    def get_classifier(model, feature='tissue'):
-        return BasicClassifier(model, feature)
-
-    def test_classifies_by_patch_at_level_0(self, n_batch=1):
-        level = 0
-        slide = load('tests/data/test.tif')
-        patch_size = (100, 256)
-        classifier = self.get_classifier(self.get_model(patch_size))
-        mask = classifier.classify(slide, level=level, n_batch=n_batch)
-
-        self.assertEqual(
-            mask.array.shape,
-            tuple([
-                slide.level_dimensions[level][::-1][i] // patch_size[i]
-                for i in range(2)
-            ]),
-        )
-        print(mask.array)
-        self.assertEqual(mask.array[:3, :].all(), 1)
-        self.assertEqual(mask.array[3:, :].all(), 0)
-
-    def test_classifies_with_filter(self):
-        level = 0
-        patch_size = (100, 100)
-        slide = load('tests/data/test.tif')
-        mask_array = np.zeros(
-            np.array(slide.level_dimensions[level][::-1]) //
-            np.array(patch_size))
-        mask_array[0, :] = 1
-        filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
-                           dt.now(), False)
-
-        slide.masks['tissue'] = filter_mask
-        classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
-        mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
-
-        self.assertTrue((mask.array / 100 == filter_mask.array).all())
-
-    def test_classifies_with_no_filtered_patch(self):
-        level = 0
-        patch_size = (100, 100)
-        slide = load('tests/data/test.tif')
-        mask_array = np.zeros(
-            np.array(slide.level_dimensions[level][::-1]) //
-            np.array(patch_size))
-        filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
-                           dt.now(), False)
-
-        slide.masks['tissue'] = filter_mask
-        classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
-        mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
-
-        self.assertEqual(mask.array.shape, filter_mask.array.shape)
-        print(mask.array)
-        self.assertTrue(not np.count_nonzero(mask.array))
+#      @staticmethod
+#      def get_classifier(model, feature='tissue'):
+#          return DaskClassifier(model, feature)
+#
+#      @staticmethod
+#      def get_model():
+#          return GreenModel()
+#
+#      def test_filter(self):
+#          slide = load('tests/data/PH10023-1.thumb.tif')
+#          model = load_model(
+#              'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+#          classifier = self.get_classifier(model, 'low_level_tissue')
+#          low_level_tissue = classifier.classify(slide, level=2)
+#          level = 1
+#          high_level_tissue = self.get_classifier(
+#              model,
+#              'high_level_tissue').classify(slide,
+#                                            level=level,
+#                                            filter_=low_level_tissue > 0.1)
+#          self.assertEqual(high_level_tissue.array.shape[::-1],
+#                           slide.level_dimensions[level])
+#
+#
+#  class TestEddlClassifier(BasicClassifierTest):
+#      @staticmethod
+#      def get_model():
+#          return EddlGreenModel()
+#
+#
+#  class TestEddlPatchClassifier(unittest.TestCase):
+#      @staticmethod
+#      def get_model(patch_size):
+#          return EddlGreenPatchModel(patch_size)
+#
+#      @staticmethod
+#      def get_classifier(model, feature='tissue'):
+#          return BasicClassifier(model, feature)
+#
+#      def test_classifies_by_patch_at_level_0(self, n_batch=1):
+#          level = 0
+#          slide = load('tests/data/test.tif')
+#          patch_size = (100, 256)
+#          classifier = self.get_classifier(self.get_model(patch_size))
+#          mask = classifier.classify(slide, level=level, n_batch=n_batch)
+#
+#          self.assertEqual(
+#              mask.array.shape,
+#              tuple([
+#                  slide.level_dimensions[level][::-1][i] // patch_size[i]
+#                  for i in range(2)
+#              ]),
+#          )
+#          print(mask.array)
+#          self.assertEqual(mask.array[:3, :].all(), 1)
+#          self.assertEqual(mask.array[3:, :].all(), 0)
+#
+#      def test_classifies_with_filter(self):
+#          level = 0
+#          patch_size = (100, 100)
+#          slide = load('tests/data/test.tif')
+#          mask_array = np.zeros(
+#              np.array(slide.level_dimensions[level][::-1]) //
+#              np.array(patch_size))
+#          mask_array[0, :] = 1
+#          filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
+#                             dt.now(), False)
+#
+#          slide.masks['tissue'] = filter_mask
+#          classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
+#          mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
+#
+#          self.assertTrue((mask.array / 100 == filter_mask.array).all())
+#
+#      def test_classifies_with_no_filtered_patch(self):
+#          level = 0
+#          patch_size = (100, 100)
+#          slide = load('tests/data/test.tif')
+#          mask_array = np.zeros(
+#              np.array(slide.level_dimensions[level][::-1]) //
+#              np.array(patch_size))
+#          filter_mask = Mask(mask_array, level, slide.level_downsamples[level],
+#                             dt.now(), False)
+#
+#          slide.masks['tissue'] = filter_mask
+#          classifier = self.get_classifier(self.get_model(patch_size), 'cancer')
+#          mask = classifier.classify(slide, level=level, filter_=filter_mask > 0)
+#
+#          self.assertEqual(mask.array.shape, filter_mask.array.shape)
+#          print(mask.array)
+#          self.assertTrue(not np.count_nonzero(mask.array))
+#
 
 
 class TestFilter(unittest.TestCase):
@@ -218,4 +175,5 @@ def test_classifies_tissue(patch_path, slide_reader, patch_tissue_mask):
 
 
 if __name__ == '__main__':
+    init_client()
     unittest.main()

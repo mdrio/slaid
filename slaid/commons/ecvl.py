@@ -28,103 +28,37 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-import dask.array as da
 import numpy as np
-import zarr
-from napari_lazy_openslide import OpenSlideStore
-from napari_lazy_openslide.store import (ArgumentError, _parse_chunk_path,
-                                         init_attrs)
 from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
-from zarr.storage import init_array, init_group
 
 from slaid.commons import Image as BaseImage
-from slaid.commons import ImageInfo
-from slaid.commons import Slide as BaseSlide
-from slaid.commons import SlideArray
-from slaid.commons import SlideArrayFactory as BaseSlideArrayFactory
 
 logger = logging.getLogger('ecvl')
+import slaid.commons.base as base
 
 
 class Image(BaseImage):
     def __init__(self, image: EcvlImage):
         self._image = image
 
-    def __array__(self):
-        return self._image.__array__()
+    def to_array(self):
+        # FIXME
+        return np.array(self._image).transpose(0, 2, 1)
+
+    @property
+    def dimensions(self) -> Tuple[int, int]:
+        return self._image.Height(), self._image.Width()
 
 
-def create_meta_store(slide: "Slide", tilesize: int) -> Dict[str, bytes]:
-    """Creates a dict containing the zarr metadata for the multiscale openslide image."""
-    store = dict()
-    root_attrs = {
-        "multiscales": [{
-            "name":
-            Path(slide._filename).name,
-            "datasets": [{
-                "path": str(i)
-            } for i in range(slide.level_count)],
-            "version":
-            "0.1",
-        }]
-    }
-    init_group(store)
-    init_attrs(store, root_attrs)
-    for i, (x, y) in enumerate(slide.level_dimensions):
-        init_array(
-            store,
-            path=str(i),
-            shape=(3, y, x),
-            chunks=(3, tilesize, tilesize),
-            dtype="|u1",
-            compressor=None,
-        )
-    return store
-
-
-class EcvlStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = 512):
-        self._path = slide.filename
-        self._slide = slide
-        self._tilesize = tilesize
-        self._store = create_meta_store(self._slide, tilesize)
-        #  self._image_info = image_info if image_info else ImageInfo()
-
-    def __getitem__(self, key: str):
-        if key in self._store:
-            # key is for metadata
-            return self._store[key]
-
-        # key should now be a path to an array chunk
-        # e.g '3/4.5.0' -> '<level>/<chunk_key>'
-        try:
-            x, y, level = _parse_chunk_path(key)
-            location = self._ref_pos(x, y, level)
-            size = (self._tilesize, self._tilesize)
-            tile = self._slide.read_region(location, level, size)
-        except ArgumentError as err:
-            # Can occur if trying to read a closed slide
-            raise err
-        except:
-            # TODO: probably need better error handling.
-            # If anything goes wrong, we just signal the chunk
-            # is missing from the store.
-            raise KeyError(key)
-
-        return tile.to_array(ImageInfo('bgr', 'yx', 'first'))
-        #  return np.array(tile).tobytes()
-
-
-class Slide(BaseSlide):
+class BasicSlide(base.BasicSlide):
     def __init__(self, filename: str):
         self._level_dimensions = OpenSlideGetLevels(filename)
         if not self._level_dimensions:
-            raise BaseSlide.InvalidFile(
+            raise base.BasicSlide.InvalidFile(
                 f'Cannot open file {filename}, is it a slide image?')
         super().__init__(filename)
 
@@ -150,24 +84,5 @@ class Slide(BaseSlide):
 
 
 def load(filename: str):
-    slide = Slide(filename)
+    slide = BasicSlide(filename)
     return slide
-
-
-class SlideArrayFactory(BaseSlideArrayFactory):
-    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
-
-    def __init__(self, slide: Slide, image_info: ImageInfo):
-        self._slide = slide
-        self.image_info = image_info
-        store = EcvlStore(slide)
-        grp = zarr.open(store, mode="r")
-        multiscales = grp.attrs["multiscales"][0]
-        self._pyramid = [
-            SlideArray(da.from_zarr(store, component=d["path"]),
-                       self.IMAGE_INFO).convert(image_info)
-            for d in multiscales["datasets"]
-        ]
-
-    def __getitem__(self, key) -> "SlideArray.Level":
-        return self._pyramid[key]

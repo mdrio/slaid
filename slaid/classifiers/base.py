@@ -7,8 +7,8 @@ from typing import Callable, Tuple
 import numpy as np
 from progress.bar import Bar
 
-from slaid.commons import Mask, Slide
-from slaid.commons.base import Filter, Image, ImageInfo
+from slaid.commons import BasicSlide, Mask, Slide
+from slaid.commons.base import Filter, ImageInfo
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
@@ -19,7 +19,7 @@ logger.addHandler(fh)
 class Classifier(abc.ABC):
     @abc.abstractmethod
     def classify(self,
-                 slide: Slide,
+                 slide: BasicSlide,
                  filter_=None,
                  threshold: float = None,
                  level: int = 2,
@@ -59,17 +59,33 @@ class BasicClassifier(Classifier):
 
         logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
                     filter_, threshold, level, n_batch, round_to_0_100)
-        batches = self._get_batch_iterator(slide, level, n_batch)
-        array = self._classify_patches(
-            slide, self._patch_size, level, filter_, threshold, n_patch,
-            round_to_0_100) if self._patch_size else self._classify_batches(
-                batches, threshold, round_to_0_100)
+        #  batches = self._get_batch_iterator(slide, level, n_batch,
+        #                                     self._color_type, self._coords,
+        #                                     self._channel)
+        if self._patch_size:
+            predictions = self._classify_patches(slide, self._patch_size,
+                                                 level, filter_, threshold,
+                                                 n_patch, round_to_0_100)
+        else:
+            predictions = self._classify_batches(slide, level, n_batch,
+                                                 filter_)
+        predictions = self._threshold(predictions, threshold)
+        predictions = self._round_to_0_100(predictions, round_to_0_100)
+        return self._get_mask(predictions, level,
+                              slide.level_downsamples[level], dt.now(),
+                              round_to_0_100)
 
-        return self._get_mask(array, level, slide.level_downsamples[level],
-                              dt.now(), round_to_0_100)
+    @staticmethod
+    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
+        return (array * 100).astype('uint8') if round_ else array
 
-    def _get_batch_iterator(self, slide, level, n_batch):
-        return BatchIterator(slide, level, n_batch, self._image_info)
+    @staticmethod
+    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
+        if threshold is not None:
+            array[array >= threshold] = 1
+            array[array < threshold] = 0
+            return array.astype('uint8')
+        return array
 
     def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
         return self.MASK_CLASS(array,
@@ -80,7 +96,7 @@ class BasicClassifier(Classifier):
                                model=str(self._model))
 
     def _classify_patches(self,
-                          slide: Slide,
+                          slide: BasicSlide,
                           patch_size,
                           level,
                           filter_: Filter,
@@ -122,14 +138,56 @@ class BasicClassifier(Classifier):
             res[patch.row, patch.column] = p
         return res
 
-    def _classify_batches(self, batches: "BatchIterator", threshold: float,
-                          round_to_0_100: bool) -> Mask:
+    def _classify_batches(self, slide, level, n_batch, filter_):
+        slide_array = self._get_slide_array(slide, level)
+        if filter_ is None:
+            return self._classify_batches_no_filter(slide_array, level,
+                                                    n_batch)
+
+        else:
+            return self._classify_batches_with_filter(slide, slide_array,
+                                                      level, n_batch, filter_)
+
+    def _get_slide_array(self, slide, level):
+        return slide[level].convert(self.model.image_info)
+
+    def _classify_batches_with_filter(self, slide, slide_array, level, n_batch,
+                                      filter_):
+        scale_factor = round(
+            slide.level_downsamples[filter_.mask.extraction_level]) // round(
+                slide.level_downsamples[level])
+
+        res = np.zeros(slide_array.size, dtype='float32')
+        for pixel in filter_:
+            pixel = pixel * scale_factor
+            area = slide_array[pixel[0]:pixel[0] + scale_factor,
+                               pixel[1]:pixel[1] + scale_factor]
+
+            n_px = area.size[0] * area.size[1]
+            prediction = self._predict(area.reshape((n_px, )))
+            res[pixel[0]:pixel[0] + scale_factor,
+                pixel[1]:pixel[1] + scale_factor] = prediction.reshape(
+                    (scale_factor, scale_factor))
+        return res
+
+    def _classify_batches_no_filter(self, slide_array, level, n_batch):
         predictions = []
-        for batch in batches:
-            prediction = self._classify_batch(batch, threshold, round_to_0_100)
-            if prediction.size:
+        step = slide_array.size[0] // n_batch
+        logger.debug('n_batch %s, step %s', n_batch, step)
+        with Bar('batches', max=n_batch) as bar:
+            for i in range(0, slide_array.size[0], step):
+                area = slide_array[i:i + step, :]
+                n_px = area.size[0] * area.size[1]
+                area_reshaped = area.reshape((n_px, ))
+
+                prediction = self._predict(area_reshaped)
+                prediction = prediction.reshape(area.size[0], area.size[1])
                 predictions.append(prediction)
-        return self._concatenate(predictions, axis=0)
+                bar.next()
+        return self._concatenate(predictions, 0)
+
+    def _predict(self, area):
+        return self.model.predict(area.array)
 
     def _classify_batch(self, batch, threshold, round_to_0_100):
         logger.debug('classify batch %s', batch)
@@ -201,7 +259,7 @@ class BasicClassifier(Classifier):
 
 @dataclass
 class ImageArea:
-    slide: Slide
+    slide: BasicSlide
     row: int
     column: int
     level: int
@@ -279,7 +337,7 @@ class Batch(ImageArea):
 
 @dataclass
 class BatchIterator:
-    slide: Slide
+    slide: BasicSlide
     level: int
     n_batch: int
     image_info: ImageInfo
@@ -314,7 +372,7 @@ class BatchIterator:
 
 @dataclass
 class Patch(ImageArea):
-    slide: Slide
+    slide: BasicSlide
     row: int
     column: int
     level: int

@@ -4,8 +4,8 @@ import os
 
 import tiledb
 
-from slaid.commons import Mask, Slide
-from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons import Mask, BasicSlide
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.writers import _dump_masks, _get_slide_metadata
 
 logger = logging.getLogger(__file__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__file__)
 SLIDE_INFO_FILENAME = '.slide_info'
 
 
-def dump(slide: Slide,
+def dump(slide: BasicSlide,
          output_path: str,
          overwrite: bool = False,
          mask: str = False,
@@ -29,7 +29,7 @@ def dump(slide: Slide,
     _dump_masks(output_path, slide, overwrite, 'to_tiledb', mask, ctx=ctx)
 
 
-def load(path: str, ctx: tiledb.Ctx = None) -> Slide:
+def load(path: str, ctx: tiledb.Ctx = None) -> BasicSlide:
     with open(os.path.join(path, SLIDE_INFO_FILENAME), 'r') as f:
         slide_info = json.load(f)
     slide = EcvlSlide(slide_info['filename'])

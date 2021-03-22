@@ -7,6 +7,7 @@ import zarr
 from dask.distributed import Client
 
 from slaid.commons import Mask as BaseMask
+from slaid.commons.base import Slide
 
 logger = logging.getLogger()
 
@@ -19,6 +20,10 @@ def init_client(address=None, processes=False):
 
 
 class Mask(BaseMask):
+    def compute(self):
+        if isinstance(self.array, da.Array):
+            self.array = self.array.compute()
+
     def to_tiledb(self, path: str, overwrite: bool = False, **kwargs):
         if overwrite:
             try:
@@ -43,3 +48,8 @@ class Mask(BaseMask):
         for attr, value in self._get_attributes().items():
             logger.info('writing attr %s %s', attr, value)
             array.attrs[attr] = value
+
+
+class DaskSlide(Slide):
+    def _read_from_store(self, dataset):
+        return da.from_zarr(self._store, component=dataset["path"])

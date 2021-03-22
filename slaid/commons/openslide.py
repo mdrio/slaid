@@ -36,7 +36,7 @@ from openslide import open_slide
 from PIL import Image as PIL_Image
 
 from slaid.commons.base import Image as BaseImage, ImageInfo
-from slaid.commons.base import Slide as BaseSlide
+from slaid.commons.base import BasicSlide as BaseSlide
 
 
 class Image(BaseImage):

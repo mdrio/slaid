@@ -4,20 +4,20 @@ import logging
 import os
 import re
 import sys
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime as dt
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Tuple
 
-import cv2
 import numpy as np
 import PIL
-import shapely
 import tiledb
 import zarr
-from shapely.geometry import MultiPolygon as ShapelyMultiPolygon
-from shapely.geometry import Polygon as ShapelyPolygon
+from napari_lazy_openslide import OpenSlideStore
+from napari_lazy_openslide.store import (ArgumentError, _parse_chunk_path,
+                                         init_attrs)
+from zarr.storage import init_array, init_group
 
 PATCH_SIZE = (256, 256)
 logger = logging.getLogger()
@@ -61,7 +61,7 @@ class Image(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def to_array(self, image_info: ImageInfo) -> np.ndarray:
+    def to_array(self):
         pass
 
 
@@ -76,45 +76,6 @@ def apply_threshold(array, threshold: float) -> np.ndarray:
     array[array <= threshold] = 0
     array = array.astype('uint8')
     return array
-
-
-def mask_to_polygons(mask, epsilon=10., min_area=10.):
-    """
-    https://stackoverflow.com/questions/60971260/how-to-transform-contours-obtained-from-opencv-to-shp-file-polygons
-
-    the original source of these helpers was a Kaggle
-    post by Konstantin Lopuhin here - you'll need
-    to be logged into Kaggle to see it
-    """
-    # first, find contours with cv2: it's much faster than shapely
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP,
-                                           cv2.CHAIN_APPROX_NONE)
-    if not contours:
-        return ShapelyMultiPolygon()
-    # now messy stuff to associate parent and child contours
-    cnt_children = defaultdict(list)
-    child_contours = set()
-    assert hierarchy.shape[0] == 1
-    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
-    for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
-        if parent_idx != -1:
-            child_contours.add(idx)
-            cnt_children[parent_idx].append(contours[idx])
-    # create actual polygons filtering by area (removes artifacts)
-    all_polygons = []
-    for idx, cnt in enumerate(contours):
-        if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
-            assert cnt.shape[1] == 1
-            poly = ShapelyPolygon(shell=cnt[:, 0, :],
-                                  holes=[
-                                      c[:, 0, :]
-                                      for c in cnt_children.get(idx, [])
-                                      if cv2.contourArea(c) >= min_area
-                                  ])
-            all_polygons.append(poly)
-    all_polygons = ShapelyMultiPolygon(all_polygons)
-
-    return all_polygons
 
 
 @dataclass
@@ -169,27 +130,7 @@ class Mask:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
-    def to_polygons(self,
-                    threshold: float = None,
-                    downsample: int = 1,
-                    n_batch: int = 1) -> List[Polygon]:
-        array = np.array(self.array[::downsample, ::downsample])
-        if threshold:
-            array[array > threshold] = 1
-            array[array <= threshold] = 0
-            array = array.astype('uint8')
-            polygons = mask_to_polygons(array)
-        return [
-            Polygon(
-                list(
-                    shapely.affinity.scale(p,
-                                           downsample,
-                                           downsample,
-                                           origin=(0, 0)).exterior.coords))
-            for p in polygons
-        ]
-
-    def to_zarr(self, path: str, overwrite: bool = False, **kwargs):
+    def to_zarr(self, path: str, overwrite: bool = False):
         logger.info('dumping mask to zarr on path %s', path)
         name = os.path.basename(path)
         group = zarr.open_group(os.path.dirname(path))
@@ -275,7 +216,7 @@ def do_filter(slide: "Slide", condition: str) -> "Filter":
 TILESIZE = 512
 
 
-class Slide(abc.ABC):
+class BasicSlide(abc.ABC):
     class InvalidFile(Exception):
         pass
 
@@ -316,10 +257,55 @@ class Slide(abc.ABC):
         return len(self.level_dimensions)
 
 
-class SlideArrayFactory(abc.ABC):
-    @abc.abstractmethod
+class Slide(BasicSlide):
+    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+
+    def __init__(self, store: "SlideStore", image_info: ImageInfo = None):
+        self._store = store
+        self._slide = store.slide
+        self.image_info = image_info if image_info else self.IMAGE_INFO
+        grp = zarr.open(store, mode="r")
+        multiscales = grp.attrs["multiscales"][0]
+        self._pyramid = [
+            self._create_slide(d) for d in multiscales["datasets"]
+        ]
+
+    def _create_slide(self, dataset):
+        return SlideArray(self._read_from_store(dataset),
+                          self.IMAGE_INFO).convert(self.image_info)
+
+    def _read_from_store(self, dataset):
+        return zarr.open(store=self._store, path=dataset["path"], mode='r')
+        # FIXME
+        #  import dask.array as da
+        #  logger.debug('dataset %s', dataset)
+        #  return da.from_zarr(self._store, component=dataset["path"])
+
     def __getitem__(self, key) -> "SlideArray":
-        pass
+        return self._pyramid[key]
+
+    @property
+    def dimensions(self) -> Tuple[int, int]:
+        return self._slide.dimensions
+
+    @property
+    def filename(self):
+        return self._slide.filename
+
+    def read_region(self, location: Tuple[int, int], level: int,
+                    size: Tuple[int, int]) -> Image:
+        return self._slide.read_region(location, level, size)
+
+    def get_best_level_for_downsample(self, downsample: int):
+        return self._slide.get_best_level_for_downsample(downsample)
+
+    @property
+    def level_dimensions(self):
+        return self._slide.level_dimensions
+
+    @property
+    def level_downsamples(self):
+        return self._slide.level_downsamples
 
 
 class SlideArray:
@@ -356,7 +342,7 @@ class SlideArray:
         if self._image_info == image_info:
             return self
 
-        array = self._array
+        array = np.array(self._array)
         if self._image_info.color_type != image_info.color_type:
             if self._is_channel_first():
                 array = array[::-1, ...]
@@ -370,3 +356,66 @@ class SlideArray:
                 array = array.transpose(2, 0, 1)
 
         return SlideArray(array, image_info)
+
+
+def create_meta_store(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
+    """Creates a dict containing the zarr metadata
+    for the multiscale openslide image."""
+    store = dict()
+    root_attrs = {
+        "multiscales": [{
+            "name":
+            Path(slide.filename).name,
+            "datasets": [{
+                "path": str(i)
+            } for i in range(slide.level_count)],
+            "version":
+            "0.1",
+        }]
+    }
+    init_group(store)
+    init_attrs(store, root_attrs)
+    for i, (x, y) in enumerate(slide.level_dimensions):
+        init_array(
+            store,
+            path=str(i),
+            shape=(3, y, x),
+            chunks=(3, tilesize, tilesize),
+            dtype="|u1",
+            compressor=None,
+        )
+    return store
+
+
+class SlideStore(OpenSlideStore):
+    def __init__(self, slide: "Slide", tilesize: int = 512):
+        self._path = slide.filename
+        self._slide = slide
+        self._tilesize = tilesize
+        self._store = create_meta_store(self._slide, tilesize)
+        #  self._image_info = image_info if image_info else ImageInfo()
+
+    @property
+    def slide(self):
+        return self._slide
+
+    def __getitem__(self, key: str):
+        if key in self._store:
+            # key is for metadata
+            return self._store[key]
+
+        # key should now be a path to an array chunk
+        # e.g '3/4.5.0' -> '<level>/<chunk_key>'
+        try:
+            x, y, level = _parse_chunk_path(key)
+            location = self._ref_pos(x, y, level)
+            size = (self._tilesize, self._tilesize)
+            tile = self._slide.read_region(location, level, size)
+        except ArgumentError as err:
+            # Can occur if trying to read a closed slide
+            raise err
+        except Exception as ex:
+            logger.error('ex %s', ex)
+            raise KeyError(key)
+
+        return tile.to_array().tobytes()

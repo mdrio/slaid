@@ -1,14 +1,14 @@
 import os
 from typing import Dict, Tuple
-from slaid.commons.base import Mask, Image, Slide
+from slaid.commons.base import Mask, Image, BasicSlide
 
 
-def _get_slide_metadata(slide: Slide) -> dict:
+def _get_slide_metadata(slide: BasicSlide) -> dict:
     return {'filename': slide.filename, 'resolution': slide.dimensions}
 
 
 def _dump_masks(path: str,
-                slide: Slide,
+                slide: BasicSlide,
                 overwrite: bool,
                 func: str,
                 only_mask: str = None,
@@ -18,7 +18,7 @@ def _dump_masks(path: str,
         getattr(mask_, func)(os.path.join(path, name), overwrite, **kwargs)
 
 
-class ReducedSlide(Slide):
+class ReducedSlide(BasicSlide):
     def __init__(self, filename: str):
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
