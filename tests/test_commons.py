@@ -44,9 +44,26 @@ def test_slice_slide(slide):
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('slide_cls', [EcvlSlide])
-def test_reads_region(slide):
+def test_read_region(slide):
     image = slide.read_region((0, 0), 0, (256, 256))
-    image.dimensions == (256, 256)
+    assert image.dimensions == (256, 256)
+    array = image.to_array()
+    assert array.shape == (
+        3,
+        256,
+        256,
+    )
+
+
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+def test_slice_read(slide):
+    image = slide.read_region((0, 0), 0, slide.dimensions)
+    slide_array = slide[0][:, :]
+    image_array = image.to_array()
+    import numpy as np
+    np.save('test.npy', slide_array.array)
+    assert (slide_array.array == image_array).all()
 
 
 class TestMask:

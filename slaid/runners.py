@@ -11,8 +11,8 @@ import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
-from slaid.commons.base import do_filter
 from slaid.classifiers.dask import Classifier as DaskClassifier
+from slaid.commons.base import Slide, SlideStore, do_filter
 from slaid.commons.dask import init_client
 from slaid.models.eddl import load_model
 
@@ -23,7 +23,8 @@ def get_slide(path, slide_reader):
     slide_ext_with_dot = os.path.splitext(path)[-1]
     slide_ext = slide_ext_with_dot[1:]
     try:
-        return STORAGE.get(slide_ext, slide_reader).load(path)
+        return Slide(
+            SlideStore(STORAGE.get(slide_ext, slide_reader).load(path)))
     except Exception as ex:
         logging.error('an error occurs with file %s: %s', path, ex)
 
@@ -45,7 +46,7 @@ class SerialRunner:
             *,
             output_dir: 'o',
             model: 'm',
-            n_batch: ('b', int) = 1,
+            max_MB_prediction: ('b', float) = None,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
@@ -55,7 +56,6 @@ class SerialRunner:
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25,
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
@@ -70,10 +70,10 @@ class SerialRunner:
             cls.prepare_output_dir(output_dir)
 
             slides = cls.classify_slides(input_path, output_dir, classifier,
-                                         n_batch, extraction_level, threshold,
-                                         writer, filter_,
+                                         max_MB_prediction, extraction_level,
+                                         threshold, writer, filter_,
                                          overwrite_output_if_exists, no_round,
-                                         n_patch, filter_slide, slide_reader)
+                                         filter_slide, slide_reader)
             return classifier, slides
 
     @classmethod
@@ -111,18 +111,19 @@ class SerialRunner:
             yield get_slide(f, slide_reader)
 
     @classmethod
-    def classify_slides(cls, input_path, output_dir, classifier, n_batch,
-                        extraction_level, threshold, writer, filter_,
-                        overwrite_output_if_exists, no_round, n_patch,
+    def classify_slides(cls, input_path, output_dir, classifier,
+                        max_MB_prediction, extraction_level, threshold, writer,
+                        filter_, overwrite_output_if_exists, no_round,
                         filter_slide, slide_reader):
 
         slides = []
         slide_reader = import_module(f'slaid.commons.{slide_reader}')
         for slide in cls.get_slides(input_path, slide_reader):
-            cls.classify_slide(slide, output_dir, classifier, n_batch,
-                               extraction_level, slide_reader, threshold,
-                               writer, filter_, overwrite_output_if_exists,
-                               no_round, n_patch, filter_slide)
+            cls.classify_slide(slide, output_dir, classifier,
+                               max_MB_prediction, extraction_level,
+                               slide_reader, threshold, writer, filter_,
+                               overwrite_output_if_exists, no_round,
+                               filter_slide)
             slides.append(slide)
         return slides
 
@@ -131,7 +132,7 @@ class SerialRunner:
                        slide,
                        output_dir,
                        classifier,
-                       n_batch,
+                       max_MB_prediction,
                        extraction_level,
                        slide_reader,
                        threshold=None,
@@ -139,7 +140,6 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       n_patch=25,
                        filter_slide=None):
 
         if filter_:
@@ -157,12 +157,11 @@ class SerialRunner:
                 return slide
 
         mask = classifier.classify(slide,
-                                   n_batch=n_batch,
+                                   max_MB_prediction=max_MB_prediction,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_0_100=not no_round,
-                                   n_patch=n_patch)
+                                   round_to_0_100=not no_round)
         feature = classifier.feature
         slide.masks[feature] = mask
         STORAGE[writer].dump(slide,
@@ -191,7 +190,7 @@ class ParallelRunner(SerialRunner):
             scheduler: str = None,
             output_dir: 'o',
             model: 'm',
-            n_batch: ('b', int) = 1,
+            max_MB_prediction: ('b', float) = None,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
@@ -201,7 +200,6 @@ class ParallelRunner(SerialRunner):
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25,
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',

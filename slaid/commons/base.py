@@ -15,8 +15,7 @@ import PIL
 import tiledb
 import zarr
 from napari_lazy_openslide import OpenSlideStore
-from napari_lazy_openslide.store import (ArgumentError, _parse_chunk_path,
-                                         init_attrs)
+from napari_lazy_openslide.store import (ArgumentError, init_attrs)
 from zarr.storage import init_array, init_group
 
 PATCH_SIZE = (256, 256)
@@ -276,6 +275,10 @@ class Slide(BasicSlide):
             self._create_slide(d) for d in multiscales["datasets"]
         ]
 
+    @property
+    def masks(self):
+        return self._slide.masks
+
     def _create_slide(self, dataset):
         return SlideArray(self._read_from_store(dataset),
                           self.IMAGE_INFO).convert(self.image_info)
@@ -393,6 +396,13 @@ def create_meta_store(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
     return store
 
 
+def _parse_chunk_path(path: str):
+    """Returns x,y chunk coords and pyramid level from string key"""
+    level, ckey = path.split("/")
+    _, y, x = map(int, ckey.split("."))
+    return x, y, int(level)
+
+
 class SlideStore(OpenSlideStore):
     def __init__(self, slide: "Slide", tilesize: int = 512):
         self._path = slide.filename
@@ -416,6 +426,9 @@ class SlideStore(OpenSlideStore):
             x, y, level = _parse_chunk_path(key)
             location = self._ref_pos(x, y, level)
             size = (self._tilesize, self._tilesize)
+            logger.debug(
+                'key %s, x %s, y %s, location %s, size %s, dimension %s', key,
+                x, y, location, size, self._slide.level_dimensions[level])
             tile = self._slide.read_region(location, level, size)
         except ArgumentError as err:
             # Can occur if trying to read a closed slide
