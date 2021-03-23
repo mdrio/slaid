@@ -3,7 +3,6 @@ import logging
 from datetime import datetime as dt
 
 import numpy as np
-from progress.bar import Bar
 
 from slaid.commons import BasicSlide, Mask, Slide
 from slaid.commons.base import Filter, ImageInfo
@@ -51,22 +50,23 @@ class BasicClassifier(Classifier):
                  filter_=None,
                  threshold: float = None,
                  level: int = 2,
-                 n_batch: int = 1,
                  round_to_0_100: bool = True,
-                 n_patch=25) -> Mask:
+                 max_MB_prediction=None) -> Mask:
 
         logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
-                    filter_, threshold, level, n_batch, round_to_0_100)
+                    filter_, threshold, level, max_MB_prediction,
+                    round_to_0_100)
         #  batches = self._get_batch_iterator(slide, level, n_batch,
         #                                     self._color_type, self._coords,
         #                                     self._channel)
         if self._patch_size:
             predictions = self._classify_patches(slide, self._patch_size,
                                                  level, filter_, threshold,
-                                                 n_patch, round_to_0_100)
+                                                 round_to_0_100,
+                                                 max_MB_prediction)
         else:
-            predictions = self._classify_batches(slide, level, n_batch,
-                                                 filter_)
+            predictions = self._classify_batches(slide, level, filter_,
+                                                 max_MB_prediction)
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)
         return self._get_mask(predictions, level,
@@ -99,8 +99,8 @@ class BasicClassifier(Classifier):
                           level,
                           filter_: Filter,
                           threshold,
-                          n_patch: int = 25,
-                          round_to_0_100: bool = True) -> Mask:
+                          round_to_0_100: bool = True,
+                          max_MB_prediction=None) -> Mask:
         dimensions = slide.level_dimensions[level][::-1]
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         res = np.zeros(
@@ -132,35 +132,38 @@ class BasicClassifier(Classifier):
         #      res[patch.row, patch.column] = p
         return res
 
-    def _classify_batches(self, slide, level, n_batch, filter_):
+    def _classify_batches(self, slide, level, filter_, max_MB_prediction):
         slide_array = self._get_slide_array(slide, level)
         if filter_ is None:
-            return self._classify_batches_no_filter(slide_array, level,
-                                                    n_batch)
+            return self._classify_batches_no_filter(slide_array,
+                                                    max_MB_prediction)
 
         else:
             return self._classify_batches_with_filter(slide, slide_array,
-                                                      level, n_batch, filter_)
+                                                      level, filter_,
+                                                      max_MB_prediction)
 
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
 
-    def _classify_batches_with_filter(self, slide, slide_array, level, n_batch,
-                                      filter_):
+    def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
+                                      max_MB_prediction):
         scale_factor = round(
             slide.level_downsamples[filter_.mask.extraction_level]) // round(
                 slide.level_downsamples[level])
 
         res = np.zeros(slide_array.size, dtype='float32')
+        max_contigous_pixels = round(max_MB_prediction * 10**6 // 3) \
+            if max_MB_prediction is not None else slide_array.size[1]
         i = 0
-        #  import pudb
-        #  pudb.set_trace()
         while i < len(filter_):
             contigous_pixels = 1
             for j in range(i + 1, len(filter_)):
                 if filter_[i][0] == filter_[j][0] and filter_[j][1] - filter_[
                         i][1] == contigous_pixels:
                     contigous_pixels += 1
+                    if contigous_pixels >= max_contigous_pixels:
+                        break
                 else:
                     break
 
@@ -178,20 +181,20 @@ class BasicClassifier(Classifier):
 
         return res
 
-    def _classify_batches_no_filter(self, slide_array, level, n_batch):
+    def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
         predictions = []
-        step = slide_array.size[0] // n_batch
-        logger.debug('n_batch %s, step %s', n_batch, step)
-        with Bar('batches', max=n_batch) as bar:
-            for i in range(0, slide_array.size[0], step):
-                area = slide_array[i:i + step, :]
-                n_px = area.size[0] * area.size[1]
-                area_reshaped = area.reshape((n_px, ))
+        step = slide_array.size[0] if max_MB_prediction is None else round(
+            max_MB_prediction * 10**6 // (3 * slide_array.size[1]))
+        logger.debug('max_MB_prediction %s, size_1 %s step %s',
+                     max_MB_prediction, slide_array.size[1], step)
+        for i in range(0, slide_array.size[0], step):
+            area = slide_array[i:i + step, :]
+            n_px = area.size[0] * area.size[1]
+            area_reshaped = area.reshape((n_px, ))
 
-                prediction = self._predict(area_reshaped)
-                prediction = prediction.reshape(area.size[0], area.size[1])
-                predictions.append(prediction)
-                bar.next()
+            prediction = self._predict(area_reshaped)
+            prediction = prediction.reshape(area.size[0], area.size[1])
+            predictions.append(prediction)
         return self._concatenate(predictions, 0)
 
     def _predict(self, area):

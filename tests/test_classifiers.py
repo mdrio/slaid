@@ -16,10 +16,13 @@ from slaid.models.eddl import TissueModel, TumorModel
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
-@pytest.mark.parametrize('n_batch', [1, 2, 3])
 @pytest.mark.parametrize('level', [0, 1])
-def test_classify_slide(green_slide, green_classifier, n_batch, level):
-    mask = green_classifier.classify(green_slide, level=level, n_batch=n_batch)
+@pytest.mark.parametrize('max_MB_prediction', [None, 0.002])
+def test_classify_slide(green_slide, green_classifier, level,
+                        max_MB_prediction):
+    mask = green_classifier.classify(green_slide,
+                                     level=level,
+                                     max_MB_prediction=max_MB_prediction)
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
     green_zone = int(300 // green_slide.level_downsamples[level])
     assert (mask.array[:green_zone, :] == 100).all()
@@ -29,9 +32,10 @@ def test_classify_slide(green_slide, green_classifier, n_batch, level):
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
-@pytest.mark.parametrize('n_batch', [1, 2, 3])
 @pytest.mark.parametrize('level', [0, 1])
-def test_classify_with_filter(green_slide, green_classifier, n_batch, level):
+@pytest.mark.parametrize('max_MB_prediction', [None, 0.0002])
+def test_classify_with_filter(green_slide, green_classifier, level,
+                              max_MB_prediction):
     filter_level = 2
     filter_downsample = green_slide.level_downsamples[filter_level]
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
@@ -40,10 +44,12 @@ def test_classify_with_filter(green_slide, green_classifier, n_batch, level):
     filter_mask = Mask(filter_array, filter_level, filter_downsample)
 
     mask = green_classifier.classify(green_slide,
-                                     level=0,
-                                     filter_=filter_mask >= 1)
+                                     level=level,
+                                     filter_=filter_mask >= 1,
+                                     max_MB_prediction=max_MB_prediction)
 
-    ones_row = round(ones_row * filter_downsample)
+    ones_row = round(ones_row * filter_downsample //
+                     green_slide.level_downsamples[level])
     assert (mask.array[:ones_row, :] == 100).all()
     assert (mask.array[ones_row:, :] == 0).all()
 

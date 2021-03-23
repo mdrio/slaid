@@ -21,7 +21,7 @@ class Classifier(BasicClassifier):
     def __init__(self, model: Model, feature: str, compute_mask: bool = False):
         super().__init__(model, feature)
         self._model_image_info = self.model.image_info
-        self._delayed_model = self._delayed_model()
+        self._delayed_model = self._get_delayed_model()
         self.compute_mask = compute_mask
 
     def classify(self,
@@ -29,11 +29,10 @@ class Classifier(BasicClassifier):
                  filter_=None,
                  threshold: float = None,
                  level: int = 2,
-                 n_batch: int = 1,
                  round_to_0_100: bool = True,
-                 n_patch=25) -> Mask:
-        mask = super().classify(slide, filter_, threshold, level, n_batch,
-                                round_to_0_100, n_patch)
+                 max_MB_prediction=None) -> Mask:
+        mask = super().classify(slide, filter_, threshold, level,
+                                round_to_0_100, max_MB_prediction)
         if self.compute_mask:
             mask.compute()
         return mask
@@ -47,7 +46,7 @@ class Classifier(BasicClassifier):
                                dtype='float32')
 
     @delayed
-    def _delayed_model(self):
+    def _get_delayed_model(self):
         return load_model(self._model.weight_filename,
                           self._model.gpu) if isinstance(
                               self._model, EddlModel) else self._model
