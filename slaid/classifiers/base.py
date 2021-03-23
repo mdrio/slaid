@@ -1,8 +1,6 @@
 import abc
 import logging
-from dataclasses import dataclass
 from datetime import datetime as dt
-from typing import Callable, Tuple
 
 import numpy as np
 from progress.bar import Bar
@@ -109,33 +107,29 @@ class BasicClassifier(Classifier):
             (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
             dtype=dtype)
 
-        patch_indexes = filter_ if filter_ is not None else np.ndindex(
-            dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
-        patches_to_predict = [
-            Patch(slide, p[0], p[1], level, patch_size, self._image_info)
-            for p in patch_indexes
-        ]
-
-        # adding fake patches, workaround for
-        # https://github.com/deephealthproject/eddl/issues/236
-        #  for _ in range(patch_to_add):
-        #      patches_to_predict.append(patches_to_predict[0])
-
-        predictions = []
-        with Bar('Predictions', max=len(patches_to_predict) // n_patch
-                 or 1) as predict_bar:
-            for i in range(0, len(patches_to_predict), n_patch):
-                patches = patches_to_predict[i:i + n_patch]
-                predictions.append(
-                    self._classify_array(
-                        np.stack([p.array() for p in patches]), threshold,
-                        round_to_0_100))
-                predict_bar.next()
-        if predictions:
-            predictions = np.concatenate(predictions)
-        for i, p in enumerate(predictions):
-            patch = patches_to_predict[i]
-            res[patch.row, patch.column] = p
+        #  patch_indexes = filter_ if filter_ is not None else np.ndindex(
+        #      dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
+        #  patches_to_predict = [
+        #      Patch(slide, p[0], p[1], level, patch_size, self._image_info)
+        #      for p in patch_indexes
+        #  ]
+        #
+        #
+        #  predictions = []
+        #  with Bar('Predictions', max=len(patches_to_predict) // n_patch
+        #           or 1) as predict_bar:
+        #      for i in range(0, len(patches_to_predict), n_patch):
+        #          patches = patches_to_predict[i:i + n_patch]
+        #          predictions.append(
+        #              self._classify_array(
+        #                  np.stack([p.array() for p in patches]), threshold,
+        #                  round_to_0_100))
+        #          predict_bar.next()
+        #  if predictions:
+        #      predictions = np.concatenate(predictions)
+        #  for i, p in enumerate(predictions):
+        #      patch = patches_to_predict[i]
+        #      res[patch.row, patch.column] = p
         return res
 
     def _classify_batches(self, slide, level, n_batch, filter_):
@@ -158,16 +152,30 @@ class BasicClassifier(Classifier):
                 slide.level_downsamples[level])
 
         res = np.zeros(slide_array.size, dtype='float32')
-        for pixel in filter_:
-            pixel = pixel * scale_factor
+        i = 0
+        #  import pudb
+        #  pudb.set_trace()
+        while i < len(filter_):
+            contigous_pixels = 1
+            for j in range(i + 1, len(filter_)):
+                if filter_[i][0] == filter_[j][0] and filter_[j][1] - filter_[
+                        i][1] == contigous_pixels:
+                    contigous_pixels += 1
+                else:
+                    break
+
+            pixel = filter_[i] * scale_factor
             area = slide_array[pixel[0]:pixel[0] + scale_factor,
-                               pixel[1]:pixel[1] + scale_factor]
+                               pixel[1]:pixel[1] +
+                               scale_factor * contigous_pixels]
 
             n_px = area.size[0] * area.size[1]
             prediction = self._predict(area.reshape((n_px, )))
-            res[pixel[0]:pixel[0] + scale_factor,
-                pixel[1]:pixel[1] + scale_factor] = prediction.reshape(
-                    (scale_factor, scale_factor))
+            res[pixel[0]:pixel[0] + scale_factor, pixel[1]:pixel[1] +
+                scale_factor * contigous_pixels] = prediction.reshape(
+                    (scale_factor, scale_factor * contigous_pixels))
+            i = i + contigous_pixels
+
         return res
 
     def _classify_batches_no_filter(self, slide_array, level, n_batch):
@@ -233,155 +241,5 @@ class BasicClassifier(Classifier):
         return prediction.astype('float32')
 
     @staticmethod
-    def _get_batch(slide, start, size, level):
-        image = slide.read_region(start[::-1], level, size[::-1])
-        array = image.to_array(True)
-        return Batch(start, size, array, slide.level_downsamples[level])
-
-    @staticmethod
-    def _get_zeros(size, dtype):
-        return np.zeros(size, dtype)
-
-    @staticmethod
     def _concatenate(seq, axis):
         return np.concatenate(seq, axis)
-
-    @staticmethod
-    def _reshape(array, shape):
-        return array.reshape(shape)
-
-    def _flat_array(self, array: np.ndarray, shape: Tuple[int,
-                                                          int]) -> np.ndarray:
-        n_px = shape[0] * shape[1]
-        array = array[:, :, :3].reshape(n_px, 3)
-        return array
-
-
-@dataclass
-class ImageArea:
-    slide: BasicSlide
-    row: int
-    column: int
-    level: int
-    size: Tuple[int, int]
-    image_info: ImageInfo = ImageInfo(ImageInfo.COLORTYPE.BGR,
-                                      ImageInfo.COORD.YX,
-                                      ImageInfo.CHANNEL.FIRST)
-
-    def __post_init__(self):
-        self._array = None
-
-    @property
-    def top_level_location(self):
-        raise NotImplementedError
-
-    def array(self):
-        logger.debug('reading array of %s', self)
-        if self._array is None:
-            image = self.slide.read_region(self.top_level_location[::-1],
-                                           self.level, self.size[::-1])
-            self._array = image.to_array(self.image_info)
-        return self._array
-
-    @property
-    def shape(self):
-        return self.array().shape[:2] if self.image_info.channel == ImageInfo.CHANNEL.LAST \
-            else self.array().shape[1:]
-
-    def flatten(self):
-        n_px = self.shape[0] * self.shape[1]
-        if self.image_info.channel == ImageInfo.CHANNEL.FIRST:
-            array = self.array().transpose(1, 2, 0)
-        else:
-            array = self.array()
-        array = array[:, :, :3].reshape(n_px, 3)
-        return array
-
-
-@dataclass
-class Batch(ImageArea):
-    def __post_init__(self):
-        super().__post_init__()
-        self.downsample = self.slide.level_downsamples[self.level]
-
-    @property
-    def top_level_location(self):
-        print(self.row, self.column, self.downsample)
-        return (round(self.row * self.downsample),
-                round(self.column * self.downsample))
-
-    def get_patches(self,
-                    patch_size: Tuple[int, int],
-                    filter_: Filter = None) -> "Patch":
-        dimensions = self.slide.level_dimensions[self.level][::-1]
-        if filter_ is None:
-            for row in range(0, self.size[0], patch_size[0]):
-                if self.row + row + patch_size[0] > dimensions[0]:
-                    continue
-                for col in range(0, self.size[1], patch_size[1]):
-                    if self.column + col + patch_size[1] > dimensions[1]:
-                        continue
-                    patch_row = int(row // patch_size[0])
-                    patch_column = int(col // patch_size[1])
-                    yield Patch(self.slide, patch_row, patch_column,
-                                patch_size, self.image_info)
-
-        else:
-            index_patches = filter_.filter(self, patch_size)
-            for p in np.argwhere(index_patches):
-                patch = Patch(self.slide, p[0], p[1], patch_size,
-                              self.image_info)
-                logger.debug('yielding patch %s', patch)
-                yield patch
-
-
-@dataclass
-class BatchIterator:
-    slide: BasicSlide
-    level: int
-    n_batch: int
-    image_info: ImageInfo
-    batch_cls: Callable = Batch
-
-    def __post_init__(self):
-        self._level_dimensions = self.slide.level_dimensions[self.level][::-1]
-        self._downsample = self.slide.level_downsamples[self.level]
-
-        batch_size_0 = self._level_dimensions[0] // self.n_batch
-        self._batch_size = (batch_size_0, self._level_dimensions[1])
-
-    def __iter__(self):
-        with Bar('collect batch') as bar:
-            for i in range(0, self._level_dimensions[0], self._batch_size[0]):
-                size_0 = min(self._batch_size[0],
-                             self._level_dimensions[0] - i)
-                #  if self._level_dimensions[0] - i < self._batch_size[0]:
-                #      continue
-                #  for j in range(0, self._level_dimensions[1], self._batch_size[1]):
-                #      size = (size_0,
-                #              min(self._batch_size[1],
-                #                  self._level_dimensions[1] - j))
-                bar.next()
-                yield self.batch_cls(self.slide, i, 0, self.level,
-                                     (size_0, self._level_dimensions[1]),
-                                     self.image_info)
-
-    def __len__(self):
-        return self._level_dimensions[0] // self._batch_size[0]
-
-
-@dataclass
-class Patch(ImageArea):
-    slide: BasicSlide
-    row: int
-    column: int
-    level: int
-    size: Tuple[int, int]
-    PIL_format: bool = False
-
-    def __post_init__(self):
-        self._array = None
-
-    @property
-    def top_level_location(self):
-        return (self.row * self.size[0], self.column * self.size[1])

@@ -16,18 +16,22 @@ from slaid.models.eddl import TissueModel, TumorModel
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
-def test_classify_slide(green_slide, green_classifier):
-    level = 0
-    mask = green_classifier.classify(green_slide, level=level)
+@pytest.mark.parametrize('n_batch', [1, 2, 3])
+@pytest.mark.parametrize('level', [0, 1])
+def test_classify_slide(green_slide, green_classifier, n_batch, level):
+    mask = green_classifier.classify(green_slide, level=level, n_batch=n_batch)
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
-    assert (mask.array[:300, :] == 100).all()
-    assert (mask.array[300:, :] == 0).all()
+    green_zone = int(300 // green_slide.level_downsamples[level])
+    assert (mask.array[:green_zone, :] == 100).all()
+    assert (mask.array[green_zone:, :] == 0).all()
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
-def test_classify_with_filter(green_slide, green_classifier):
+@pytest.mark.parametrize('n_batch', [1, 2, 3])
+@pytest.mark.parametrize('level', [0, 1])
+def test_classify_with_filter(green_slide, green_classifier, n_batch, level):
     filter_level = 2
     filter_downsample = green_slide.level_downsamples[filter_level]
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])

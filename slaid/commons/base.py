@@ -194,6 +194,12 @@ class Filter:
     def __iter__(self):
         return iter(self.indices)
 
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, key):
+        return self.indices.__getitem__(key)
+
 
 def do_filter(slide: "Slide", condition: str) -> "Filter":
     operator_mapping = {

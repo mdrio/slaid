@@ -1,15 +1,10 @@
 import logging
-from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
 from dask import delayed
-from progress.bar import Bar
 
-from slaid.classifiers.base import BasicClassifier
-from slaid.classifiers.base import Batch as BaseBatch
-from slaid.classifiers.base import BatchIterator, Filter
-from slaid.classifiers.base import Patch as BasePatch
+from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
@@ -26,7 +21,7 @@ class Classifier(BasicClassifier):
     def __init__(self, model: Model, feature: str, compute_mask: bool = False):
         super().__init__(model, feature)
         self._model_image_info = self.model.image_info
-        self._model_ = self._delayed_model()
+        self._delayed_model = self._delayed_model()
         self.compute_mask = compute_mask
 
     def classify(self,
@@ -47,7 +42,7 @@ class Classifier(BasicClassifier):
         return slide[level].convert(self._model_image_info)
 
     def _predict(self, area):
-        return da.from_delayed(self._model_.predict(area.array),
+        return da.from_delayed(self._delayed_model.predict(area.array),
                                shape=(area.array.shape[0], ),
                                dtype='float32')
 
