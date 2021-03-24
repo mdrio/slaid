@@ -13,24 +13,24 @@ import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.base import Slide, SlideStore, do_filter
-from slaid.commons.dask import init_client
+from slaid.commons.dask import DaskSlide, init_client
 from slaid.models.eddl import load_model
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
 
-def get_slide(path, slide_reader):
-    slide_ext_with_dot = os.path.splitext(path)[-1]
-    slide_ext = slide_ext_with_dot[1:]
-    try:
-        return Slide(
-            SlideStore(STORAGE.get(slide_ext, slide_reader).load(path)))
-    except Exception as ex:
-        logging.error('an error occurs with file %s: %s', path, ex)
-
-
 class SerialRunner:
     CLASSIFIER = BasicClassifier
+
+    @staticmethod
+    def get_slide(path, slide_reader):
+        slide_ext_with_dot = os.path.splitext(path)[-1]
+        slide_ext = slide_ext_with_dot[1:]
+        try:
+            return Slide(
+                SlideStore(STORAGE.get(slide_ext, slide_reader).load(path)))
+        except Exception as ex:
+            logging.error('an error occurs with file %s: %s', path, ex)
 
     @staticmethod
     def convert_gpu_params(gpu: List[int]) -> List[int]:
@@ -98,8 +98,8 @@ class SerialRunner:
     def prepare_output_dir(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    @staticmethod
-    def get_slides(input_path, slide_reader):
+    @classmethod
+    def get_slides(cls, input_path, slide_reader):
 
         inputs = [
             os.path.abspath(os.path.join(input_path, f))
@@ -108,7 +108,7 @@ class SerialRunner:
             input_path)[-1][1:] not in STORAGE.keys() else [input_path]
         logging.info('processing inputs %s', inputs)
         for f in inputs:
-            yield get_slide(f, slide_reader)
+            yield cls.get_slide(f, slide_reader)
 
     @classmethod
     def classify_slides(cls, input_path, output_dir, classifier,
@@ -213,3 +213,13 @@ class ParallelRunner(SerialRunner):
     @staticmethod
     def _init_client(scheduler, processes):
         init_client(address=scheduler, processes=processes)
+
+    @staticmethod
+    def get_slide(path, slide_reader):
+        slide_ext_with_dot = os.path.splitext(path)[-1]
+        slide_ext = slide_ext_with_dot[1:]
+        try:
+            return DaskSlide(
+                SlideStore(STORAGE.get(slide_ext, slide_reader).load(path)))
+        except Exception as ex:
+            logging.error('an error occurs with file %s: %s', path, ex)
