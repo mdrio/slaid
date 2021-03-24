@@ -222,6 +222,8 @@ TILESIZE = 512
 
 
 class BasicSlide(abc.ABC):
+    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+
     class InvalidFile(Exception):
         pass
 
@@ -263,8 +265,6 @@ class BasicSlide(abc.ABC):
 
 
 class Slide(BasicSlide):
-    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
-
     def __init__(self, store: "SlideStore", image_info: ImageInfo = None):
         self._store = store
         self._slide = store.slide
@@ -281,7 +281,7 @@ class Slide(BasicSlide):
 
     def _create_slide(self, dataset):
         return SlideArray(self._read_from_store(dataset),
-                          self.IMAGE_INFO).convert(self.image_info)
+                          self._slide.IMAGE_INFO).convert(self.image_info)
 
     def _read_from_store(self, dataset):
         return zarr.open(store=self._store, path=dataset["path"], mode='r')
@@ -367,7 +367,7 @@ class SlideArray:
         return SlideArray(array, image_info)
 
 
-def create_meta_store(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
+def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
     """Creates a dict containing the zarr metadata
     for the multiscale openslide image."""
     store = dict()
@@ -388,19 +388,14 @@ def create_meta_store(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
         init_array(
             store,
             path=str(i),
-            shape=(3, y, x),
-            chunks=(3, tilesize, tilesize),
+            shape=(3, y, x) if slide.IMAGE_INFO.channel
+            == ImageInfo.CHANNEL.FIRST else (y, x, 3),
+            chunks=(3, tilesize, tilesize) if slide.IMAGE_INFO.channel
+            == ImageInfo.CHANNEL.FIRST else (tilesize, tilesize, 3),
             dtype="|u1",
             compressor=None,
         )
     return store
-
-
-def _parse_chunk_path(path: str):
-    """Returns x,y chunk coords and pyramid level from string key"""
-    level, ckey = path.split("/")
-    _, y, x = map(int, ckey.split("."))
-    return x, y, int(level)
 
 
 class SlideStore(OpenSlideStore):
@@ -408,7 +403,7 @@ class SlideStore(OpenSlideStore):
         self._path = slide.filename
         self._slide = slide
         self._tilesize = tilesize
-        self._store = create_meta_store(self._slide, tilesize)
+        self._store = _create_metastore(self._slide, tilesize)
         #  self._image_info = image_info if image_info else ImageInfo()
 
     @property
@@ -423,7 +418,7 @@ class SlideStore(OpenSlideStore):
         # key should now be a path to an array chunk
         # e.g '3/4.5.0' -> '<level>/<chunk_key>'
         try:
-            x, y, level = _parse_chunk_path(key)
+            x, y, level = self._parse_chunk_path(key)
             location = self._ref_pos(x, y, level)
             size = (self._tilesize, self._tilesize)
             logger.debug(
@@ -438,3 +433,11 @@ class SlideStore(OpenSlideStore):
             raise KeyError(key)
 
         return tile.to_array().tobytes()
+
+    def _parse_chunk_path(self, path: str):
+        """Returns x,y chunk coords and pyramid level from string key"""
+        level, ckey = path.split("/")
+        _, y, x = map(int, ckey.split("."))
+        if self._slide.IMAGE_INFO.channel == ImageInfo.CHANNEL.LAST:
+            y, x, _ = _, y, x
+        return x, y, int(level)
