@@ -11,7 +11,7 @@ import zarr
 
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
-from slaid.commons.ecvl import Slide
+from slaid.commons.ecvl import BasicSlide as Slide
 from slaid.runners import SerialRunner
 
 DIR = os.path.dirname(os.path.realpath(__file__))
