@@ -1,20 +1,22 @@
 import logging
 import os
+import threading
 from abc import ABC, abstractstaticmethod
 from typing import List
 
 import numpy as np
 import pyeddl.eddl as eddl
 import stringcase
-from dask.distributed import Lock
 from pyeddl.tensor import Tensor
 
-from slaid.commons.base import Image, ImageInfo
+from slaid.commons.base import ImageInfo
 from slaid.models import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
 fh = logging.FileHandler('/tmp/eddl.log')
 logger.addHandler(fh)
+
+lock = threading.Lock()
 
 
 class Model(BaseModel, ABC):
@@ -80,20 +82,11 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        logger.info('array %s', array)
+        logger.info('array %s, type %s', array, type(array))
         tensor = Tensor.fromarray(array / self.normalization_factor)
 
-        try:
-            lock = Lock('prediction')
-        except Exception as ex:
-            logger.error('cannot create lock, not using dask? error %s', ex)
-            return eddl.predict(self._model, [tensor])
-
-        try:
-            lock.acquire()
+        with lock:
             prediction = eddl.predict(self._model, [tensor])
-        finally:
-            lock.release()
 
         return prediction
 
