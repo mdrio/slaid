@@ -7,17 +7,18 @@ import pytest
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
-from slaid.commons.base import ImageInfo
-from slaid.commons.dask import init_client
+from slaid.commons.base import ImageInfo, Slide
+from slaid.commons.dask import DaskSlide, init_client
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.models.eddl import TissueModel, TumorModel
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [DaskSlide, Slide])
+@pytest.mark.parametrize('classifier_cls', [DaskClassifier, BasicClassifier])
 @pytest.mark.parametrize('level', [0, 1])
-@pytest.mark.parametrize('max_MB_prediction', [None, 0.002])
+@pytest.mark.parametrize('max_MB_prediction', [None, 0.1])
 def test_classify_slide(green_slide, green_classifier, level,
                         max_MB_prediction):
     mask = green_classifier.classify(green_slide,
@@ -30,10 +31,11 @@ def test_classify_slide(green_slide, green_classifier, level,
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 @pytest.mark.parametrize('classifier_cls', [BasicClassifier, DaskClassifier])
 @pytest.mark.parametrize('level', [0, 1])
-@pytest.mark.parametrize('max_MB_prediction', [None, 0.0002])
+@pytest.mark.parametrize('max_MB_prediction', [None, 0.01])
 def test_classify_with_filter(green_slide, green_classifier, level,
                               max_MB_prediction):
     filter_level = 2

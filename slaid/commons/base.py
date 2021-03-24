@@ -331,7 +331,7 @@ class SlideArray:
 
     @property
     def array(self):
-        return self._array
+        return np.array(self._array)
 
     def _is_channel_first(self):
         return self._image_info.channel == ImageInfo.CHANNEL.FIRST
@@ -351,7 +351,8 @@ class SlideArray:
         if self._image_info == image_info:
             return self
 
-        array = np.array(self._array)
+        array = self.array
+        print('type array', type(array))
         if self._image_info.color_type != image_info.color_type:
             if self._is_channel_first():
                 array = array[::-1, ...]
@@ -364,7 +365,7 @@ class SlideArray:
             else:
                 array = array.transpose(2, 0, 1)
 
-        return SlideArray(array, image_info)
+        return self.__class__(array, image_info)
 
 
 def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:

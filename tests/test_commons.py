@@ -5,7 +5,8 @@ import pytest
 import tiledb
 
 from slaid.commons import Mask
-from slaid.commons.base import ImageInfo
+from slaid.commons.base import ImageInfo, Slide, SlideArray
+from slaid.commons.dask import DaskSlide, DaskSlideArray
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 
@@ -18,7 +19,8 @@ IMAGE = 'tests/data/test.tif'
     ImageInfo('rgb', 'yx', 'last'),
     ImageInfo('bgr', 'yx', 'last')
 ])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slide_level(slide):
     for i in range(slide.level_count):
         array = slide[i]
@@ -31,7 +33,8 @@ def test_slide_level(slide):
     ImageInfo('rgb', 'yx', 'last'),
     ImageInfo('bgr', 'yx', 'last')
 ])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slice_slide(slide):
     for i in range(slide.level_count):
         array = slide[i]
@@ -43,7 +46,8 @@ def test_slice_slide(slide):
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_read_region(slide):
     image = slide.read_region((0, 0), 0, (256, 256))
     assert image.dimensions == (256, 256)
@@ -56,7 +60,8 @@ def test_read_region(slide):
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slice_read(slide):
     image = slide.read_region((0, 0), 0, slide.dimensions)
     slide_array = slide[0][:, :]
@@ -95,6 +100,7 @@ class TestDaskMask(TestMask):
         super().test_dumps_to_tiledb(dask_array, tmp_path)
 
 
+@pytest.mark.parametrize('cls', [SlideArray, DaskSlideArray])
 def test_slide_array_reshape(slide_array):
     size = slide_array.size
     slide_array = slide_array.reshape((size[0] * size[1], 1))

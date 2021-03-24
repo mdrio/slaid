@@ -37,8 +37,8 @@ class Classifier(BasicClassifier):
             mask.compute()
         return mask
 
-    def _get_slide_array(self, slide, level):
-        return slide[level].convert(self._model_image_info)
+    #  def _get_slide_array(self, slide, level):
+    #      return slide[level].convert(self._model_image_info)
 
     def _predict(self, area):
         return da.from_delayed(self._delayed_model.predict(area.array),

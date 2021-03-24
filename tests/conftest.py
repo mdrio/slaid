@@ -78,20 +78,20 @@ def tissue_model():
 
 
 @pytest.fixture
-def slide_array():
-    return SlideArray(
+def slide_array(cls):
+    return cls(
         np.arange(16 * 3).reshape(3, 4, 4), ImageInfo('bgr', 'yx', 'first'))
 
 
 @pytest.fixture
-def slide(slide_path, slide_cls, image_info):
-    return Slide(SlideStore(slide_cls(slide_path)), image_info)
+def slide(slide_path, basic_slide_cls, slide_cls, image_info):
+    return slide_cls(SlideStore(basic_slide_cls(slide_path)), image_info)
 
 
 @pytest.fixture
-def green_slide(slide_cls, image_info):
+def green_slide(basic_slide_cls, slide_cls, image_info):
     slide_path = 'tests/data/test.tif'
-    return Slide(SlideStore(slide_cls(slide_path)), image_info)
+    return slide_cls(SlideStore(basic_slide_cls(slide_path)), image_info)
 
 
 @pytest.fixture

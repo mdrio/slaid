@@ -145,6 +145,7 @@ class BasicClassifier(Classifier):
 
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
+        #  return slide[level]
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
                                       max_MB_prediction):
