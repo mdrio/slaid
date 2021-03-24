@@ -327,7 +327,7 @@ class SlideArray:
             array = self._array[:, key[0], key[1]]
         else:
             array = self._array[key[0], key[1], :]
-        return SlideArray(array, self._image_info)
+        return self.__class__(array, self._image_info)
 
     @property
     def array(self):
@@ -345,7 +345,7 @@ class SlideArray:
 
         array = self._array.reshape((3, ) + shape) if self._is_channel_first(
         ) else self._array.reshape(shape + (3, ))
-        return SlideArray(array, self._image_info)
+        return self.__class__(array, self._image_info)
 
     def convert(self, image_info: ImageInfo) -> "SlideArray":
         if self._image_info == image_info:
