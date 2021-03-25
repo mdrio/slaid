@@ -37,19 +37,27 @@ class Classifier(BasicClassifier):
             mask.compute()
         return mask
 
-    #  def _get_slide_array(self, slide, level):
-    #      return slide[level].convert(self._model_image_info)
-
-    def _predict(self, area):
-        return da.from_delayed(self._delayed_model.predict(area.array),
-                               shape=(area.array.shape[0], ),
-                               dtype='float32')
+    def _predict(self, array):
+        n_px = array.shape[0] * array.shape[1]
+        p = self._model.predict(array.reshape(
+            (n_px, 3))).reshape(array.shape[:2])
+        return p
+        #  return da.from_delayed(self._delayed_model.predict(area.array),
+        #                         shape=(area.array.shape[0], ),
+        #                         dtype='float32')
 
     @delayed
     def _get_delayed_model(self):
         return load_model(self._model.weight_filename,
                           self._model.gpu) if isinstance(
                               self._model, EddlModel) else self._model
+
+    def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
+        prediction = slide_array.array.map_blocks(self._predict,
+                                                  meta=np.array(
+                                                      (), dtype='float32'),
+                                                  drop_axis=2)
+        return prediction
 
     #  @delayed
     #  def _classify_batches_no_filter(self, slide_array, level, n_batch):

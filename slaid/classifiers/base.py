@@ -2,6 +2,7 @@ import abc
 import logging
 from datetime import datetime as dt
 
+import dask.array as da
 import numpy as np
 
 from slaid.commons import BasicSlide, Mask, Slide
@@ -186,14 +187,16 @@ class BasicClassifier(Classifier):
         predictions = []
         step = slide_array.size[0] if max_MB_prediction is None else round(
             max_MB_prediction * 10**6 // (3 * slide_array.size[1]))
-        logger.debug('max_MB_prediction %s, size_1 %s step %s',
-                     max_MB_prediction, slide_array.size[1], step)
+        logger.info('max_MB_prediction %s, size_1 %s step %s, n_batch %s',
+                    max_MB_prediction, slide_array.size[1], step,
+                    slide_array.size[1] // step)
         for i in range(0, slide_array.size[0], step):
             area = slide_array[i:i + step, :]
             n_px = area.size[0] * area.size[1]
             area_reshaped = area.reshape((n_px, ))
 
             prediction = self._predict(area_reshaped)
+
             prediction = prediction.reshape(area.size[0], area.size[1])
             predictions.append(prediction)
         return self._concatenate(predictions, 0)

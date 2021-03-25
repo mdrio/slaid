@@ -15,8 +15,8 @@ from slaid.models.eddl import TissueModel, TumorModel
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [DaskSlide, Slide])
-@pytest.mark.parametrize('classifier_cls', [DaskClassifier, BasicClassifier])
+@pytest.mark.parametrize('slide_cls', [DaskSlide])
+@pytest.mark.parametrize('classifier_cls', [DaskClassifier])
 @pytest.mark.parametrize('level', [0, 1])
 @pytest.mark.parametrize('max_MB_prediction', [None, 0.1])
 def test_classify_slide(green_slide, green_classifier, level,
