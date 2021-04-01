@@ -128,3 +128,8 @@ def green_slide_and_classifier(backend, image_info):
                              compute_mask=True)
     else:
         return NotImplementedError(backend)
+
+
+@pytest.fixture
+def mask():
+    return Mask(np.arange(9).reshape((3, 3)), 0, 1)

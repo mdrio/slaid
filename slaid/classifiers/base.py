@@ -150,37 +150,13 @@ class BasicClassifier(Classifier):
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
                                       max_MB_prediction):
-        scale_factor = round(
-            slide.level_downsamples[filter_.mask.extraction_level]) // round(
-                slide.level_downsamples[level])
 
-        res = np.zeros(slide_array.size, dtype='float32')
-        max_contigous_pixels = round(max_MB_prediction * 10**6 // 3) \
-            if max_MB_prediction is not None else slide_array.size[1]
-        i = 0
-        while i < len(filter_):
-            contigous_pixels = 1
-            for j in range(i + 1, len(filter_)):
-                if filter_[i][0] == filter_[j][0] and filter_[j][1] - filter_[
-                        i][1] == contigous_pixels:
-                    contigous_pixels += 1
-                    if contigous_pixels >= max_contigous_pixels:
-                        break
-                else:
-                    break
-
-            pixel = filter_[i] * scale_factor
-            area = slide_array[pixel[0]:pixel[0] + scale_factor,
-                               pixel[1]:pixel[1] +
-                               scale_factor * contigous_pixels]
-
-            n_px = area.size[0] * area.size[1]
-            prediction = self._predict(area.reshape((n_px, )))
-            res[pixel[0]:pixel[0] + scale_factor, pixel[1]:pixel[1] +
-                scale_factor * contigous_pixels] = prediction.reshape(
-                    (scale_factor, scale_factor * contigous_pixels))
-            i = i + contigous_pixels
-
+        filter_.rescale(slide_array.size)
+        res = np.zeros(slide_array.size[0] * slide_array.size[1],
+                       dtype='float32')
+        prediction = self._model.predict(slide_array.array[filter_.array])
+        res[filter_.array.reshape(res.shape)] = prediction
+        res = res.reshape(slide_array.size)
         return res
 
     def _classify_batches_no_filter(self, slide_array, max_MB_prediction):

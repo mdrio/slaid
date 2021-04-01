@@ -15,7 +15,7 @@ import PIL
 import tiledb
 import zarr
 from napari_lazy_openslide import OpenSlideStore
-from napari_lazy_openslide.store import (ArgumentError, init_attrs)
+from napari_lazy_openslide.store import ArgumentError, init_attrs
 from zarr.storage import init_array, init_group
 
 PATCH_SIZE = (256, 256)
@@ -91,8 +91,7 @@ class Mask:
         mask = np.array(self.array)
         if self.round_to_0_100:
             mask = mask / 100
-        index_patches = getattr(mask, operator)(value)
-        return np.argwhere(index_patches)
+        return getattr(mask, operator)(value)
 
     def __gt__(self, value):
         return Filter(self, self._filter('__gt__', value))
@@ -185,19 +184,40 @@ class Mask:
         return res
 
 
-@dataclass
 class Filter:
-    mask: Mask
-    indices: np.ndarray
+    def __init__(self, mask: Mask, array: np.ndarray):
+        self._mask = mask
+
+        self._indices = None
+        self._array = array
+
+    @property
+    def array(self):
+        return self._array
 
     def __iter__(self):
-        return iter(self.indices)
+        return iter(self._array)
 
-    def __len__(self):
-        return len(self.indices)
+    #  def __len__(self):
+    #      return len(self.indices)
 
     def __getitem__(self, key):
-        return self.indices.__getitem__(key)
+        return self._array.__getitem__(key)
+
+    def rescale(self, size: int):
+        if size < self._array.shape:
+            raise NotImplementedError('size %s < %s', size, self._array.shape)
+        if size == self._array.shape:
+            return self._array
+        scale = (size[0] // int(self._array.shape[0]),
+                 size[1] // int(self._array.shape[1]))
+        print(scale)
+        res = np.zeros(size, dtype='bool')
+        for x in range(self._array.shape[0]):
+            for y in range(self._array.shape[1]):
+                res[x * scale[0]:x * scale[0] + scale[0],
+                    y * scale[1]:y * scale[1] + scale[1]] = self._array[x, y]
+        self._array = res
 
 
 def do_filter(slide: "Slide", condition: str) -> "Filter":

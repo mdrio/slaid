@@ -36,27 +36,40 @@ class Classifier(BasicClassifier):
             mask.compute()
         return mask
 
-    def _predict(self, array):
+    def _predict_batch(self, array):
         n_px = array.shape[0] * array.shape[1]
         p = self._model.predict(array.reshape(
             (n_px, 3))).reshape(array.shape[:2])
         return p
-        #  return da.from_delayed(self._delayed_model.predict(area.array),
-        #                         shape=(area.array.shape[0], ),
-        #                         dtype='float32')
-
-    @delayed
-    def _get_delayed_model(self):
-        return load_model(self._model.weight_filename,
-                          self._model.gpu) if isinstance(
-                              self._model, EddlModel) else self._model
 
     def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
-        prediction = slide_array.array.map_blocks(self._predict,
+        prediction = slide_array.array.map_blocks(self._predict_batch,
                                                   meta=np.array(
                                                       (), dtype='float32'),
                                                   drop_axis=2)
         return prediction
+
+    def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
+                                      max_MB_prediction):
+        filter_.rescale(slide_array.size)
+        prediction = slide_array.array.map_blocks(self._predict_with_filter,
+                                                  meta=np.array(
+                                                      (), dtype='float32'),
+                                                  drop_axis=2,
+                                                  filter_=filter_)
+        return prediction
+
+    def _predict_with_filter(self, array, filter_, block_id=None):
+        filter_array = filter_[block_id[0] *
+                               array.shape[0]:block_id[0] * array.shape[0] +
+                               array.shape[0], block_id[1] *
+                               array.shape[1]:block_id[1] * array.shape[1] +
+                               array.shape[1]]
+        res = np.zeros(array.shape[0] * array.shape[1], dtype='float32')
+        prediction = self._model.predict(array[filter_array])
+        res[filter_array.reshape(res.shape)] = prediction
+        res = res.reshape(array.shape[:2])
+        return res
 
     #  @delayed
     #  def _classify_batches_no_filter(self, slide_array, level, n_batch):
