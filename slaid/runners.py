@@ -14,6 +14,7 @@ from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.base import Slide, SlideStore, do_filter
 from slaid.commons.dask import DaskSlide, init_client
+from slaid.models.dask import ActorModel
 from slaid.models.eddl import load_model
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
@@ -223,3 +224,9 @@ class ParallelRunner(SerialRunner):
                 SlideStore(STORAGE.get(slide_ext, slide_reader).load(path)))
         except Exception as ex:
             logging.error('an error occurs with file %s: %s', path, ex)
+
+    @staticmethod
+    def get_model(filename, gpu):
+        return ActorModel.create(SerialRunner.get_model,
+                                 filename=filename,
+                                 gpu=gpu)

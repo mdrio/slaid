@@ -5,12 +5,15 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.commons import ImageInfo, Mask, SlideArray
-from slaid.commons.base import Slide, SlideStore
-from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.classifiers.dask import Classifier as DaskClassifier
+from slaid.classifiers.base import BasicClassifier
+from slaid.commons import ImageInfo, Mask
+from slaid.commons.base import Slide, SlideStore
+from slaid.commons.dask import DaskSlide
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 #  from slaid.commons.openslide import Slide as OpenSlide
 from slaid.models.eddl import load_model
+from slaid.models.dask import ActorModel
 from tests.commons import DummyModel, GreenModel
 
 
@@ -94,7 +97,6 @@ def green_slide(basic_slide_cls, slide_cls, image_info):
     return slide_cls(SlideStore(basic_slide_cls(slide_path)), image_info)
 
 
-@pytest.fixture
 def green_classifier(classifier_cls):
     model = GreenModel()
 
@@ -109,3 +111,20 @@ def green_classifier(classifier_cls):
 def dummy_classifier(classifier_cls):
     model = DummyModel(np.zeros)
     return classifier_cls(model, 'tissue')
+
+
+@pytest.fixture
+def green_slide_and_classifier(backend, image_info):
+
+    slide_path = 'tests/data/test.tif'
+    if backend == 'basic':
+        return Slide(SlideStore(EcvlSlide(slide_path)),
+                     image_info), BasicClassifier(GreenModel(), 'tissue')
+    elif backend == 'dask':
+        return DaskSlide(SlideStore(EcvlSlide(slide_path)),
+                         image_info), DaskClassifier(
+                             ActorModel.create(GreenModel),
+                             'tissue',
+                             compute_mask=True)
+    else:
+        return NotImplementedError(backend)

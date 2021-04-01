@@ -3,6 +3,7 @@ import logging
 import dask.array as da
 import numpy as np
 from dask import delayed
+from dask.distributed import Client
 
 from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
@@ -20,8 +21,6 @@ class Classifier(BasicClassifier):
 
     def __init__(self, model: Model, feature: str, compute_mask: bool = False):
         super().__init__(model, feature)
-        self._model_image_info = self.model.image_info
-        self._delayed_model = self._get_delayed_model()
         self.compute_mask = compute_mask
 
     def classify(self,
