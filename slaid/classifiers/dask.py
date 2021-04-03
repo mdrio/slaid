@@ -51,191 +51,92 @@ class Classifier(BasicClassifier):
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
                                       max_MB_prediction):
-        filter_.rescale(slide_array.size)
-        prediction = slide_array.array.map_blocks(self._predict_with_filter,
-                                                  meta=np.array(
-                                                      (), dtype='float32'),
-                                                  drop_axis=2,
-                                                  filter_=filter_)
+
+        size = slide_array.size
+        logger.debug('filter_.array.shape %s', filter_.array.shape)
+        logger.debug('slide_array.array.shape %s', slide_array.array.shape)
+        logger.debug('slide_array.array.chunksize %s',
+                     slide_array.array.chunksize)
+        logger.debug('slide_array.array.numblocks %s',
+                     slide_array.array.numblocks)
+        scale = (size[0] // filter_.array.shape[0],
+                 size[1] // filter_.array.shape[1])
+        logger.debug('scale %s', scale)
+        filter_array = np.expand_dims(filter_.array, 2)
+        filter_array = da.from_array(
+            filter_array,
+            chunks=(round(filter_array.shape[0] /
+                          slide_array.array.numblocks[0]),
+                    round(filter_array.shape[1] /
+                          slide_array.array.numblocks[1]),
+                    filter_array.shape[2]))
+        logger.debug('filter_array.numblocks %s chunks %s',
+                     filter_array.numblocks, filter_array.chunksize)
+        logger.debug('slide_array.array.numblocks %s, chunks %s',
+                     slide_array.array.numblocks, slide_array.array.chunksize)
+        #  assert filter_array.numblocks[:2] == slide_array.array.numblocks[:2]
+        filter_array = da.map_blocks(
+            _rescale,
+            filter_array,
+            dtype='uint8',
+            meta=np.array((), dtype='uint8'),
+            #  chunks=(slide_array.array.shape[0] //
+            #          slide_array.array.numblocks[0],
+            #          slide_array.array.shape[1] //
+            #          slide_array.array.numblocks[1], 1),
+            chunks=(scale[0] * filter_array.chunksize[0],
+                    scale[1] * filter_array.chunksize[1], 1),
+            scale=scale)
+        filter_array = filter_array[:slide_array.size[0], :slide_array.
+                                    size[1], :]
+        filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
+                                            ((1, )))
+        #  filter_.rescale(slide_array.size)
+        #  filter_array = np.expand_dims(filter_.array, 2)
+        #  filter_array = da.from_array(filter_array,
+        #                               chunks=(slide_array.array.chunks[0],
+        #                                       slide_array.array.chunks[1], 1))
+
+        logger.debug('filter_array.shape %s', filter_array.shape)
+        logger.debug('slide_array.array.shape %s', slide_array.array.shape)
+        logger.debug('filter_array.chunksize %s', filter_array.chunksize)
+        logger.debug('slide_array.array.chunksize %s',
+                     slide_array.array.chunksize)
+        logger.debug('filter_array.numblocks %s', filter_array.numblocks)
+        logger.debug('slide_array.array.numblocks %s',
+                     slide_array.array.numblocks)
+        assert filter_array.shape[:2] == slide_array.array.shape[:2]
+        assert filter_array.numblocks[:2] == slide_array.array.numblocks[:2]
+        assert filter_array.chunksize[:2] == slide_array.array.chunksize[:2]
+        filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
+                                            (1, ))
+        prediction = da.map_blocks(self._predict_with_filter,
+                                   slide_array.array,
+                                   filter_array,
+                                   dtype='float32',
+                                   meta=np.array((), dtype='float32'),
+                                   drop_axis=2)
         return prediction
 
-    def _predict_with_filter(self, array, filter_, block_id=None):
-        filter_array = filter_[block_id[0] *
-                               array.shape[0]:block_id[0] * array.shape[0] +
-                               array.shape[0], block_id[1] *
-                               array.shape[1]:block_id[1] * array.shape[1] +
-                               array.shape[1]]
+    def _predict_with_filter(self,
+                             array,
+                             filter_array,
+                             block_id=None,
+                             block_info=None):
+
+        logger.debug('block_id %s', block_id)
+        logger.debug('block_info %s', block_info)
         res = np.zeros(array.shape[0] * array.shape[1], dtype='float32')
-        prediction = self._model.predict(array[filter_array])
-        res[filter_array.reshape(res.shape)] = prediction
+
+        filter_array = np.squeeze(filter_array)
+        logger.debug('filter_array.shape %s', filter_array.shape)
+        logger.debug('array.shape %s', array.shape)
+        filtered_array = array[filter_array]
+        if filtered_array.shape[0] > 0:
+            prediction = self._model.predict(filtered_array)
+            res[filter_array.reshape(res.shape)] = prediction
         res = res.reshape(array.shape[:2])
         return res
-
-    #  @delayed
-    #  def _classify_batches_no_filter(self, slide_array, level, n_batch):
-    #      return super()._classify_batches_no_filter(slide_array, level, n_batch)
-    #  return da.rechunk(predictions)
-
-    #  def _classify_batches_with_filter(self, slide_array, filter_,
-    #                                    scale_factor):
-    #      model = load_model(self._model.weight_filename, False) if isinstance(
-    #          self._model, EddlModel) else self._model
-    #      res = np.zeros((slide_array.shape[0], slide_array.shape[1]),
-    #                     dtype='float32')
-    #      step = 2
-    #      with Bar('pixels', max=len(filter_.indices) / step) as progress:
-    #          for pixels in toolz.partition_all(step, filter_.indices):
-    #              logger.debug('pixels %s', pixels)
-    #              areas = []
-    #              for pixel in pixels:
-    #                  pixel = pixel * scale_factor
-    #                  area = slide_array[pixel[0]:pixel[0] + scale_factor,
-    #                                     pixel[1]:pixel[1] + scale_factor, :3]
-    #                  n_px = area.shape[0] * area.shape[1]
-    #                  areas.append(np.array(area.reshape((n_px, 3))))
-    #
-    #              logger.debug('np.concatenate(areas, 0) %s',
-    #                           np.concatenate(areas, 0))
-    #              predictions = model.predict(np.concatenate(areas, 0))
-    #              for i, pixel in enumerate(pixels):
-    #                  idx = i * scale_factor
-    #                  pixel = pixel * scale_factor
-    #                  prediction = predictions[idx:idx + scale_factor].reshape(
-    #                      scale_factor, scale_factor)
-    #                  res[pixel[0]:pixel[0] + scale_factor - 1,
-    #                      pixel[1]:pixel[1] + scale_factor - 1] = prediction
-    #              progress.next()
-    #
-    #      return res
-    #  @delayed
-    #  def _classify_batches_with_filter(self, slide_array, filter_,
-    #                                    scale_factor):
-    #      res = np.zeros(slide_array.size, dtype='float32')
-    #      model = load_model(self._model.weight_filename,
-    #                         self._model.gpu) if isinstance(
-    #                             self._model, EddlModel) else self._model
-    #      for pixel in filter_:
-    #          pixel = pixel * scale_factor
-    #          area = slide_array[pixel[0]:pixel[0] + scale_factor,
-    #                             pixel[1]:pixel[1] + scale_factor]
-    #          n_px = area.size[0] * area.size[1]
-    #          prediction = model.predict(area.reshape(n_px).array)
-    #          res[pixel[0]:pixel[0] + scale_factor,
-    #              pixel[1]:pixel[1] + scale_factor] = prediction.reshape(
-    #                  (scale_factor, scale_factor))
-    #      return res
-    #
-    #  def _classify_batches(self, slide, level, n_batch, threshold,
-    #                        round_to_0_100, filter_):
-    #      slide_array = slide[level]
-    #      model = delayed(self.model)
-    #      if filter_ is not None:
-    #          scale_factor = round(slide.level_downsamples[
-    #              filter_.mask.extraction_level]) // round(
-    #                  slide.level_downsamples[level])
-    #
-    #          predictions = da.from_delayed(self._classify_batches_with_filter(
-    #              slide_array, filter_, scale_factor),
-    #                                        shape=slide_array.size,
-    #                                        dtype='float32')
-    #  predictions = da.from_delayed(
-    #      self._classify_batches_with_filter(slide_array, filter_,
-    #                                         scale_factor),
-    #      shape=(slide_array.shape[0], slide_array.shape[1]),
-    #  dtype='float32')
-    #  return da.rechunk(predictions)
-    #  res = np.zeros((slide_array.shape[0], slide_array.shape[1]),
-    #                 dtype='float32')
-    #  for pixel in filter_:
-    #      pixel = pixel * scale_factor
-    #
-    #      area = slide_array[pixel[0]:pixel[0] + scale_factor,
-    #                         pixel[1]:pixel[1] + scale_factor, :3]
-    #      n_px = area.shape[0] * area.shape[1]
-    #      area_reshaped = area.reshape((n_px, 3))
-    #      prediction = da.from_delayed(self.model.predict(area),
-    #                                   shape=(area_reshaped.shape[0], ),
-    #                                   dtype='float32')
-    #      prediction = prediction.reshape((scale_factor, scale_factor))
-    #      res[pixel[0]:pixel[0] + scale_factor,
-    #          pixel[1]:pixel[1] + scale_factor] = prediction
-    #
-    #  predictions = []
-    #  area_by_row = defaultdict(list)
-    #  for pixel in filter_:
-    #      pixel = pixel * scale_factor
-    #
-    #      area = slide_array[pixel[0]:pixel[0] + scale_factor,
-    #                         pixel[1]:pixel[1] + scale_factor, :3]
-    #      n_px = area.shape[0] * area.shape[1]
-    #      area_reshaped = area.reshape((n_px, 3))
-    #      area_by_row[pixel[0]].append((pixel[1], area_reshaped))
-    #
-    #  for row in range(0, slide_array.shape[0], scale_factor):
-    #      step = scale_factor if row + scale_factor < slide_array.shape[
-    #          0] else slide_array.shape[0] - row
-    #
-    #      row_predictions = []
-    #      if row not in area_by_row:
-    #          row_predictions = da.zeros((step, slide_array.shape[1]),
-    #                                     dtype='float32')
-    #      else:
-    #          areas = area_by_row[row]
-    #          prev_y = 0
-    #          for y, area in areas:
-    #              pad_0 = y - prev_y
-    #              if pad_0 > 0:
-    #                  row_predictions.append(
-    #                      da.zeros((scale_factor, pad_0),
-    #                               dtype='float32'))
-    #
-    #              prediction = da.from_delayed(model.predict(area),
-    #                                           shape=(area.shape[0], ),
-    #                                           dtype='float32')
-    #              row_predictions.append(
-    #                  prediction.reshape(scale_factor, scale_factor))
-    #              prev_y = y + scale_factor
-    #
-    #          y = slide_array.shape[1]
-    #          pad_0 = y - prev_y
-    #          if pad_0:
-    #              row_predictions.append(
-    #                  da.zeros((scale_factor, pad_0), dtype='float32'))
-    #
-    #          row_predictions = da.concatenate(row_predictions, 1)
-    #
-    #      predictions.append(row_predictions)
-    #  predictions = da.concatenate(predictions, 0)
-    #  logger.debug('predictions shape %s', predictions.shape)
-    #  return da.rechunk(predictions)
-
-    #  res = da.concatenate(res)
-    #  logger.debug(
-    #      'dif shapes %s',
-    #      res.shape[0] - slide_array.shape[0] * slide_array.shape[1])
-    #  assert res.shape[0] == slide_array.shape[0] * slide_array.shape[1]
-    #  logger.debug('res shape %s, slide_array shape %s', res.shape,
-    #               slide_array.shape)
-    #  return res.reshape((slide_array.shape[0], slide_array.shape[1]))
-
-    #  else:
-    #      predictions = []
-    #      step = slide_array.size[0] // n_batch
-    #      logger.debug('n_batch %s, step %s', n_batch, step)
-    #      with Bar('batches', max=n_batch) as bar:
-    #          for i in range(0, slide_array.size[0], step):
-    #              bar.next()
-    #              area = slide_array[i:i + step, :]
-    #              n_px = area.size[0] * area.size[1]
-    #              area_reshaped = area.reshape((n_px, ))
-    #
-    #              prediction = da.from_delayed(
-    #                  model.predict(area_reshaped.array),
-    #                  shape=(area_reshaped.size[0], ),
-    #                  dtype='float32')
-    #              prediction = prediction.reshape(area.size[0], area.size[1])
-    #              predictions.append(prediction)
-    #      return da.concatenate(predictions, 0)
 
     def _classify_patches(self,
                           slide: BasicSlide,
@@ -293,3 +194,17 @@ class Classifier(BasicClassifier):
 
 def _classify_batch(slide_path: str, model_path: str, level: int):
     pass
+
+
+def _rescale(array, scale, block_info=None):
+    #  logger.debug('scale %s', scale)
+    #  logger.debug('array.shape %s', array.shape)
+    res = np.zeros((array.shape[0] * scale[0], array.shape[1] * scale[1], 1),
+                   dtype='bool')
+    for x in range(array.shape[0]):
+        for y in range(array.shape[1]):
+            res[x * scale[0]:x * scale[0] + scale[0],
+                y * scale[1]:y * scale[1] + scale[1]] = array[x, y]
+    #  res = np.expand_dims(res, 2)
+    #  logger.debug('res.shape %s', res.shape)
+    return res
