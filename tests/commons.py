@@ -19,7 +19,7 @@ class GreenModel(BaseModel):
     image_info = ImageInfo('rgb', 'yx', 'last')
 
     def __init__(self, patch_size=None):
-        self.patch_size = patch_size
+        self._patch_size = patch_size
 
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
@@ -42,7 +42,11 @@ class EddlGreenModel(BaseModel, EddlModel):
 
 class EddlGreenPatchModel(BaseModel, EddlModel):
     def __init__(self, patch_size=(256, 256)):
-        self.patch_size = patch_size
+        self._patch_size = patch_size
+
+    @property
+    def patch_size(self):
+        return self._patch_size
 
     @staticmethod
     def _create_net():

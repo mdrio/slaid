@@ -54,6 +54,28 @@ def test_classify_with_filter(green_slide_and_classifier, level,
     assert (mask.array[ones_row:, :] == 0).all()
 
 
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('level', [0])
+#  @pytest.mark.parametrize('backend', ['basic', 'dask'])
+@pytest.mark.parametrize('backend', ['dask'])
+@pytest.mark.parametrize('max_MB_prediction', [None])
+def test_classify_slide_by_patches(green_slide_and_patch_classifier, level,
+                                   max_MB_prediction):
+    green_slide, green_classifier = green_slide_and_patch_classifier
+    mask = green_classifier.classify(green_slide,
+                                     level=level,
+                                     max_MB_prediction=max_MB_prediction)
+    dims = green_slide.level_dimensions[level][::-1]
+    assert mask.array.shape == (dims[0] //
+                                green_classifier.model.patch_size[0],
+                                dims[1] //
+                                green_classifier.model.patch_size[1])
+    green_zone = int(300 // green_slide.level_downsamples[level] //
+                     green_classifier.model.patch_size[0])
+    assert (mask.array[:green_zone, :] == 100).all()
+    assert (mask.array[green_zone:, :] == 0).all()
+
+
 #  class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
 #      @classmethod
 #      def setUpClass(cls):

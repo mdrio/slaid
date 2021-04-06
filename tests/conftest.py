@@ -5,16 +5,16 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.classifiers.base import BasicClassifier
+from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import ImageInfo, Mask
 from slaid.commons.base import Slide, SlideStore
 from slaid.commons.dask import DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.models.dask import ActorModel
 #  from slaid.commons.openslide import Slide as OpenSlide
 from slaid.models.eddl import load_model
-from slaid.models.dask import ActorModel
-from tests.commons import DummyModel, GreenModel
+from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 
 
 @pytest.fixture
@@ -126,6 +126,23 @@ def green_slide_and_classifier(backend, image_info):
                              ActorModel.create(GreenModel),
                              'tissue',
                              compute_mask=True)
+    else:
+        return NotImplementedError(backend)
+
+
+@pytest.fixture
+def green_slide_and_patch_classifier(backend, image_info):
+
+    slide_path = 'tests/data/test.tif'
+    if backend == 'basic':
+        return Slide(SlideStore(EcvlSlide(slide_path)),
+                     image_info), BasicClassifier(GreenModel(), 'tissue')
+    elif backend == 'dask':
+        return DaskSlide(SlideStore(EcvlSlide(slide_path), tilesize=100),
+                         image_info), DaskClassifier(ActorModel.create(
+                             EddlGreenPatchModel, patch_size=(10, 10)),
+                                                     'tissue',
+                                                     compute_mask=True)
     else:
         return NotImplementedError(backend)
 

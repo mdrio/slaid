@@ -4,6 +4,7 @@ import dask.array as da
 import numpy as np
 from dask import delayed
 from dask.distributed import Client
+from skimage.util.shape import view_as_blocks
 
 from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
@@ -144,39 +145,63 @@ class Classifier(BasicClassifier):
                           level,
                           filter_: Filter,
                           threshold,
-                          n_patch: int = 25,
-                          round_to_0_100: bool = True) -> Mask:
-        dimensions = slide.level_dimensions[level][::-1]
-        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        patches_to_predict = filter_ if filter_ is not None else np.ndindex(
-            dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
+                          round_to_0_100: bool = True,
+                          max_MB_prediction=None) -> Mask:
+        slide_array = self._get_slide_array(slide, level)
+        predictions = da.map_blocks(self._predict_patches,
+                                    slide_array.array,
+                                    drop_axis=0,
+                                    meta=np.array([], dtype='float32'))
+        return predictions
 
-        slide_array = slide[level]
-        model = delayed(self.model)
-        predictions = []
-        patches_to_predict = list(patches_to_predict)
-        for i in range(0, len(patches_to_predict), n_patch):
-            patches = patches_to_predict[i:i + n_patch]
-            input_array = da.stack([
-                slide_array[p[0]:p[0] + self._patch_size[0],
-                            p[1]:p[1] + self._patch_size[1]].array
-                for p in patches
-            ])
-            predictions.append(
-                da.from_delayed(model.predict(input_array),
-                                shape=(len(patches), ),
-                                dtype=dtype))
-        if predictions:
-            predictions = da.concatenate(predictions)
+    def _predict_patches(self, chunk):
+        tmp_splits = np.split(chunk,
+                              chunk.shape[1] // self._patch_size[0],
+                              axis=1)
+        splits = []
+        for s in tmp_splits:
+            splits.extend(
+                np.split(s, chunk.shape[2] // self._patch_size[1], axis=2))
+        #  raise Exception(f'{list([s.shape for s in splits])}')
+        chunk_reshaped = np.array(splits)
 
-        predictions = predictions.compute()
-        res = np.zeros(
-            (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
-            dtype='float32')
-        for i, p in enumerate(predictions):
-            patch = patches_to_predict[i]
-            res[patch[0], patch[1]] = p
-        return da.array(res, dtype='float32')
+        logger.debug('chunk_reshaped %s', chunk_reshaped.shape)
+        predictions = self._model.predict(chunk_reshaped)
+
+        return predictions.reshape(chunk.shape[1] // self._patch_size[0],
+                                   chunk.shape[2] // self._patch_size[1])
+
+        #  dimensions = slide.level_dimensions[level][::-1]
+        #  dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
+        #  patches_to_predict = filter_ if filter_ is not None else np.ndindex(
+        #      dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
+        #
+        #  slide_array = slide[level]
+        #  model = delayed(self.model)
+        #  predictions = []
+        #  patches_to_predict = list(patches_to_predict)
+        #  for i in range(0, len(patches_to_predict), n_patch):
+        #      patches = patches_to_predict[i:i + n_patch]
+        #      input_array = da.stack([
+        #          slide_array[p[0]:p[0] + self._patch_size[0],
+        #                      p[1]:p[1] + self._patch_size[1]].array
+        #          for p in patches
+        #      ])
+        #      predictions.append(
+        #          da.from_delayed(model.predict(input_array),
+        #                          shape=(len(patches), ),
+        #                          dtype=dtype))
+        #  if predictions:
+        #      predictions = da.concatenate(predictions)
+        #
+        #  predictions = predictions.compute()
+        #  res = np.zeros(
+        #      (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
+        #      dtype='float32')
+        #  for i, p in enumerate(predictions):
+        #      patch = patches_to_predict[i]
+        #      res[patch[0], patch[1]] = p
+        #  return da.array(res, dtype='float32')
 
     @staticmethod
     def _get_zeros(size, dtype):
@@ -190,10 +215,6 @@ class Classifier(BasicClassifier):
     @staticmethod
     def _reshape(array, shape):
         return da.reshape(array, shape)
-
-
-def _classify_batch(slide_path: str, model_path: str, level: int):
-    pass
 
 
 def _rescale(array, scale, block_info=None):
