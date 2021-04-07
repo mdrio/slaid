@@ -151,25 +151,45 @@ class Classifier(BasicClassifier):
         predictions = da.map_blocks(self._predict_patches,
                                     slide_array.array,
                                     drop_axis=0,
-                                    meta=np.array([], dtype='float32'))
+                                    meta=np.array([], dtype='float32'),
+                                    filter_=filter_)
         return predictions
 
-    def _predict_patches(self, chunk):
+    def _predict_patches(self, chunk, filter_=None, block_info=None):
+        loc = block_info[0]['array-location']
         tmp_splits = np.split(chunk,
                               chunk.shape[1] // self._patch_size[0],
                               axis=1)
         splits = []
-        for s in tmp_splits:
+        for split in tmp_splits:
             splits.extend(
-                np.split(s, chunk.shape[2] // self._patch_size[1], axis=2))
-        #  raise Exception(f'{list([s.shape for s in splits])}')
+                np.split(split, chunk.shape[2] // self._patch_size[1], axis=2))
         chunk_reshaped = np.array(splits)
+        if filter_ is not None:
+            scaled_loc = [[
+                loc[1][0] // self._patch_size[0],
+                loc[1][1] // self._patch_size[1],
+            ],
+                          [
+                              loc[2][0] // self._patch_size[0],
+                              loc[2][1] // self._patch_size[1]
+                          ]]
+            filter_array = filter_.array[
+                scaled_loc[0][0]:scaled_loc[0][1],
+                scaled_loc[1][0]:scaled_loc[1][1]].reshape(
+                    chunk_reshaped.shape[0])
+            res = np.zeros(filter_array.shape, dtype='float32')
+            chunk_reshaped = chunk_reshaped[filter_array, ...]
+            if chunk_reshaped.shape[0] > 0:
+                predictions = self._model.predict(chunk_reshaped)
+            else:
+                predictions = np.empty((), dtype='float32')
+            res[filter_array] = predictions
+        else:
+            res = self._model.predict(chunk_reshaped)
 
-        logger.debug('chunk_reshaped %s', chunk_reshaped.shape)
-        predictions = self._model.predict(chunk_reshaped)
-
-        return predictions.reshape(chunk.shape[1] // self._patch_size[0],
-                                   chunk.shape[2] // self._patch_size[1])
+        return res.reshape(chunk.shape[1] // self._patch_size[0],
+                           chunk.shape[2] // self._patch_size[1])
 
         #  dimensions = slide.level_dimensions[level][::-1]
         #  dtype = 'uint8' if threshold or round_to_0_100 else 'float32'

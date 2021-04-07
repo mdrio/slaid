@@ -22,7 +22,7 @@ def init_client(address=None, processes=False):
 class Mask(BaseMask):
     def compute(self):
         if isinstance(self.array, da.Array):
-            self.array = self.array.compute()
+            self.array = self.array.compute(rerun_exceptions_locally=True)
 
     def to_tiledb(self, path: str, overwrite: bool = False, **kwargs):
         if overwrite:
