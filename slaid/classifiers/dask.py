@@ -140,22 +140,58 @@ class Classifier(BasicClassifier):
                           threshold,
                           round_to_0_100: bool = True,
                           max_MB_prediction=None) -> Mask:
-        slide_array = self._get_slide_array(slide, level)
-        chunks = [[], []]
-        for axis, orig_chunks in enumerate(slide_array.array.chunks[1:]):
-            chunks[axis] = [
-                chunk // self._patch_size[axis] for chunk in orig_chunks
-            ]
+        slide_array = self._get_slide_array(slide, level).array
+        level_dims = slide_array.shape
+        chunk_shape = [3] + [
+            slide_array.shape[i + 1] -
+            (slide_array.shape[i + 1] % self._patch_size[i]) for i in range(2)
+        ]
+        slide_array = slide_array[:, :chunk_shape[1], :chunk_shape[2]]
 
-        predictions = da.map_blocks(self._predict_patches,
-                                    slide_array.array,
-                                    chunks=chunks,
-                                    drop_axis=0,
-                                    meta=np.array([], dtype='float32'),
-                                    filter_=filter_)
+        if filter_ is not None:
+            filter_array = filter_.array
+            patches = []
+            for x in range(0, filter_.array.shape[0]):
+                for y in range(0, filter_.array.shape[1]):
+                    if filter_array[x, y]:
+                        patches.append(slide_array[:,
+                                                   x * self._patch_size[0]:x *
+                                                   self._patch_size[0] +
+                                                   self._patch_size[0],
+                                                   y * self._patch_size[1]:y *
+                                                   self._patch_size[1] +
+                                                   self._patch_size[1]])
+
+            slide_array_flat = da.stack(patches)
+
+        slide_array_flat = slide_array_flat.rechunk(50, 3, self._patch_size[0],
+                                                    self._patch_size[1])
+        if slide_array_flat.shape[0] == 0:
+            predictions = np.zeros((level_dims[1] // self._patch_size[0],
+                                    level_dims[2] // self._patch_size[1]),
+                                   dtype='float32')
+        else:
+            filtered_predictions = da.map_blocks(self._predict_patches,
+                                                 slide_array_flat,
+                                                 drop_axis=[1, 2, 3],
+                                                 meta=np.array(
+                                                     [], dtype='float32'),
+                                                 chunks=(1, ))
+            predictions = np.zeros((level_dims[1] // self._patch_size[0],
+                                    level_dims[2] // self._patch_size[1]),
+                                   dtype='float32')
+            filtered_predictions = filtered_predictions.compute().flatten()
+            #  raise Exception(filter_.array.shape,
+            #                  predictions[filter_.array].shape,
+            #                  filtered_predictions.shape)
+
+            predictions[filter_.array] = filtered_predictions
         return predictions
 
-    def _predict_patches(self, chunk, filter_=None, block_info=None):
+    def _predict_patches(self, chunk, block_info=None):
+        return self._model.predict(chunk)
+
+    def _predict_patches_old(self, chunk, filter_=None, block_info=None):
         loc = block_info[0]['array-location']
         chunk_shape = [3] + [
             chunk.shape[i + 1] - (chunk.shape[i + 1] % self._patch_size[i])
@@ -196,38 +232,6 @@ class Classifier(BasicClassifier):
         res = res.reshape(chunk.shape[1] // self._patch_size[0],
                           chunk.shape[2] // self._patch_size[1])
         return res
-
-        #  dimensions = slide.level_dimensions[level][::-1]
-        #  dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        #  patches_to_predict = filter_ if filter_ is not None else np.ndindex(
-        #      dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
-        #
-        #  slide_array = slide[level]
-        #  model = delayed(self.model)
-        #  predictions = []
-        #  patches_to_predict = list(patches_to_predict)
-        #  for i in range(0, len(patches_to_predict), n_patch):
-        #      patches = patches_to_predict[i:i + n_patch]
-        #      input_array = da.stack([
-        #          slide_array[p[0]:p[0] + self._patch_size[0],
-        #                      p[1]:p[1] + self._patch_size[1]].array
-        #          for p in patches
-        #      ])
-        #      predictions.append(
-        #          da.from_delayed(model.predict(input_array),
-        #                          shape=(len(patches), ),
-        #                          dtype=dtype))
-        #  if predictions:
-        #      predictions = da.concatenate(predictions)
-        #
-        #  predictions = predictions.compute()
-        #  res = np.zeros(
-        #      (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
-        #      dtype='float32')
-        #  for i, p in enumerate(predictions):
-        #      patch = patches_to_predict[i]
-        #      res[patch[0], patch[1]] = p
-        #  return da.array(res, dtype='float32')
 
     @staticmethod
     def _get_zeros(size, dtype):
