@@ -1,17 +1,13 @@
 import logging
+import math
 
 import dask.array as da
 import numpy as np
-from dask import delayed
-from dask.distributed import Client
-from skimage.util.shape import view_as_blocks
 
 from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
-from slaid.models.eddl import Model as EddlModel
-from slaid.models.eddl import load_model
 
 logger = logging.getLogger('dask')
 logger.setLevel(logging.DEBUG)
@@ -106,9 +102,6 @@ class Classifier(BasicClassifier):
         logger.debug('filter_array.numblocks %s', filter_array.numblocks)
         logger.debug('slide_array.array.numblocks %s',
                      slide_array.array.numblocks)
-        assert filter_array.shape[:2] == slide_array.array.shape[:2]
-        assert filter_array.numblocks[:2] == slide_array.array.numblocks[:2]
-        assert filter_array.chunksize[:2] == slide_array.array.chunksize[:2]
         filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
                                             (1, ))
         prediction = da.map_blocks(self._predict_with_filter,
@@ -148,8 +141,15 @@ class Classifier(BasicClassifier):
                           round_to_0_100: bool = True,
                           max_MB_prediction=None) -> Mask:
         slide_array = self._get_slide_array(slide, level)
+        chunks = [[], []]
+        for axis, orig_chunks in enumerate(slide_array.array.chunks[1:]):
+            chunks[axis] = [
+                chunk // self._patch_size[axis] for chunk in orig_chunks
+            ]
+
         predictions = da.map_blocks(self._predict_patches,
                                     slide_array.array,
+                                    chunks=chunks,
                                     drop_axis=0,
                                     meta=np.array([], dtype='float32'),
                                     filter_=filter_)
@@ -157,6 +157,11 @@ class Classifier(BasicClassifier):
 
     def _predict_patches(self, chunk, filter_=None, block_info=None):
         loc = block_info[0]['array-location']
+        chunk_shape = [3] + [
+            chunk.shape[i + 1] - (chunk.shape[i + 1] % self._patch_size[i])
+            for i in range(2)
+        ]
+        chunk = chunk[:, :chunk_shape[1], :chunk_shape[2]]
         tmp_splits = np.split(chunk,
                               chunk.shape[1] // self._patch_size[0],
                               axis=1)
@@ -188,8 +193,9 @@ class Classifier(BasicClassifier):
         else:
             res = self._model.predict(chunk_reshaped)
 
-        return res.reshape(chunk.shape[1] // self._patch_size[0],
-                           chunk.shape[2] // self._patch_size[1])
+        res = res.reshape(chunk.shape[1] // self._patch_size[0],
+                          chunk.shape[2] // self._patch_size[1])
+        return res
 
         #  dimensions = slide.level_dimensions[level][::-1]
         #  dtype = 'uint8' if threshold or round_to_0_100 else 'float32'

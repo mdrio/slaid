@@ -138,7 +138,7 @@ def green_slide_and_patch_classifier(backend, image_info):
         return Slide(SlideStore(EcvlSlide(slide_path)),
                      image_info), BasicClassifier(GreenModel(), 'tissue')
     elif backend == 'dask':
-        return DaskSlide(SlideStore(EcvlSlide(slide_path), tilesize=100),
+        return DaskSlide(SlideStore(EcvlSlide(slide_path), tilesize=90),
                          image_info), DaskClassifier(ActorModel.create(
                              EddlGreenPatchModel, patch_size=(10, 10)),
                                                      'tissue',

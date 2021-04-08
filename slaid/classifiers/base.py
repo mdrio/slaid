@@ -37,6 +37,7 @@ class BasicClassifier(Classifier):
             self._image_info = model.image_info
         except AttributeError as ex:
             logger.error(ex)
+            raise ex
             self._patch_size = None
             self._image_info = ImageInfo(ImageInfo.COLORTYPE('rgb'),
                                          ImageInfo.COORD('yx'),
@@ -60,6 +61,7 @@ class BasicClassifier(Classifier):
         #  batches = self._get_batch_iterator(slide, level, n_batch,
         #                                     self._color_type, self._coords,
         #                                     self._channel)
+        logger.info('patch size %s', self._patch_size)
         if self._patch_size:
             predictions = self._classify_patches(slide, self._patch_size,
                                                  level, filter_, threshold,

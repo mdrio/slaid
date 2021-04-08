@@ -63,7 +63,7 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
 class BaseDummyModel(BaseModel):
     def __init__(self, patch_size=None):
-        self.patch_size = patch_size
+        self._patch_size = patch_size
         self.array_predicted = []
 
     def predict(self, array):
@@ -73,9 +73,13 @@ class BaseDummyModel(BaseModel):
     def _predict(self, array):
         raise NotImplementedError
 
+    @property
+    def patch_size(self):
+        return self._patch_size
+
 
 class DummyModel(BaseDummyModel):
-    image_info = ImageInfo('bgr', 'yx', 'last')
+    image_info = ImageInfo('bgr', 'yx', 'first')
 
     def __init__(self, func, patch_size=None):
         self.func = func

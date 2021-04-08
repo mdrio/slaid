@@ -196,8 +196,9 @@ class TestPatchClassifier:
 
         assert output.attrs['filename'] == slide.filename
         assert tuple(output.attrs['resolution']) == slide.dimensions
+        print(slide.level_dimensions[level])
         assert output[self.feature].shape == tuple([
-            slide.level_dimensions[level][::-1][i] // (256, 256)[i]
+            slide.level_dimensions[level][::-1][i] // (128, 128)[i]
             for i in range(2)
         ])
         assert output[self.feature].attrs['extraction_level'] == level

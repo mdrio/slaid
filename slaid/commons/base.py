@@ -420,7 +420,7 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = 2048):
+    def __init__(self, slide: "Slide", tilesize: int = 1024):
         self._path = slide.filename
         self._slide = slide
         self._tilesize = tilesize

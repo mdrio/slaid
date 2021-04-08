@@ -82,9 +82,7 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        logger.info('array %s, type %s', array, type(array))
         tensor = Tensor.fromarray(array / self.normalization_factor)
-
         with lock:
             prediction = eddl.predict(self._model, [tensor])
 
