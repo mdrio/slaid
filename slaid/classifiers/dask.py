@@ -1,5 +1,4 @@
 import logging
-import math
 
 import dask.array as da
 import numpy as np
@@ -142,17 +141,23 @@ class Classifier(BasicClassifier):
                           max_MB_prediction=None) -> Mask:
         slide_array = self._get_slide_array(slide, level).array
         level_dims = slide_array.shape
-        chunk_shape = [3] + [
+        final_shape = [3] + [
             slide_array.shape[i + 1] -
             (slide_array.shape[i + 1] % self._patch_size[i]) for i in range(2)
         ]
-        slide_array = slide_array[:, :chunk_shape[1], :chunk_shape[2]]
-
-        if filter_ is not None:
+        slide_array = slide_array[:, :final_shape[1], :final_shape[2]]
+        if filter_ is None:
+            filter_array = np.ones(
+                (slide_array.shape[1] // self._patch_size[0],
+                 slide_array.shape[2] // self._patch_size[1]),
+                dtype='bool')
+        else:
             filter_array = filter_.array
+
+        if (filter_array == 1).any():
             patches = []
-            for x in range(0, filter_.array.shape[0]):
-                for y in range(0, filter_.array.shape[1]):
+            for x in range(0, filter_array.shape[0]):
+                for y in range(0, filter_array.shape[1]):
                     if filter_array[x, y]:
                         patches.append(slide_array[:,
                                                    x * self._patch_size[0]:x *
@@ -164,28 +169,30 @@ class Classifier(BasicClassifier):
 
             slide_array_flat = da.stack(patches)
 
-        slide_array_flat = slide_array_flat.rechunk(50, 3, self._patch_size[0],
-                                                    self._patch_size[1])
-        if slide_array_flat.shape[0] == 0:
-            predictions = np.zeros((level_dims[1] // self._patch_size[0],
-                                    level_dims[2] // self._patch_size[1]),
-                                   dtype='float32')
-        else:
-            filtered_predictions = da.map_blocks(self._predict_patches,
-                                                 slide_array_flat,
-                                                 drop_axis=[1, 2, 3],
-                                                 meta=np.array(
-                                                     [], dtype='float32'),
-                                                 chunks=(1, ))
-            predictions = np.zeros((level_dims[1] // self._patch_size[0],
-                                    level_dims[2] // self._patch_size[1]),
-                                   dtype='float32')
-            filtered_predictions = filtered_predictions.compute().flatten()
-            #  raise Exception(filter_.array.shape,
-            #                  predictions[filter_.array].shape,
-            #                  filtered_predictions.shape)
+            slide_array_flat = slide_array_flat.rechunk(
+                50, 3, self._patch_size[0], self._patch_size[1])
+            if slide_array_flat.shape[0] == 0:
+                predictions = np.zeros((level_dims[1] // self._patch_size[0],
+                                        level_dims[2] // self._patch_size[1]),
+                                       dtype='float32')
+            else:
+                filtered_predictions = da.map_blocks(self._predict_patches,
+                                                     slide_array_flat,
+                                                     drop_axis=[1, 2, 3],
+                                                     meta=np.array(
+                                                         [], dtype='float32'),
+                                                     chunks=(1, ))
+                predictions = np.zeros((level_dims[1] // self._patch_size[0],
+                                        level_dims[2] // self._patch_size[1]),
+                                       dtype='float32')
+                filtered_predictions = filtered_predictions.compute().flatten()
+                #  raise Exception(filter_.array.shape,
+                #                  predictions[filter_.array].shape,
+                #                  filtered_predictions.shape)
 
-            predictions[filter_.array] = filtered_predictions
+                predictions[filter_array] = filtered_predictions
+        else:
+            predictions = np.zeros(filter_array.shape, dtype='float32')
         return predictions
 
     def _predict_patches(self, chunk, block_info=None):

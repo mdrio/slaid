@@ -222,7 +222,7 @@ class TestPatchClassifier:
         assert output.attrs['filename'] == slide.filename
         assert tuple(output.attrs['resolution']) == slide.dimensions
         assert output[self.feature].shape == tuple([
-            slide.level_dimensions[level][::-1][i] // (256, 256)[i]
+            slide.level_dimensions[level][::-1][i] // (128, 128)[i]
             for i in range(2)
         ])
         assert output[self.feature].attrs['extraction_level'] == level
@@ -230,19 +230,6 @@ class TestPatchClassifier:
             'level_downsample'] == slide.level_downsamples[level]
         assert output[self.feature].dtype == 'float32'
         assert (np.array(output[self.feature]) <= 1).all()
-
-
-def test_n_patch(slide_path, tmp_path, model_all_ones_path):
-    classifier, slides = SerialRunner.run(slide_path,
-                                          output_dir=tmp_path,
-                                          model=model_all_ones_path,
-                                          feature='test',
-                                          extraction_level=1,
-                                          n_patch=2,
-                                          writer='zarr')
-    model = classifier.model
-    assert len(model.array_predicted) > 0
-    assert model.array_predicted[0].shape[0] == 2
 
 
 def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
@@ -254,7 +241,7 @@ def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
 
     cmd = [
         'classify.py',
-        'serial',
+        'parallel',
         '-f',
         'test',
         '-m',

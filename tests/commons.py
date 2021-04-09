@@ -11,15 +11,19 @@ from slaid.models.eddl import Model as EddlModel
 class BaseModel:
     image_info = ImageInfo('bgr', 'yx', 'first')
 
+    def __init__(self, patch_size=None):
+        self._patch_size = patch_size
+
     def __str__(self):
         return self.__class__.__name__
+
+    @property
+    def patch_size(self):
+        return self._patch_size
 
 
 class GreenModel(BaseModel):
     image_info = ImageInfo('rgb', 'yx', 'last')
-
-    def __init__(self, patch_size=None):
-        self._patch_size = patch_size
 
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
@@ -43,10 +47,6 @@ class EddlGreenModel(BaseModel, EddlModel):
 class EddlGreenPatchModel(BaseModel, EddlModel):
     def __init__(self, patch_size=(256, 256)):
         self._patch_size = patch_size
-
-    @property
-    def patch_size(self):
-        return self._patch_size
 
     @staticmethod
     def _create_net():

@@ -104,36 +104,7 @@ class BasicClassifier(Classifier):
                           threshold,
                           round_to_0_100: bool = True,
                           max_MB_prediction=None) -> Mask:
-        dimensions = slide.level_dimensions[level][::-1]
-        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        res = np.zeros(
-            (dimensions[0] // patch_size[0], dimensions[1] // patch_size[1]),
-            dtype=dtype)
-
-        #  patch_indexes = filter_ if filter_ is not None else np.ndindex(
-        #      dimensions[0] // patch_size[0], dimensions[1] // patch_size[1])
-        #  patches_to_predict = [
-        #      Patch(slide, p[0], p[1], level, patch_size, self._image_info)
-        #      for p in patch_indexes
-        #  ]
-        #
-        #
-        #  predictions = []
-        #  with Bar('Predictions', max=len(patches_to_predict) // n_patch
-        #           or 1) as predict_bar:
-        #      for i in range(0, len(patches_to_predict), n_patch):
-        #          patches = patches_to_predict[i:i + n_patch]
-        #          predictions.append(
-        #              self._classify_array(
-        #                  np.stack([p.array() for p in patches]), threshold,
-        #                  round_to_0_100))
-        #          predict_bar.next()
-        #  if predictions:
-        #      predictions = np.concatenate(predictions)
-        #  for i, p in enumerate(predictions):
-        #      patch = patches_to_predict[i]
-        #      res[patch.row, patch.column] = p
-        return res
+        raise NotImplementedError()
 
     def _classify_batches(self, slide, level, filter_, max_MB_prediction):
         slide_array = self._get_slide_array(slide, level)

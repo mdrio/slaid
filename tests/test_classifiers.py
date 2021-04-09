@@ -131,52 +131,29 @@ def test_classify_slide_by_patches_with_filter(
     assert (mask.array[2:, :] == 0).all()
 
 
-#  class TestDaskClassifier(BaseTestClassifier, unittest.TestCase):
-#      @classmethod
-#      def setUpClass(cls):
-#          #  init_client()
-#          import dask
-#          dask.config.set(scheduler='synchronous')
-#
-#      @staticmethod
-#      def get_classifier(model, feature='tissue'):
-#          return DaskClassifier(model, feature)
-#
-#      @staticmethod
-#      def get_model():
-#          return GreenModel()
-#
-#      def test_filter(self):
-#          slide = load('tests/data/PH10023-1.thumb.tif')
-#          model = load_model(
-#              'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
-#          classifier = self.get_classifier(model, 'low_level_tissue')
-#          low_level_tissue = classifier.classify(slide, level=2)
-#          level = 1
-#          high_level_tissue = self.get_classifier(
-#              model,
-#              'high_level_tissue').classify(slide,
-#                                            level=level,
-#                                            filter_=low_level_tissue > 0.1)
-#          self.assertEqual(high_level_tissue.array.shape[::-1],
-#                           slide.level_dimensions[level])
-#
-#
-#  class TestEddlClassifier(BasicClassifierTest):
-#      @staticmethod
-#      def get_model():
-#          return EddlGreenModel()
-#
-#
-#  class TestEddlPatchClassifier(unittest.TestCase):
-#      @staticmethod
-#      def get_model(patch_size):
-#          return EddlGreenPatchModel(patch_size)
-#
-#      @staticmethod
-#      def get_classifier(model, feature='tissue'):
-#          return BasicClassifier(model, feature)
-#
+@pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [DaskSlide])
+@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+def test_classifies_tumor(slide, patch_tissue_mask):
+    model = TumorModel(
+        'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin')
+    classifier = DaskClassifier(model, 'tumor')
+    mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
+
+
+@pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('slide_cls', [DaskSlide])
+@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
+def test_classifies_tissue(slide, patch_tissue_mask):
+    model = TissueModel(
+        'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+    classifier = DaskClassifier(model, 'tissue')
+    mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert (mask.array == patch_tissue_mask).all()
+
 
 if __name__ == '__main__':
     init_client()
