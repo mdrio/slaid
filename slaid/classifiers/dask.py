@@ -4,7 +4,8 @@ import dask.array as da
 import numpy as np
 
 from slaid.classifiers.base import BasicClassifier, Filter
-from slaid.commons import BasicSlide, Slide
+from slaid.commons import BasicSlide, ImageInfo, Slide, SlideStore
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
 
@@ -49,86 +50,71 @@ class Classifier(BasicClassifier):
                                       max_MB_prediction):
 
         size = slide_array.size
-        logger.debug('filter_.array.shape %s', filter_.array.shape)
-        logger.debug('slide_array.array.shape %s', slide_array.array.shape)
-        logger.debug('slide_array.array.chunksize %s',
-                     slide_array.array.chunksize)
-        logger.debug('slide_array.array.numblocks %s',
-                     slide_array.array.numblocks)
         scale = (size[0] // filter_.array.shape[0],
                  size[1] // filter_.array.shape[1])
-        logger.debug('scale %s', scale)
-        filter_array = np.expand_dims(filter_.array, 2)
-        filter_array = da.from_array(
-            filter_array,
-            chunks=(round(filter_array.shape[0] /
-                          slide_array.array.numblocks[0]),
-                    round(filter_array.shape[1] /
-                          slide_array.array.numblocks[1]),
-                    filter_array.shape[2]))
-        logger.debug('filter_array.numblocks %s chunks %s',
-                     filter_array.numblocks, filter_array.chunksize)
-        logger.debug('slide_array.array.numblocks %s, chunks %s',
-                     slide_array.array.numblocks, slide_array.array.chunksize)
-        #  assert filter_array.numblocks[:2] == slide_array.array.numblocks[:2]
-        filter_array = da.map_blocks(
-            _rescale,
-            filter_array,
-            dtype='uint8',
-            meta=np.array((), dtype='uint8'),
-            #  chunks=(slide_array.array.shape[0] //
-            #          slide_array.array.numblocks[0],
-            #          slide_array.array.shape[1] //
-            #          slide_array.array.numblocks[1], 1),
-            chunks=(scale[0] * filter_array.chunksize[0],
-                    scale[1] * filter_array.chunksize[1], 1),
-            scale=scale)
-        filter_array = filter_array[:slide_array.size[0], :slide_array.
-                                    size[1], :]
-        filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
-                                            ((1, )))
-        #  filter_.rescale(slide_array.size)
-        #  filter_array = np.expand_dims(filter_.array, 2)
-        #  filter_array = da.from_array(filter_array,
-        #                               chunks=(slide_array.array.chunks[0],
-        #                                       slide_array.array.chunks[1], 1))
 
-        logger.debug('filter_array.shape %s', filter_array.shape)
-        logger.debug('slide_array.array.shape %s', slide_array.array.shape)
-        logger.debug('filter_array.chunksize %s', filter_array.chunksize)
-        logger.debug('slide_array.array.chunksize %s',
-                     slide_array.array.chunksize)
-        logger.debug('filter_array.numblocks %s', filter_array.numblocks)
-        logger.debug('slide_array.array.numblocks %s',
-                     slide_array.array.numblocks)
-        filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
-                                            (1, ))
-        prediction = da.map_blocks(self._predict_with_filter,
-                                   slide_array.array,
-                                   filter_array,
-                                   dtype='float32',
-                                   meta=np.array((), dtype='float32'),
-                                   drop_axis=2)
-        return prediction
+        filter_array = da.from_array(filter_.array, chunks=10)
+        chunks = []
+        for i, chunk in enumerate(filter_array.chunks):
+            chunks.append([c * scale[i] for c in chunk])
+        filter_array = da.map_blocks(
+            lambda x, scale: x.repeat(scale[0], 0).repeat(scale[1], 1),
+            filter_array,
+            scale,
+            meta=np.array([], dtype='float32'),
+            chunks=chunks)
+
+        predictions = da.map_blocks(self._predict_with_filter,
+                                    filter_array,
+                                    slide.filename,
+                                    level,
+                                    meta=np.array([], dtype='float32'))
+
+        return predictions
+        #  filter_array = filter_array[:slide_array.size[0], :slide_array.
+        #                              size[1], :]
+        #  filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
+        #                                      ((1, )))
+        #
+        #  filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
+        #                                      (1, ))
+        #  prediction = da.map_blocks(self._predict_with_filter,
+        #                             slide_array.array,
+        #                             filter_array,
+        #                             dtype='float32',
+        #                             meta=np.array((), dtype='float32'),
+        #                             drop_axis=2)
+        #  return prediction
 
     def _predict_with_filter(self,
-                             array,
                              filter_array,
-                             block_id=None,
+                             slide_filename,
+                             level,
                              block_info=None):
+        res = np.zeros(filter_array.shape, dtype='float32')
+        if (filter_array == 0).all():
+            return res
+        loc = block_info[0]['array-location']
+        #  slide = Slide(SlideStore(EcvlSlide(slide_filename)),
+        #                ImageInfo('rgb', 'yx', 'last'))
+        #  data = slide[level][loc[0][0]:loc[0][1], loc[1][0]:loc[1][1]].array
+        slide = EcvlSlide(slide_filename)
+        data = slide.read_region(
+            (loc[0][0], loc[1][0]), level,
+            (loc[0][1] - loc[0][0],
+             loc[1][1] - loc[1][0])).to_array().transpose(2, 1, 0)
 
-        logger.debug('block_id %s', block_id)
-        logger.debug('block_info %s', block_info)
-        res = np.zeros(array.shape[0] * array.shape[1], dtype='float32')
+        try:
+            predictions = self._model.predict(data[filter_array])
+            res[filter_array] = predictions
+        except Exception as ex:
+            logger.error('data %s, filter %s',
+                         (data.shape, filter_array.shape))
+            logger.exception(ex)
 
-        filter_array = np.squeeze(filter_array)
-        logger.debug('filter_array.shape %s', filter_array.shape)
-        logger.debug('array.shape %s', array.shape)
-        filtered_array = array[filter_array]
-        if filtered_array.shape[0] > 0:
-            prediction = self._model.predict(filtered_array)
-            res[filter_array.reshape(res.shape)] = prediction
-        res = res.reshape(array.shape[:2])
+        #  raise Exception(data.shape, filter_array.shape, predictions.shape,
+        #                  res[filter_array].shape)
+        #  if (filter_array == 0).all():
         return res
 
     def _classify_patches(self,

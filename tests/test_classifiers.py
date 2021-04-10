@@ -50,6 +50,7 @@ def test_classify_with_filter(green_slide_and_classifier, level,
 
     ones_row = round(ones_row * filter_downsample //
                      green_slide.level_downsamples[level])
+    assert mask.array.shape == green_slide.level_dimensions[level][::-1]
     assert (mask.array[:ones_row, :] == 100).all()
     assert (mask.array[ones_row:, :] == 0).all()
 
