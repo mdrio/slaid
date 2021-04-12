@@ -29,7 +29,7 @@ def test_classify_slide(green_slide_and_classifier, level, max_MB_prediction):
     assert (mask.array[green_zone:, :] == 0).all()
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
 @pytest.mark.parametrize('level', [0, 1])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 @pytest.mark.parametrize('max_MB_prediction', [None])

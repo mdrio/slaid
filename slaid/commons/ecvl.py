@@ -36,18 +36,25 @@ from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
 
 from slaid.commons import Image as BaseImage
+from slaid.commons import ImageInfo
+
+import slaid.commons.base as base
 
 logger = logging.getLogger('ecvl')
-import slaid.commons.base as base
 
 
 class Image(BaseImage):
+    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+
     def __init__(self, image: EcvlImage):
         self._image = image
 
-    def to_array(self):
+    def to_array(self, image_info: ImageInfo = None):
         # FIXME
-        return np.array(self._image).transpose(0, 2, 1)
+        array = np.array(self._image).transpose(0, 2, 1)
+        if image_info is not None:
+            array = self.IMAGE_INFO.convert(array, image_info)
+        return array
 
     @property
     def dimensions(self) -> Tuple[int, int]:

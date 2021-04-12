@@ -53,6 +53,25 @@ class ImageInfo(abc.ABC):
         if isinstance(self.channel, str):
             self.channel = ImageInfo.CHANNEL(self.channel)
 
+    def convert(self, array: np.ndarray,
+                array_image_info: "ImageInfo") -> np.ndarray:
+        if self == array_image_info:
+            return array
+
+        if self.color_type != array_image_info.color_type:
+            if self.channel == ImageInfo.CHANNEL.FIRST:
+                array = array[::-1, ...]
+            else:
+                array = array[..., ::-1]
+
+        if self.channel != array_image_info.channel:
+            if self.channel == ImageInfo.CHANNEL.FIRST:
+                array = array.transpose(1, 2, 0)
+            else:
+                array = array.transpose(2, 0, 1)
+
+        return array
+
 
 class Image(abc.ABC):
     @abc.abstractproperty
@@ -60,7 +79,7 @@ class Image(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def to_array(self):
+    def to_array(self, image_info: ImageInfo = None):
         pass
 
 
@@ -368,23 +387,7 @@ class SlideArray:
         return self.__class__(array, self._image_info)
 
     def convert(self, image_info: ImageInfo) -> "SlideArray":
-        if self._image_info == image_info:
-            return self
-
-        array = self.array
-        print('type array', type(array))
-        if self._image_info.color_type != image_info.color_type:
-            if self._is_channel_first():
-                array = array[::-1, ...]
-            else:
-                array = array[..., ::-1]
-
-        if self._image_info.channel != image_info.channel:
-            if self._is_channel_first():
-                array = array.transpose(1, 2, 0)
-            else:
-                array = array.transpose(2, 0, 1)
-
+        array = self._image_info.convert(self.array, image_info)
         return self.__class__(array, image_info)
 
 

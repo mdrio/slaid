@@ -67,54 +67,33 @@ class Classifier(BasicClassifier):
         predictions = da.map_blocks(self._predict_with_filter,
                                     filter_array,
                                     slide.filename,
+                                    type(slide._slide),
+                                    self.model.image_info,
                                     level,
                                     meta=np.array([], dtype='float32'))
 
         return predictions
-        #  filter_array = filter_array[:slide_array.size[0], :slide_array.
-        #                              size[1], :]
-        #  filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
-        #                                      ((1, )))
-        #
-        #  filter_array = filter_array.rechunk(slide_array.array.chunks[:2] +
-        #                                      (1, ))
-        #  prediction = da.map_blocks(self._predict_with_filter,
-        #                             slide_array.array,
-        #                             filter_array,
-        #                             dtype='float32',
-        #                             meta=np.array((), dtype='float32'),
-        #                             drop_axis=2)
-        #  return prediction
 
     def _predict_with_filter(self,
                              filter_array,
                              slide_filename,
+                             slide_cls,
+                             image_info,
                              level,
                              block_info=None):
         res = np.zeros(filter_array.shape, dtype='float32')
         if (filter_array == 0).all():
             return res
-        loc = block_info[0]['array-location']
-        #  slide = Slide(SlideStore(EcvlSlide(slide_filename)),
-        #                ImageInfo('rgb', 'yx', 'last'))
-        #  data = slide[level][loc[0][0]:loc[0][1], loc[1][0]:loc[1][1]].array
-        slide = EcvlSlide(slide_filename)
-        data = slide.read_region(
-            (loc[0][0], loc[1][0]), level,
-            (loc[0][1] - loc[0][0],
-             loc[1][1] - loc[1][0])).to_array().transpose(2, 1, 0)
+        loc = block_info[0]['array-location'][::-1]
 
-        try:
-            predictions = self._model.predict(data[filter_array])
-            res[filter_array] = predictions
-        except Exception as ex:
-            logger.error('data %s, filter %s',
-                         (data.shape, filter_array.shape))
-            logger.exception(ex)
+        slide = slide_cls(slide_filename)
+        data = slide.read_region((loc[0][0], loc[1][0]), level,
+                                 (loc[0][1] - loc[0][0],
+                                  loc[1][1] - loc[1][0])).to_array(image_info)
 
-        #  raise Exception(data.shape, filter_array.shape, predictions.shape,
-        #                  res[filter_array].shape)
-        #  if (filter_array == 0).all():
+        predictions = self._model.predict(data[filter_array])
+        res[filter_array] = predictions
+
         return res
 
     def _classify_patches(self,
