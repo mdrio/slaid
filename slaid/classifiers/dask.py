@@ -2,10 +2,10 @@ import logging
 
 import dask.array as da
 import numpy as np
+from dask import delayed
 
 from slaid.classifiers.base import BasicClassifier, Filter
-from slaid.commons import BasicSlide, ImageInfo, Slide, SlideStore
-from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.commons import BasicSlide, Slide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
 
@@ -105,105 +105,70 @@ class Classifier(BasicClassifier):
                           round_to_0_100: bool = True,
                           max_MB_prediction=None) -> Mask:
         slide_array = self._get_slide_array(slide, level).array
-        level_dims = slide_array.shape
-        final_shape = [3] + [
-            slide_array.shape[i + 1] -
-            (slide_array.shape[i + 1] % self._patch_size[i]) for i in range(2)
-        ]
-        slide_array = slide_array[:, :final_shape[1], :final_shape[2]]
+
+        shape_1 = slide_array.shape[1] - (slide_array.shape[1] %
+                                          self._patch_size[0])
+        shape_2 = slide_array.shape[2] - (slide_array.shape[2] %
+                                          self._patch_size[1])
+        slide_array = slide_array[:, :shape_1, :shape_2]
+
+        chunks = []
+        for axis in range(2):
+            slide_chunks = np.array(
+                slide_array.chunks[axis + 1]) // self._patch_size[axis]
+            chunks.append(slide_chunks.tolist())
+
         if filter_ is None:
-            filter_array = np.ones(
-                (slide_array.shape[1] // self._patch_size[0],
-                 slide_array.shape[2] // self._patch_size[1]),
-                dtype='bool')
+            predictions = da.map_blocks(self._predict_patches,
+                                        slide_array,
+                                        drop_axis=0,
+                                        meta=np.array([], dtype='float32'),
+                                        chunks=chunks)
         else:
-            filter_array = filter_.array
+            filter_array = da.from_array(filter_.array, chunks=(5, 5))
+            predictions = da.map_blocks(self._predict_patch_with_filter,
+                                        filter_array,
+                                        slide.filename,
+                                        type(slide._slide),
+                                        level,
+                                        meta=np.array([], dtype='float32'))
 
-        if (filter_array == 1).any():
-            patches = []
-            for x in range(0, filter_array.shape[0]):
-                for y in range(0, filter_array.shape[1]):
-                    if filter_array[x, y]:
-                        patches.append(slide_array[:,
-                                                   x * self._patch_size[0]:x *
-                                                   self._patch_size[0] +
-                                                   self._patch_size[0],
-                                                   y * self._patch_size[1]:y *
-                                                   self._patch_size[1] +
-                                                   self._patch_size[1]])
-
-            slide_array_flat = da.stack(patches)
-
-            slide_array_flat = slide_array_flat.rechunk(
-                50, 3, self._patch_size[0], self._patch_size[1])
-            if slide_array_flat.shape[0] == 0:
-                predictions = np.zeros((level_dims[1] // self._patch_size[0],
-                                        level_dims[2] // self._patch_size[1]),
-                                       dtype='float32')
-            else:
-                filtered_predictions = da.map_blocks(self._predict_patches,
-                                                     slide_array_flat,
-                                                     drop_axis=[1, 2, 3],
-                                                     meta=np.array(
-                                                         [], dtype='float32'),
-                                                     chunks=(1, ))
-                predictions = np.zeros((level_dims[1] // self._patch_size[0],
-                                        level_dims[2] // self._patch_size[1]),
-                                       dtype='float32')
-                filtered_predictions = filtered_predictions.compute().flatten()
-                #  raise Exception(filter_.array.shape,
-                #                  predictions[filter_.array].shape,
-                #                  filtered_predictions.shape)
-
-                predictions[filter_array] = filtered_predictions
-        else:
-            predictions = np.zeros(filter_array.shape, dtype='float32')
         return predictions
 
-    def _predict_patches(self, chunk, block_info=None):
-        return self._model.predict(chunk)
+    def _predict_patch_with_filter(self,
+                                   filter_array,
+                                   slide_filename,
+                                   slide_cls,
+                                   level,
+                                   block_info=None):
+        predictions = np.zeros(filter_array.shape, dtype='float32')
+        if (filter_array == 0).all():
+            return predictions
+        loc = block_info[0]['array-location'][::-1]
+        slide = slide_cls(slide_filename)
+        data = slide.read_region(
+            (loc[0][0] * self._patch_size[0], loc[1][0] * self._patch_size[1]),
+            level, ((loc[0][1] - loc[0][0]) * self._patch_size[0],
+                    (loc[1][1] - loc[1][0]) * self._patch_size[1])).to_array(
+                        self.model.image_info)
 
-    def _predict_patches_old(self, chunk, filter_=None, block_info=None):
-        loc = block_info[0]['array-location']
-        chunk_shape = [3] + [
-            chunk.shape[i + 1] - (chunk.shape[i + 1] % self._patch_size[i])
-            for i in range(2)
-        ]
-        chunk = chunk[:, :chunk_shape[1], :chunk_shape[2]]
-        tmp_splits = np.split(chunk,
-                              chunk.shape[1] // self._patch_size[0],
-                              axis=1)
-        splits = []
-        for split in tmp_splits:
-            splits.extend(
-                np.split(split, chunk.shape[2] // self._patch_size[1], axis=2))
-        chunk_reshaped = np.array(splits)
-        if filter_ is not None:
-            scaled_loc = [[
-                loc[1][0] // self._patch_size[0],
-                loc[1][1] // self._patch_size[1],
-            ],
-                          [
-                              loc[2][0] // self._patch_size[0],
-                              loc[2][1] // self._patch_size[1]
-                          ]]
-            filter_array = filter_.array[
-                scaled_loc[0][0]:scaled_loc[0][1],
-                scaled_loc[1][0]:scaled_loc[1][1]].reshape(
-                    chunk_reshaped.shape[0])
-            res = np.zeros(filter_array.shape, dtype='float32')
-            chunk_reshaped = chunk_reshaped[filter_array, ...]
-            if chunk_reshaped.shape[0] > 0:
-                predictions = self._model.predict(chunk_reshaped)
-            else:
-                predictions = np.empty((), dtype='float32')
-            res[filter_array] = predictions
-        else:
-            res = self._model.predict(chunk_reshaped)
+        data = np.concatenate([
+            np.split(row, data.shape[2] // self._patch_size[1], 2)
+            for row in np.split(data, data.shape[1] // self._patch_size[0], 1)
+        ])
+        filtered_predictions = self.model.predict(data[filter_array.flatten()])
+        predictions[filter_array] = filtered_predictions
+        return predictions
 
-        res = res.reshape(chunk.shape[1] // self._patch_size[0],
-                          chunk.shape[2] // self._patch_size[1])
-        return res
+    def _predict_patches(self, chunk):
+        final_shape = (chunk.shape[1] // self._patch_size[0],
+                       chunk.shape[2] // self._patch_size[1])
+        data = np.concatenate([
+            np.split(row, final_shape[1], 2)
+            for row in np.split(chunk, final_shape[0], 1)
+        ])
+        predictions = self._model.predict(data).reshape(final_shape)
+        return predictions
 
     @staticmethod
     def _get_zeros(size, dtype):
