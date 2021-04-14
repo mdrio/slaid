@@ -143,6 +143,14 @@ def test_classifies_tumor(slide, patch_tissue_mask):
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
     assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
 
+    mask = classifier.classify(slide,
+                               level=0,
+                               round_to_0_100=False,
+                               filter_=Filter(None,
+                                              np.ones((1, 1), dtype='bool')))
+    print(mask.array.shape, type(mask.array))
+    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
+
 
 @pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
@@ -153,6 +161,15 @@ def test_classifies_tissue(slide, patch_tissue_mask):
         'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
     classifier = DaskClassifier(model, 'tissue')
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
+    assert (mask.array == patch_tissue_mask).all()
+
+    mask = classifier.classify(slide,
+                               level=0,
+                               round_to_0_100=False,
+                               filter_=Filter(
+                                   None,
+                                   np.ones(patch_tissue_mask.shape,
+                                           dtype='bool')))
     assert (mask.array == patch_tissue_mask).all()
 
 

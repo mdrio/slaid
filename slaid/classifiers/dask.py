@@ -2,7 +2,6 @@ import logging
 
 import dask.array as da
 import numpy as np
-from dask import delayed
 
 from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
@@ -125,7 +124,10 @@ class Classifier(BasicClassifier):
                                         meta=np.array([], dtype='float32'),
                                         chunks=chunks)
         else:
-            filter_array = da.from_array(filter_.array, chunks=(5, 5))
+            chunks = (5, 5)
+            chunks = chunks if min(filter_.array.shape +
+                                   chunks) > chunks[0] else 'auto'
+            filter_array = da.from_array(filter_.array, chunks=chunks)
             predictions = da.map_blocks(self._predict_patch_with_filter,
                                         filter_array,
                                         slide.filename,
