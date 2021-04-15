@@ -1,4 +1,4 @@
-FROM  mobydick.crs4.it:5000/pylibs-toolkit:a157c06
+FROM  dhealth/pylibs-toolkit:0.10.0-gpu
 
 # RUN useradd -ms  /bin/bash slaid && \
 #     chown slaid /tmp/slaid && \
