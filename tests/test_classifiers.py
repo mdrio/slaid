@@ -8,7 +8,7 @@ from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import Mask
 from slaid.commons.base import Filter, ImageInfo, Slide
-from slaid.commons.dask import DaskSlide, init_client
+from slaid.commons.dask import Slide as DaskSlide, init_client
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.models.eddl import TissueModel, TumorModel
 

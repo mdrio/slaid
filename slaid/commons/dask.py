@@ -7,7 +7,7 @@ import zarr
 from dask.distributed import Client
 
 from slaid.commons import Mask as BaseMask
-from slaid.commons.base import Slide, SlideArray
+from slaid.commons.base import Slide as BaseSlide, SlideArray
 
 logger = logging.getLogger()
 
@@ -50,7 +50,7 @@ class Mask(BaseMask):
             array.attrs[attr] = value
 
 
-class DaskSlide(Slide):
+class Slide(BaseSlide):
     def _read_from_store(self, dataset):
         return da.from_zarr(self._store, component=dataset["path"])
 

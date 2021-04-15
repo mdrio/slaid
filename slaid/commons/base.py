@@ -18,7 +18,7 @@ from napari_lazy_openslide import OpenSlideStore
 from napari_lazy_openslide.store import ArgumentError, init_attrs
 from zarr.storage import init_array, init_group
 
-PATCH_SIZE = (256, 256)
+_TILESIZE = 2048
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -257,9 +257,6 @@ def do_filter(slide: "Slide", condition: str) -> "Filter":
     return getattr(mask, operator)(value)
 
 
-TILESIZE = 512
-
-
 class BasicSlide(abc.ABC):
     IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
 
@@ -423,7 +420,7 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = 1024):
+    def __init__(self, slide: "Slide", tilesize: int = _TILESIZE):
         self._path = slide.filename
         self._slide = slide
         self._tilesize = tilesize
@@ -465,3 +462,21 @@ class SlideStore(OpenSlideStore):
         if self._slide.IMAGE_INFO.channel == ImageInfo.CHANNEL.LAST:
             y, x, _ = _, y, x
         return x, y, int(level)
+
+
+class BaseSlideFactory(abc.ABC):
+    def __init__(self,
+                 filename: str,
+                 basic_slide_module: str,
+                 slide_module: str,
+                 tilesize: int = _TILESIZE,
+                 image_info: ImageInfo = None):
+        self._filename = filename
+        self._basic_slide_module = basic_slide_module
+        self._slide_module = slide_module
+        self._tilesize = tilesize
+        self._image_info = image_info
+
+    @abc.abstractmethod
+    def get_slide(self) -> Slide:
+        pass

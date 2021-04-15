@@ -9,7 +9,7 @@ from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import ImageInfo, Mask
 from slaid.commons.base import Slide, SlideStore
-from slaid.commons.dask import DaskSlide
+from slaid.commons.dask import Slide as DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.models.dask import ActorModel
 #  from slaid.commons.openslide import Slide as OpenSlide

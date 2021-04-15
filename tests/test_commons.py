@@ -6,7 +6,7 @@ import tiledb
 
 from slaid.commons import Mask
 from slaid.commons.base import ImageInfo, Slide, SlideArray
-from slaid.commons.dask import DaskSlide, DaskSlideArray
+from slaid.commons.dask import Slide as DaskSlide, DaskSlideArray
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 
