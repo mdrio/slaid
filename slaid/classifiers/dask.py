@@ -7,6 +7,7 @@ from slaid.classifiers.base import BasicClassifier, Filter
 from slaid.commons import BasicSlide, Slide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
+from dask import delayed
 
 logger = logging.getLogger('dask')
 logger.setLevel(logging.DEBUG)
@@ -32,14 +33,14 @@ class Classifier(BasicClassifier):
             mask.compute()
         return mask
 
-    def _predict_batch(self, array):
+    def _predict_batch(self, array, model):
         n_px = array.shape[0] * array.shape[1]
-        p = self._model.predict(array.reshape(
-            (n_px, 3))).reshape(array.shape[:2])
+        p = model.predict(array.reshape((n_px, 3))).reshape(array.shape[:2])
         return p
 
     def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
         prediction = slide_array.array.map_blocks(self._predict_batch,
+                                                  delayed(self._model),
                                                   meta=np.array(
                                                       (), dtype='float32'),
                                                   drop_axis=2)
@@ -52,7 +53,7 @@ class Classifier(BasicClassifier):
         scale = (size[0] // filter_.array.shape[0],
                  size[1] // filter_.array.shape[1])
 
-        filter_array = da.from_array(filter_.array, chunks=10)
+        filter_array = da.from_array(filter_.array, chunks=20)
         chunks = []
         for i, chunk in enumerate(filter_array.chunks):
             chunks.append([c * scale[i] for c in chunk])
@@ -65,6 +66,7 @@ class Classifier(BasicClassifier):
 
         predictions = da.map_blocks(self._predict_with_filter,
                                     filter_array,
+                                    delayed(self.model),
                                     slide.filename,
                                     type(slide._slide),
                                     self.model.image_info,
@@ -75,6 +77,7 @@ class Classifier(BasicClassifier):
 
     def _predict_with_filter(self,
                              filter_array,
+                             model,
                              slide_filename,
                              slide_cls,
                              image_info,
@@ -90,7 +93,7 @@ class Classifier(BasicClassifier):
                                  (loc[0][1] - loc[0][0],
                                   loc[1][1] - loc[1][0])).to_array(image_info)
 
-        predictions = self._model.predict(data[filter_array])
+        predictions = model.predict(data[filter_array])
         res[filter_array] = predictions
 
         return res
@@ -120,16 +123,18 @@ class Classifier(BasicClassifier):
         if filter_ is None:
             predictions = da.map_blocks(self._predict_patches,
                                         slide_array,
+                                        delayed(self._model),
                                         drop_axis=0,
                                         meta=np.array([], dtype='float32'),
                                         chunks=chunks)
         else:
-            chunks = (5, 5)
-            chunks = chunks if min(filter_.array.shape +
-                                   chunks) > chunks[0] else 'auto'
+            chunks = 20
+            #  chunks = chunks if min(filter_.array.shape +
+            #                         chunks) > chunks[0] else 'auto'
             filter_array = da.from_array(filter_.array, chunks=chunks)
             predictions = da.map_blocks(self._predict_patch_with_filter,
                                         filter_array,
+                                        delayed(self.model),
                                         slide.filename,
                                         type(slide._slide),
                                         level,
@@ -139,37 +144,39 @@ class Classifier(BasicClassifier):
 
     def _predict_patch_with_filter(self,
                                    filter_array,
+                                   model,
                                    slide_filename,
                                    slide_cls,
                                    level,
                                    block_info=None):
         predictions = np.zeros(filter_array.shape, dtype='float32')
-        if (filter_array == 0).all():
+        if np.count_nonzero(filter_array) == 0:
             return predictions
         loc = block_info[0]['array-location'][::-1]
         slide = slide_cls(slide_filename)
-        data = slide.read_region(
-            (loc[0][0] * self._patch_size[0], loc[1][0] * self._patch_size[1]),
-            level, ((loc[0][1] - loc[0][0]) * self._patch_size[0],
-                    (loc[1][1] - loc[1][0]) * self._patch_size[1])).to_array(
-                        self.model.image_info)
+        pos = (loc[0][0] * self._patch_size[0],
+               loc[1][0] * self._patch_size[1])
+        size = ((loc[0][1] - loc[0][0]) * self._patch_size[0],
+                (loc[1][1] - loc[1][0]) * self._patch_size[1])
+        data = slide.read_region(pos, level,
+                                 size).to_array(self.model.image_info)
 
         data = np.concatenate([
             np.split(row, data.shape[2] // self._patch_size[1], 2)
             for row in np.split(data, data.shape[1] // self._patch_size[0], 1)
         ])
-        filtered_predictions = self.model.predict(data[filter_array.flatten()])
+        filtered_predictions = model.predict(data[filter_array.flatten()])
         predictions[filter_array] = filtered_predictions
         return predictions
 
-    def _predict_patches(self, chunk):
+    def _predict_patches(self, chunk, model):
         final_shape = (chunk.shape[1] // self._patch_size[0],
                        chunk.shape[2] // self._patch_size[1])
         data = np.concatenate([
             np.split(row, final_shape[1], 2)
             for row in np.split(chunk, final_shape[0], 1)
         ])
-        predictions = self._model.predict(data).reshape(final_shape)
+        predictions = model.predict(data).reshape(final_shape)
         return predictions
 
     @staticmethod
