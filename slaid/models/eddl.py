@@ -10,6 +10,7 @@ import stringcase
 from pyeddl.tensor import Tensor
 
 from slaid.commons.base import ImageInfo
+from slaid.models import Factory as BaseFactory
 from slaid.models import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
@@ -19,6 +20,19 @@ logger.addHandler(fh)
 lock = threading.Lock()
 
 
+class Factory(BaseFactory):
+    def __init__(self, filename: str, gpu: List[int], batch: int = None):
+        super().__init__(filename)
+        self._gpu = gpu
+        self._batch = batch
+
+    def get_model(self):
+        basename = os.path.basename(self._filename)
+        cls_name = basename.split('-')[0]
+        cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+        return globals()[cls_name](self._filename, self._gpu, self._batch)
+
+
 class Model(BaseModel, ABC):
     patch_size = None
     image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
@@ -26,8 +40,9 @@ class Model(BaseModel, ABC):
     normalization_factor = 1
     index_prediction = 1
 
-    def __init__(self, weight_filename, gpu: List = None):
+    def __init__(self, weight_filename, gpu: List = None, batch: int = None):
         self._weight_filename = weight_filename
+        self.batch = batch
         self._gpu = gpu
         self._model_ = None
 
@@ -82,8 +97,8 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        tensor = Tensor.fromarray(array / self.normalization_factor)
         with lock:
+            tensor = Tensor.fromarray(array / self.normalization_factor)
             prediction = eddl.predict(self._model, [tensor])
 
         return prediction
@@ -99,6 +114,13 @@ class TissueModel(Model):
     index_prediction = 1
     image_info = ImageInfo(ImageInfo.COLORTYPE.RGB, ImageInfo.COORD.YX,
                            ImageInfo.CHANNEL.LAST)
+
+    def predict(self, array: np.ndarray) -> np.ndarray:
+        res = []
+        step = 1000000
+        for i in range(0, array.shape[0], step):
+            res.append(super().predict(array[i:i + step, ...]))
+        return np.concatenate(res)
 
     @staticmethod
     def _create_net():
@@ -151,6 +173,21 @@ class TumorModel(Model):
         x = eddl.ReLu(init(eddl.Dense(x, 256), seed))
         x = eddl.Softmax(eddl.Dense(x, num_classes))
         return x
+
+    def predict(self, array: np.ndarray) -> np.ndarray:
+        res = []
+        step = 5
+        for i in range(0, array.shape[0], step):
+            done = False
+            while not done:
+                try:
+                    res.append(super().predict(array[i:i + step, ...]))
+                    done = True
+                except RuntimeError as ex:
+                    logger.error(array[i:i + step, ...].shape)
+                    logger.exception(ex)
+                    raise ex
+        return np.concatenate(res)
 
 
 def load_model(weight_filename: str, gpu: List[int] = None) -> Model:
