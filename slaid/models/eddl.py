@@ -119,8 +119,9 @@ class TissueModel(Model):
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         res = []
-        for i in range(0, array.shape[0], self.batch):
-            res.append(super().predict(array[i:i + self.batch, ...]))
+        step = self.batch or array.shape[0]
+        for i in range(0, array.shape[0], step):
+            res.append(super().predict(array[i:i + step, ...]))
         return np.concatenate(res)
 
     @staticmethod
@@ -177,17 +178,10 @@ class TumorModel(Model):
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         res = []
-        step = self.batch // (self.patch_size[0] * self.patch_size[1])
+        step = self.batch // (self.patch_size[0] * self.patch_size[1]
+                              ) if self.batch else array.shape[0]
         for i in range(0, array.shape[0], step):
-            done = False
-            while not done:
-                try:
-                    res.append(super().predict(array[i:i + step, ...]))
-                    done = True
-                except RuntimeError as ex:
-                    logger.error(array[i:i + step, ...].shape)
-                    logger.exception(ex)
-                    raise ex
+            res.append(super().predict(array[i:i + step, ...]))
         return np.concatenate(res)
 
 
