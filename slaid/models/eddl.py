@@ -104,7 +104,9 @@ class Model(BaseModel, ABC):
         return prediction
 
     def __getstate__(self):
-        return dict(weight_filename=self._weight_filename, gpu=self._gpu)
+        return dict(weight_filename=self._weight_filename,
+                    gpu=self._gpu,
+                    batch=self.batch)
 
     def __setstate__(self, state):
         self.__init__(**state)
@@ -117,9 +119,8 @@ class TissueModel(Model):
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         res = []
-        step = 1000000
-        for i in range(0, array.shape[0], step):
-            res.append(super().predict(array[i:i + step, ...]))
+        for i in range(0, array.shape[0], self.batch):
+            res.append(super().predict(array[i:i + self.batch, ...]))
         return np.concatenate(res)
 
     @staticmethod
@@ -176,7 +177,7 @@ class TumorModel(Model):
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         res = []
-        step = 5
+        step = self.batch // (self.patch_size[0] * self.patch_size[1])
         for i in range(0, array.shape[0], step):
             done = False
             while not done:
