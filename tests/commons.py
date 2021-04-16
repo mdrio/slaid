@@ -4,22 +4,26 @@ import numpy as np
 from pyeddl.tensor import Tensor
 
 from slaid.commons import Slide
-from slaid.commons.base import Image
+from slaid.commons.base import Image, ImageInfo
 from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
-    color_type = Image.COLORTYPE.BGR
-    coords = Image.COORD.YX
-    channel = Image.CHANNEL.FIRST
+    image_info = ImageInfo('bgr', 'yx', 'first')
+
+    def __init__(self, patch_size=None):
+        self._patch_size = patch_size
 
     def __str__(self):
         return self.__class__.__name__
 
+    @property
+    def patch_size(self):
+        return self._patch_size
+
 
 class GreenModel(BaseModel):
-    def __init__(self, patch_size=None):
-        self.patch_size = patch_size
+    image_info = ImageInfo('rgb', 'yx', 'last')
 
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
@@ -42,7 +46,7 @@ class EddlGreenModel(BaseModel, EddlModel):
 
 class EddlGreenPatchModel(BaseModel, EddlModel):
     def __init__(self, patch_size=(256, 256)):
-        self.patch_size = patch_size
+        self._patch_size = patch_size
 
     @staticmethod
     def _create_net():
@@ -59,7 +63,7 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
 class BaseDummyModel(BaseModel):
     def __init__(self, patch_size=None):
-        self.patch_size = patch_size
+        self._patch_size = patch_size
         self.array_predicted = []
 
     def predict(self, array):
@@ -69,8 +73,14 @@ class BaseDummyModel(BaseModel):
     def _predict(self, array):
         raise NotImplementedError
 
+    @property
+    def patch_size(self):
+        return self._patch_size
+
 
 class DummyModel(BaseDummyModel):
+    image_info = ImageInfo('bgr', 'yx', 'first')
+
     def __init__(self, func, patch_size=None):
         self.func = func
         super().__init__(patch_size)
@@ -104,7 +114,7 @@ class DummySlide(Slide):
     def level_downsamples(self):
         return self._level_downsamples
 
-    def read_region(self, location: Tuple[int, int],
+    def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> Image:
         raise NotImplementedError()
 

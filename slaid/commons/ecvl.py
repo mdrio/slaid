@@ -1,3 +1,32 @@
+# NAPARI LAZY OPENSLIDE
+#  Copyright (c) 2020, Trevor Manz
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  * Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+#  * Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+#  * Neither the name of napari-lazy-openslide nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 import logging
 from typing import List, Tuple
 
@@ -7,36 +36,36 @@ from pyecvl.ecvl import Image as EcvlImage
 from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
 
 from slaid.commons import Image as BaseImage
-from slaid.commons import Slide as BaseSlide
+from slaid.commons import ImageInfo
+
+import slaid.commons.base as base
 
 logger = logging.getLogger('ecvl')
 
 
 class Image(BaseImage):
+    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+
     def __init__(self, image: EcvlImage):
         self._image = image
 
-    @property
-    def dimensions(self) -> Tuple[int, int]:
-        return tuple(self._image.dims_)
-
-    def to_array(self, colortype: "Image.COLORTYPE", coords: "Image.COORD",
-                 channel: 'Image.CHANNEL') -> np.ndarray:
-        array = np.array(self._image)  # cxy, BGR
-        if self.COLORTYPE(colortype) == self.COLORTYPE.RGB:
-            array = array[::-1, ...]
-        if self.COORD(coords) == self.COORD.YX:
-            array = np.transpose(array, [0, 2, 1])
-        if self.CHANNEL(channel) == self.CHANNEL.LAST:
-            array = np.transpose(array, [1, 2, 0])
+    def to_array(self, image_info: ImageInfo = None):
+        # FIXME
+        array = np.array(self._image).transpose(0, 2, 1)
+        if image_info is not None:
+            array = self.IMAGE_INFO.convert(array, image_info)
         return array
 
+    @property
+    def dimensions(self) -> Tuple[int, int]:
+        return self._image.Height(), self._image.Width()
 
-class Slide(BaseSlide):
+
+class BasicSlide(base.BasicSlide):
     def __init__(self, filename: str):
         self._level_dimensions = OpenSlideGetLevels(filename)
         if not self._level_dimensions:
-            raise BaseSlide.InvalidFile(
+            raise base.BasicSlide.InvalidFile(
                 f'Cannot open file {filename}, is it a slide image?')
         super().__init__(filename)
 
@@ -62,5 +91,5 @@ class Slide(BaseSlide):
 
 
 def load(filename: str):
-    slide = Slide(filename)
+    slide = BasicSlide(filename)
     return slide

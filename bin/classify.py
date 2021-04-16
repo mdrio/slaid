@@ -12,7 +12,7 @@ from slaid.runners import ParallelRunner, SerialRunner
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 
 
 def set_model(func, model):
@@ -30,7 +30,8 @@ def set_feature(func, feature):
 
 
 def get_parallel_classifier(model, feature):
-    from slaid.classifiers.dask import Classifier, init_client
+    from slaid.classifiers.dask import Classifier
+    from slaid.commons.dask import init_client
     init_client()
     return Classifier(model, feature)
 

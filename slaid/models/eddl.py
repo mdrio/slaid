@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 from abc import ABC, abstractstaticmethod
 from typing import List
 
@@ -7,37 +8,64 @@ import numpy as np
 import pyeddl.eddl as eddl
 import stringcase
 from pyeddl.tensor import Tensor
-from slaid.commons.base import Image
+
+from slaid.commons.base import ImageInfo
+from slaid.models import Factory as BaseFactory
 from slaid.models import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
+fh = logging.FileHandler('/tmp/eddl.log')
+logger.addHandler(fh)
+
+lock = threading.Lock()
+
+
+class Factory(BaseFactory):
+    def __init__(self, filename: str, gpu: List[int], batch: int = None):
+        super().__init__(filename)
+        self._gpu = gpu
+        self._batch = batch
+
+    def get_model(self):
+        basename = os.path.basename(self._filename)
+        cls_name = basename.split('-')[0]
+        cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+        return globals()[cls_name](self._filename, self._gpu, self._batch)
 
 
 class Model(BaseModel, ABC):
     patch_size = None
-    channel = Image.CHANNEL.FIRST
-    coords = Image.COORD.YX
-    color_type = Image.COLORTYPE.BGR
+    image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
+                           ImageInfo.CHANNEL.FIRST)
     normalization_factor = 1
     index_prediction = 1
 
-    def __init__(self, weight_filename, gpu: List = None):
+    def __init__(self, weight_filename, gpu: List = None, batch: int = None):
         self._weight_filename = weight_filename
+        self.batch = batch
         self._gpu = gpu
         self._model_ = None
 
     @property
-    def _model(self):
+    def weight_filename(self):
+        return self._weight_filename
+
+    def _get_model(self):
         if self._model_ is None:
             self._create_model()
         return self._model_
+
+    def _set_model(self, value):
+        self._model_ = value
+
+    _model = property(_get_model, _set_model)
 
     def __str__(self):
         return self._weight_filename
 
     def _set_gpu(self, value: List):
         self._gpu = value
-        self._create_model()
+        self._model = None
 
     def _get_gpu(self) -> List:
         return self._gpu
@@ -69,11 +97,16 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        tensor = Tensor.fromarray(array / self.normalization_factor)
-        return eddl.predict(self._model, [tensor])
+        with lock:
+            tensor = Tensor.fromarray(array / self.normalization_factor)
+            prediction = eddl.predict(self._model, [tensor])
+
+        return prediction
 
     def __getstate__(self):
-        return dict(weight_filename=self._weight_filename, gpu=self._gpu)
+        return dict(weight_filename=self._weight_filename,
+                    gpu=self._gpu,
+                    batch=self.batch)
 
     def __setstate__(self, state):
         self.__init__(**state)
@@ -81,8 +114,15 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
-    color_type = Image.COLORTYPE.RGB
-    channel = Image.CHANNEL.LAST
+    image_info = ImageInfo(ImageInfo.COLORTYPE.RGB, ImageInfo.COORD.YX,
+                           ImageInfo.CHANNEL.LAST)
+
+    def predict(self, array: np.ndarray) -> np.ndarray:
+        res = []
+        step = self.batch or array.shape[0]
+        for i in range(0, array.shape[0], step):
+            res.append(super().predict(array[i:i + step, ...]))
+        return np.concatenate(res)
 
     @staticmethod
     def _create_net():
@@ -136,9 +176,17 @@ class TumorModel(Model):
         x = eddl.Softmax(eddl.Dense(x, num_classes))
         return x
 
+    def predict(self, array: np.ndarray) -> np.ndarray:
+        res = []
+        step = self.batch // (self.patch_size[0] * self.patch_size[1]
+                              ) if self.batch else array.shape[0]
+        for i in range(0, array.shape[0], step):
+            res.append(super().predict(array[i:i + step, ...]))
+        return np.concatenate(res)
 
-def load_model(weight_filename: str) -> Model:
+
+def load_model(weight_filename: str, gpu: List[int] = None) -> Model:
     basename = os.path.basename(weight_filename)
     cls_name = basename.split('-')[0]
     cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-    return globals()[cls_name](weight_filename)
+    return globals()[cls_name](weight_filename, gpu)

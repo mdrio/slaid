@@ -1,7 +1,5 @@
 import logging
 import os
-import pickle
-from importlib import import_module
 from typing import List
 
 import numpy as np
@@ -10,25 +8,25 @@ from clize import parameters
 import slaid.commons.ecvl as ecvl
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
-from slaid.classifiers import BasicClassifier, do_filter
+from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
+from slaid.commons.base import do_filter
 from slaid.commons.dask import init_client
-from slaid.models.eddl import load_model
+from slaid.commons.factory import SlideFactory
+from slaid.models.factory import Factory as ModelFactory
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
 
-def get_slide(path, slide_reader):
-    slide_ext_with_dot = os.path.splitext(path)[-1]
-    slide_ext = slide_ext_with_dot[1:]
-    try:
-        return STORAGE.get(slide_ext, slide_reader).load(path)
-    except Exception as ex:
-        logging.error('an error occurs with file %s: %s', path, ex)
-
-
 class SerialRunner:
     CLASSIFIER = BasicClassifier
+
+    @staticmethod
+    def get_slide(path, slide_reader, tilesize):
+        try:
+            return SlideFactory(path, slide_reader, 'base').get_slide()
+        except Exception as ex:
+            logging.error('an error occurs with file %s: %s', path, ex)
 
     @staticmethod
     def convert_gpu_params(gpu: List[int]) -> List[int]:
@@ -44,7 +42,6 @@ class SerialRunner:
             *,
             output_dir: 'o',
             model: 'm',
-            n_batch: ('b', int) = 1,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
@@ -54,10 +51,11 @@ class SerialRunner:
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25,
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
+            tilesize: ('T', int) = 1024,
+            batch: ('b', int) = None,
             dry_run: bool = False):
         if dry_run:
             args = dict(locals())
@@ -65,40 +63,27 @@ class SerialRunner:
             print(args)
         else:
             gpu = cls.convert_gpu_params(gpu)
-            classifier = cls.get_classifier(model, feature, gpu)
+            classifier = cls.get_classifier(model, feature, gpu, batch)
             cls.prepare_output_dir(output_dir)
 
             slides = cls.classify_slides(input_path, output_dir, classifier,
-                                         n_batch, extraction_level, threshold,
-                                         writer, filter_,
-                                         overwrite_output_if_exists, no_round,
-                                         n_patch, filter_slide, slide_reader)
+                                         extraction_level, threshold, writer,
+                                         filter_, overwrite_output_if_exists,
+                                         no_round, filter_slide, slide_reader,
+                                         tilesize)
             return classifier, slides
 
     @classmethod
-    def get_classifier(cls, model, feature, gpu):
-        model = cls.get_model(model, gpu)
+    def get_classifier(cls, model, feature, gpu, batch):
+        model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
         return cls.CLASSIFIER(model, feature)
-
-    @staticmethod
-    def get_model(filename, gpu):
-        ext = os.path.splitext(filename)[-1]
-        if ext in ('.pkl', '.pickle'):
-            with open(filename, 'rb') as f:
-                model = pickle.load(f)
-        elif ext == '.bin':
-            model = load_model(filename)
-        else:
-            raise NotImplementedError(f'unsupported model type {ext}')
-        model.gpu = gpu
-        return model
 
     @staticmethod
     def prepare_output_dir(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    @staticmethod
-    def get_slides(input_path, slide_reader):
+    @classmethod
+    def get_slides(cls, input_path, slide_reader, tilesize):
 
         inputs = [
             os.path.abspath(os.path.join(input_path, f))
@@ -107,21 +92,20 @@ class SerialRunner:
             input_path)[-1][1:] not in STORAGE.keys() else [input_path]
         logging.info('processing inputs %s', inputs)
         for f in inputs:
-            yield get_slide(f, slide_reader)
+            yield cls.get_slide(f, slide_reader, tilesize)
 
     @classmethod
-    def classify_slides(cls, input_path, output_dir, classifier, n_batch,
+    def classify_slides(cls, input_path, output_dir, classifier,
                         extraction_level, threshold, writer, filter_,
-                        overwrite_output_if_exists, no_round, n_patch,
-                        filter_slide, slide_reader):
+                        overwrite_output_if_exists, no_round, filter_slide,
+                        slide_reader, tilesize):
 
         slides = []
-        slide_reader = import_module(f'slaid.commons.{slide_reader}')
-        for slide in cls.get_slides(input_path, slide_reader):
-            cls.classify_slide(slide, output_dir, classifier, n_batch,
-                               extraction_level, slide_reader, threshold,
-                               writer, filter_, overwrite_output_if_exists,
-                               no_round, n_patch, filter_slide)
+        for slide in cls.get_slides(input_path, slide_reader, tilesize):
+            cls.classify_slide(slide, output_dir, classifier, extraction_level,
+                               slide_reader, threshold, writer, filter_,
+                               overwrite_output_if_exists, no_round,
+                               filter_slide)
             slides.append(slide)
         return slides
 
@@ -130,7 +114,6 @@ class SerialRunner:
                        slide,
                        output_dir,
                        classifier,
-                       n_batch,
                        extraction_level,
                        slide_reader,
                        threshold=None,
@@ -138,12 +121,10 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       n_patch=25,
                        filter_slide=None):
 
         if filter_:
-            filter_slide = get_slide(filter_slide,
-                                     slide_reader) if filter_slide else slide
+            filter_slide = slide
             filter_ = do_filter(filter_slide, filter_)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')
@@ -156,12 +137,10 @@ class SerialRunner:
                 return slide
 
         mask = classifier.classify(slide,
-                                   n_batch=n_batch,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_0_100=not no_round,
-                                   n_patch=n_patch)
+                                   round_to_0_100=not no_round)
         feature = classifier.feature
         slide.masks[feature] = mask
         STORAGE[writer].dump(slide,
@@ -190,7 +169,6 @@ class ParallelRunner(SerialRunner):
             scheduler: str = None,
             output_dir: 'o',
             model: 'm',
-            n_batch: ('b', int) = 1,
             extraction_level: ('l', int) = 2,
             feature: 'f',
             threshold: ('t', float) = None,
@@ -200,10 +178,11 @@ class ParallelRunner(SerialRunner):
             filter_: 'F' = None,
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
-            n_patch: int = 25,
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
+            tilesize: ('T', int) = 1024,
+            batch: ('b', int) = None,
             dry_run: bool = False):
         kwargs = dict(locals())
         for key in ('cls', '__class__', 'processes', 'scheduler'):
@@ -214,3 +193,11 @@ class ParallelRunner(SerialRunner):
     @staticmethod
     def _init_client(scheduler, processes):
         init_client(address=scheduler, processes=processes)
+
+    @staticmethod
+    def get_slide(path, slide_reader, tilesize):
+        try:
+            return SlideFactory(path, slide_reader, 'dask',
+                                tilesize).get_slide()
+        except Exception as ex:
+            logging.error('an error occurs with file %s: %s', path, ex)
