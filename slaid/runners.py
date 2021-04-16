@@ -57,6 +57,13 @@ class SerialRunner:
             tilesize: ('T', int) = 1024,
             batch: ('b', int) = None,
             dry_run: bool = False):
+        """
+        :param batch: how many bytes will be predicted at once. Default: all tile is predicted (see tilesize)
+        :param tilesize: the size of the slide area read at once before prediction
+
+
+
+        """
         if dry_run:
             args = dict(locals())
             args.pop('cls')
