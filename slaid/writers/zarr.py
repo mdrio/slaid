@@ -6,7 +6,7 @@ import zarr
 
 from slaid.commons import Mask, BasicSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
-from slaid.writers import ReducedSlide, _dump_masks, _get_slide_metadata
+from slaid.writers import _dump_masks, _get_slide_metadata
 
 logger = logging.getLogger(__file__)
 
@@ -29,7 +29,8 @@ def load(path: str) -> BasicSlide:
     try:
         slide = EcvlSlide(group.attrs['filename'])
     except BasicSlide.InvalidFile:
-        slide = ReducedSlide(group.attrs['filename'])
+        # FIXME: workaround for cwl
+        slide = EcvlSlide(os.path.basename(group.attrs['filename']))
     for name, value in group.arrays():
         try:
             logger.info('loading mask %s, %s', name, value.attrs.asdict())

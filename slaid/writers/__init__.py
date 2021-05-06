@@ -4,10 +4,7 @@ from slaid.commons.base import Mask, Image, BasicSlide
 
 
 def _get_slide_metadata(slide: BasicSlide) -> dict:
-    return {
-        'filename': os.path.basename(slide.filename),
-        'resolution': slide.dimensions
-    }
+    return {'filename': slide.filename, 'resolution': slide.dimensions}
 
 
 def _dump_masks(path: str,
