@@ -131,7 +131,7 @@ class SerialRunner:
                        filter_slide=None):
 
         if filter_:
-            filter_slide = slide
+            filter_slide = cls.get_slide(filter_slide, slide_reader, 256)
             filter_ = do_filter(filter_slide, filter_)
         output_path = os.path.join(
             output_dir, f'{os.path.basename(slide.filename)}.{writer}')

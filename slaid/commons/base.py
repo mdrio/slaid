@@ -471,7 +471,7 @@ class BaseSlideFactory(abc.ABC):
                  slide_module: str,
                  tilesize: int = _TILESIZE,
                  image_info: ImageInfo = None):
-        self._filename = filename
+        self._filename = filename.rstrip('/')
         self._basic_slide_module = basic_slide_module
         self._slide_module = slide_module
         self._tilesize = tilesize
