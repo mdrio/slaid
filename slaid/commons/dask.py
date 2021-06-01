@@ -4,7 +4,7 @@ import os
 import dask.array as da
 import tiledb
 import zarr
-from dask.distributed import Client
+from dask.distributed import Client, progress
 
 from slaid.commons import Mask as BaseMask
 from slaid.commons.base import Slide as BaseSlide, SlideArray
@@ -41,7 +41,12 @@ class Mask(BaseMask):
         if overwrite and name in group:
             del group[name]
         if isinstance(self.array, da.Array):
-            da.to_zarr(self.array, path, compute=True)
+            task = da.to_zarr(self.array,
+                              path,
+                              compute=True,
+                              return_stored=True)
+            progress(task)
+
         else:
             zarr.save(path, self.array)
         array = group[os.path.basename(path)]
