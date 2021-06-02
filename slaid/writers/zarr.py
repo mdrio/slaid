@@ -23,6 +23,13 @@ def dump(slide: BasicSlide,
     _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
 
 
+def open(path, array_name, shape, slide, dtype):
+    group = zarr.open_group(path, mode='w')
+    if not group.attrs:
+        group.attrs.update(_get_slide_metadata(slide))
+    return group.create(array_name, shape=shape, dtype=dtype)
+
+
 def load(path: str) -> BasicSlide:
     logger.info('loading slide from zarr at path %s', path)
     group = zarr.open_group(path)

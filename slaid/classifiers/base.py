@@ -1,9 +1,10 @@
 import abc
 import logging
 from datetime import datetime as dt
+from typing import Tuple
 
-import dask.array as da
 import numpy as np
+from skimage.util import view_as_blocks
 
 from slaid.commons import BasicSlide, Mask, Slide
 from slaid.commons.base import Filter, ImageInfo
@@ -22,7 +23,8 @@ class Classifier(abc.ABC):
                  threshold: float = None,
                  level: int = 2,
                  n_batch: int = 1,
-                 round_to_0_100: bool = True) -> Mask:
+                 round_to_0_100: bool = True,
+                 region: Tuple[int, int, int, int] = None) -> Mask:
         pass
 
 
@@ -53,28 +55,63 @@ class BasicClassifier(Classifier):
                  threshold: float = None,
                  level: int = 2,
                  round_to_0_100: bool = True,
-                 max_MB_prediction=None) -> Mask:
+                 dest_array=None,
+                 chunk: Tuple[int, int] = None) -> Mask:
 
-        logger.info('classify: %s, %s, %s, %s, %s, %s', slide.filename,
-                    filter_, threshold, level, max_MB_prediction,
-                    round_to_0_100)
-        #  batches = self._get_batch_iterator(slide, level, n_batch,
-        #                                     self._color_type, self._coords,
-        #                                     self._channel)
-        logger.info('patch size %s', self._patch_size)
+        slide_array = self._get_slide_array(slide, level)
+        filter_ = filter_.rescale(slide_array.size) if filter_ else np.ones(
+            slide_array.size, dtype='bool')
+        chunk = chunk or slide_array.size
+        dest_array = dest_array if dest_array is not None else np.empty(
+            (0, slide_array.size[1]), dtype='float32')
+
         if self._patch_size:
             predictions = self._classify_patches(slide, self._patch_size,
                                                  level, filter_, threshold,
-                                                 round_to_0_100,
-                                                 max_MB_prediction)
+                                                 round_to_0_100)
         else:
-            predictions = self._classify_batches(slide, level, filter_,
-                                                 max_MB_prediction)
-        predictions = self._threshold(predictions, threshold)
-        predictions = self._round_to_0_100(predictions, round_to_0_100)
-        return self._get_mask(predictions, level,
+            dest_array = self._classify(slide_array, filter_, dest_array,
+                                        chunk, threshold, round_to_0_100)
+
+        return self._get_mask(dest_array, level,
                               slide.level_downsamples[level], dt.now(),
                               round_to_0_100)
+
+    def _classify(self, slide_array, filter_, dest_array, chunk, threshold,
+                  round_to_0_100):
+        filter_blocks = view_as_blocks(filter_, chunk)
+        array_blocks, channel_first = slide_array.get_blocks(chunk)
+        for x in range(filter_blocks.shape[0]):
+            row = np.empty((filter_blocks[x].shape[1], 0), dtype='float32')
+            print(row.shape)
+            for y in range(filter_blocks[x].shape[0]):
+                block = array_blocks[0, x,
+                                     y] if channel_first else array_blocks[x,
+                                                                           y,
+                                                                           0]
+                filter_block = filter_blocks[x, y]
+
+                res = np.zeros(filter_block.shape, dtype='float32')
+                to_predict = block[:,
+                                   filter_block] if channel_first else block[
+                                       filter_block, :]
+                prediction = self._predict(to_predict)
+                res[filter_block] = prediction
+                res = self._threshold(res, threshold)
+                res = self._round_to_0_100(res, round_to_0_100)
+                row = self._append(row, res, 1)
+            dest_array = self._append(dest_array, row, 0)
+            print(dest_array.shape)
+        return dest_array
+
+    @staticmethod
+    def _append(array, values, axis):
+        import zarr
+        if isinstance(array, np.ndarray):
+            return np.append(array, values, axis)
+        elif isinstance(array, zarr.core.Array):
+            array.append(values, axis)
+            return array
 
     @staticmethod
     def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
@@ -119,7 +156,6 @@ class BasicClassifier(Classifier):
 
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
-        #  return slide[level]
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
                                       max_MB_prediction):
@@ -151,7 +187,7 @@ class BasicClassifier(Classifier):
         return self._concatenate(predictions, 0)
 
     def _predict(self, area):
-        return self.model.predict(area.array)
+        return self.model.predict(area)
 
     def _classify_batch(self, batch, threshold, round_to_0_100):
         logger.debug('classify batch %s', batch)

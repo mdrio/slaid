@@ -15,13 +15,12 @@ from slaid.models.eddl import TissueModel, TumorModel
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0, 1])
-@pytest.mark.parametrize('backend', ['basic', 'dask'])
+@pytest.mark.parametrize('backend', ['basic'])
 @pytest.mark.parametrize('max_MB_prediction', [None])
 def test_classify_slide(green_slide_and_classifier, level, max_MB_prediction):
     green_slide, green_classifier = green_slide_and_classifier
-    mask = green_classifier.classify(green_slide,
-                                     level=level,
-                                     max_MB_prediction=max_MB_prediction)
+    mask = green_classifier.classify(green_slide, level=level)
+
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
     green_zone = int(300 // green_slide.level_downsamples[level])
     print(mask.array)

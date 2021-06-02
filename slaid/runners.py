@@ -14,6 +14,7 @@ from slaid.commons.base import do_filter
 from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
+from slaid.writers import _get_slide_metadata
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
@@ -143,17 +144,18 @@ class SerialRunner:
                     'See flag overwrite', slide.filename, classifier.feature)
                 return slide
 
+        chunk = (256, slide.level_dimensions[extraction_level][0])
+        dest_array = STORAGE[writer].open(
+            output_path, classifier.feature, (0, chunk[1]), slide,
+            'uint8' if not no_round else 'float32')
         mask = classifier.classify(slide,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_0_100=not no_round)
+                                   round_to_0_100=not no_round,
+                                   dest_array=dest_array)
         feature = classifier.feature
         slide.masks[feature] = mask
-        STORAGE[writer].dump(slide,
-                             output_path,
-                             overwrite=overwrite_output_if_exists,
-                             mask=feature)
         logging.info('output %s', output_path)
         return slide
 
