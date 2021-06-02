@@ -361,9 +361,11 @@ class SlideArray:
 
     def __getitem__(self, key) -> "SlideArray":
         if self._is_channel_first():
-            array = self._array[:, key[0], key[1]]
+            array = self._array[:, key[0], key[1]] if isinstance(
+                key, tuple) else self._array[:, key]
         else:
-            array = self._array[key[0], key[1], :]
+            array = self._array[key[0], key[1], :] if isinstance(
+                key, tuple) else self._array[key, :]
         return self.__class__(array, self._image_info)
 
     @property

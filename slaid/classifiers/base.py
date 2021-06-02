@@ -4,6 +4,7 @@ from datetime import datetime as dt
 from typing import Tuple
 
 import numpy as np
+from progress.bar import Bar
 from skimage.util import view_as_blocks
 
 from slaid.commons import BasicSlide, Mask, Slide
@@ -79,29 +80,24 @@ class BasicClassifier(Classifier):
 
     def _classify(self, slide_array, filter_, dest_array, chunk, threshold,
                   round_to_0_100):
-        filter_blocks = view_as_blocks(filter_, chunk)
-        array_blocks, channel_first = slide_array.get_blocks(chunk)
-        for x in range(filter_blocks.shape[0]):
-            row = np.empty((filter_blocks[x].shape[1], 0), dtype='float32')
-            print(row.shape)
-            for y in range(filter_blocks[x].shape[0]):
-                block = array_blocks[0, x,
-                                     y] if channel_first else array_blocks[x,
-                                                                           y,
-                                                                           0]
-                filter_block = filter_blocks[x, y]
+        with Bar('Processing', max=filter_.shape[0] // chunk[0]) as bar:
+            for x in range(0, filter_.shape[0], chunk[0]):
+                row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
+                               dtype='float32')
+                for y in range(0, filter_.shape[1], chunk[1]):
+                    block = slide_array[x:x + chunk[0], y:y + chunk[1]]
+                    filter_block = filter_[x:x + chunk[0], y:y + chunk[1]]
 
-                res = np.zeros(filter_block.shape, dtype='float32')
-                to_predict = block[:,
-                                   filter_block] if channel_first else block[
-                                       filter_block, :]
-                prediction = self._predict(to_predict)
-                res[filter_block] = prediction
-                res = self._threshold(res, threshold)
-                res = self._round_to_0_100(res, round_to_0_100)
-                row = self._append(row, res, 1)
-            dest_array = self._append(dest_array, row, 0)
-            print(dest_array.shape)
+                    res = np.zeros(filter_block.shape, dtype='float32')
+                    to_predict = block[filter_block]
+                    prediction = self._predict(to_predict)
+                    res[filter_block] = prediction
+                    res = self._threshold(res, threshold)
+                    res = self._round_to_0_100(res, round_to_0_100)
+                    row = self._append(row, res, 1)
+                dest_array = self._append(dest_array, row, 0)
+                bar.next()
+
         return dest_array
 
     @staticmethod
@@ -187,7 +183,7 @@ class BasicClassifier(Classifier):
         return self._concatenate(predictions, 0)
 
     def _predict(self, area):
-        return self.model.predict(area)
+        return self.model.predict(area.array)
 
     def _classify_batch(self, batch, threshold, round_to_0_100):
         logger.debug('classify batch %s', batch)

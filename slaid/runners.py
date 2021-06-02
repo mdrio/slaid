@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 from clize import parameters
@@ -14,7 +14,6 @@ from slaid.commons.base import do_filter
 from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
-from slaid.writers import _get_slide_metadata
 
 STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
 
@@ -53,6 +52,7 @@ class SerialRunner:
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             filter_slide: str = None,
+            chunk: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
             tilesize: ('T', int) = 1024,
@@ -65,6 +65,8 @@ class SerialRunner:
 
 
         """
+        chunk = tuple(int(i.strip())
+                      for i in chunk.split(',')) if chunk else None
         if dry_run:
             args = dict(locals())
             args.pop('cls')
@@ -73,12 +75,11 @@ class SerialRunner:
             gpu = cls.convert_gpu_params(gpu)
             classifier = cls.get_classifier(model, feature, gpu, batch)
             cls.prepare_output_dir(output_dir)
-
             slides = cls.classify_slides(input_path, output_dir, classifier,
                                          extraction_level, threshold, writer,
                                          filter_, overwrite_output_if_exists,
-                                         no_round, filter_slide, slide_reader,
-                                         tilesize)
+                                         no_round, filter_slide, chunk,
+                                         slide_reader, tilesize)
             return classifier, slides
 
     @classmethod
@@ -106,14 +107,14 @@ class SerialRunner:
     def classify_slides(cls, input_path, output_dir, classifier,
                         extraction_level, threshold, writer, filter_,
                         overwrite_output_if_exists, no_round, filter_slide,
-                        slide_reader, tilesize):
+                        chunk, slide_reader, tilesize):
 
         slides = []
         for slide in cls.get_slides(input_path, slide_reader, tilesize):
             cls.classify_slide(slide, output_dir, classifier, extraction_level,
                                slide_reader, threshold, writer, filter_,
                                overwrite_output_if_exists, no_round,
-                               filter_slide)
+                               filter_slide, chunk)
             slides.append(slide)
         return slides
 
@@ -129,7 +130,8 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       filter_slide=None):
+                       filter_slide=None,
+                       chunk=None):
 
         if filter_:
             filter_slide = cls.get_slide(filter_slide, slide_reader, 256)
@@ -144,16 +146,25 @@ class SerialRunner:
                     'See flag overwrite', slide.filename, classifier.feature)
                 return slide
 
-        chunk = (256, slide.level_dimensions[extraction_level][0])
+        chunk = chunk or (-1, -1)
+        tmp_chunk = list(chunk)
+        for i in range(len(chunk)):
+            if chunk[i] < 0:
+                tmp_chunk[i] = slide.level_dimensions[extraction_level][::-1][
+                    i]
+
+        chunk = tuple(tmp_chunk)
         dest_array = STORAGE[writer].open(
-            output_path, classifier.feature, (0, chunk[1]), slide,
+            output_path, classifier.feature,
+            (0, slide.level_dimensions[extraction_level][0]), slide,
             'uint8' if not no_round else 'float32')
         mask = classifier.classify(slide,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
                                    round_to_0_100=not no_round,
-                                   dest_array=dest_array)
+                                   dest_array=dest_array,
+                                   chunk=chunk)
         feature = classifier.feature
         slide.masks[feature] = mask
         logging.info('output %s', output_path)
