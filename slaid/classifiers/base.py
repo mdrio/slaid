@@ -5,7 +5,6 @@ from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
-from skimage.util import view_as_blocks
 
 from slaid.commons import BasicSlide, Mask, Slide
 from slaid.commons.base import Filter, ImageInfo
@@ -85,7 +84,9 @@ class BasicClassifier(Classifier):
                 row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
                                dtype='float32')
                 for y in range(0, filter_.shape[1], chunk[1]):
-                    block = slide_array[x:x + chunk[0], y:y + chunk[1]]
+                    block = slide_array[x:x + chunk[0],
+                                        y:y + chunk[1]].convert(
+                                            self.model.image_info)
                     filter_block = filter_[x:x + chunk[0], y:y + chunk[1]]
 
                     res = np.zeros(filter_block.shape, dtype='float32')
@@ -151,7 +152,8 @@ class BasicClassifier(Classifier):
                                                       max_MB_prediction)
 
     def _get_slide_array(self, slide, level):
-        return slide[level].convert(self.model.image_info)
+        #  return slide[level].convert(self.model.image_info)
+        return slide[level]
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
                                       max_MB_prediction):

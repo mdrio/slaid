@@ -16,7 +16,6 @@ import tiledb
 import zarr
 from napari_lazy_openslide import OpenSlideStore
 from napari_lazy_openslide.store import ArgumentError, init_attrs
-from skimage.util import view_as_blocks
 from zarr.storage import init_array, init_group
 
 _TILESIZE = 2048
@@ -318,7 +317,7 @@ class Slide(BasicSlide):
 
     def _create_slide(self, dataset):
         return SlideArray(self._read_from_store(dataset),
-                          self._slide.IMAGE_INFO).convert(self.image_info)
+                          self._slide.IMAGE_INFO)
 
     def _read_from_store(self, dataset):
         return zarr.open(store=self._store, path=dataset["path"], mode='r')
@@ -397,18 +396,6 @@ class SlideArray:
             array = self.array[filter_.array, :]
 
         return self.__class__(array, self._image_info)
-
-    def get_blocks(self, block_shape: Tuple[int,
-                                            int]) -> Tuple[np.ndarray, bool]:
-        if self._is_channel_first():
-            block_shape = (3, ) + block_shape
-            channel_first = True
-        else:
-
-            block_shape = block_shape + (3, )
-            channel_first = False
-        array = view_as_blocks(self.array, block_shape)
-        return array, channel_first
 
 
 def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
