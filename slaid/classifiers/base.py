@@ -1,18 +1,22 @@
 import abc
 import logging
 from datetime import datetime as dt
-from typing import Tuple
+from typing import Callable, Tuple
 
 import numpy as np
 from progress.bar import Bar
 
 from slaid.commons import BasicSlide, Mask, Slide
-from slaid.commons.base import Filter, ImageInfo
+from slaid.commons.base import ImageInfo
 from slaid.models import Model
 
 logger = logging.getLogger('classify')
 fh = logging.FileHandler('/tmp/base-classifier.log')
 logger.addHandler(fh)
+
+
+class InvalidChunkSize(Exception):
+    pass
 
 
 class Classifier(abc.ABC):
@@ -24,16 +28,20 @@ class Classifier(abc.ABC):
                  level: int = 2,
                  n_batch: int = 1,
                  round_to_0_100: bool = True,
-                 region: Tuple[int, int, int, int] = None) -> Mask:
+                 chunk: Tuple[int, int] = None) -> Mask:
         pass
 
 
 class BasicClassifier(Classifier):
     MASK_CLASS = Mask
 
-    def __init__(self, model: "Model", feature: str):
+    def __init__(self,
+                 model: "Model",
+                 feature: str,
+                 array_factory: Callable = np.empty):
         self._model = model
         self.feature = feature
+        self._array_factory = array_factory
         try:
             self._patch_size = self._model.patch_size
             self._image_info = model.image_info
@@ -55,34 +63,37 @@ class BasicClassifier(Classifier):
                  threshold: float = None,
                  level: int = 2,
                  round_to_0_100: bool = True,
-                 dest_array=None,
                  chunk: Tuple[int, int] = None) -> Mask:
 
         slide_array = self._get_slide_array(slide, level)
-        filter_ = filter_.rescale(slide_array.size) if filter_ else np.ones(
-            slide_array.size, dtype='bool')
         chunk = chunk or slide_array.size
-        dest_array = dest_array if dest_array is not None else np.empty(
-            (0, slide_array.size[1]), dtype='float32')
+        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
 
         if self._patch_size:
-            predictions = self._classify_patches(slide, self._patch_size,
-                                                 level, filter_, threshold,
-                                                 round_to_0_100)
+            predictions = self._classify_patches(slide_array, filter_, chunk,
+                                                 threshold, round_to_0_100,
+                                                 dtype)
         else:
-            dest_array = self._classify(slide_array, filter_, dest_array,
-                                        chunk, threshold, round_to_0_100)
-
-        return self._get_mask(dest_array, level,
+            predictions = self._classify_pixels(slide_array, filter_, chunk,
+                                                threshold, round_to_0_100,
+                                                dtype)
+        return self._get_mask(predictions, level,
                               slide.level_downsamples[level], dt.now(),
                               round_to_0_100)
 
-    def _classify(self, slide_array, filter_, dest_array, chunk, threshold,
-                  round_to_0_100):
+    def _classify_pixels(self, slide_array, filter_, chunk, threshold,
+                         round_to_0_100, dtype):
+        predictions = self._array_factory((0, slide_array.size[1]),
+                                          dtype=dtype)
+        if filter_:
+            filter_.rescale(slide_array.size)
+            filter_ = filter_.array
+        else:
+            filter_ = np.ones(slide_array.size, dtype='bool')
         with Bar('Processing', max=filter_.shape[0] // chunk[0]) as bar:
             for x in range(0, filter_.shape[0], chunk[0]):
                 row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
-                               dtype='float32')
+                               dtype=dtype)
                 for y in range(0, filter_.shape[1], chunk[1]):
                     block = slide_array[x:x + chunk[0],
                                         y:y + chunk[1]].convert(
@@ -91,15 +102,16 @@ class BasicClassifier(Classifier):
 
                     res = np.zeros(filter_block.shape, dtype='float32')
                     to_predict = block[filter_block]
-                    prediction = self._predict(to_predict)
-                    res[filter_block] = prediction
+                    if to_predict:
+                        prediction = self._predict(to_predict.array)
+                        res[filter_block] = prediction
                     res = self._threshold(res, threshold)
                     res = self._round_to_0_100(res, round_to_0_100)
                     row = self._append(row, res, 1)
-                dest_array = self._append(dest_array, row, 0)
+                predictions = self._append(predictions, row, 0)
                 bar.next()
 
-        return dest_array
+        return predictions
 
     @staticmethod
     def _append(array, values, axis):
@@ -130,106 +142,67 @@ class BasicClassifier(Classifier):
                                round_to_0_100,
                                model=str(self._model))
 
-    def _classify_patches(self,
-                          slide: BasicSlide,
-                          patch_size,
-                          level,
-                          filter_: Filter,
-                          threshold,
-                          round_to_0_100: bool = True,
-                          max_MB_prediction=None) -> Mask:
-        raise NotImplementedError()
+    def _classify_patches(self, slide_array, filter_, chunk, threshold,
+                          round_to_0_100, dtype):
+        predictions = self._array_factory(
+            (0, slide_array.size[1] // self._patch_size[1]), dtype=dtype)
+        filter_ = filter_ if filter_ else np.ones(
+            (slide_array.size[0] // self._patch_size[0],
+             slide_array.size[1] // self._patch_size[1]),
+            dtype='bool')
+        for i in range(2):
+            if chunk[i] % self._patch_size[i] > 0 and chunk[
+                    i] < slide_array.size[i]:
+                raise InvalidChunkSize(
+                    f'Invalid chunk size {chunk}: should be a multiple of {self._patch_size}'
+                )
+        with Bar('Processing',
+                 max=slide_array.size[0] // chunk[0]) as progress_bar:
+            for x in range(0, slide_array.size[0], chunk[0]):
+                row_size = min(chunk[0], slide_array.size[0] - x)
+                row_size = row_size - (row_size % self._patch_size[0])
+                if not row_size:
+                    break
+                row = np.empty((row_size // self._patch_size[0], 0),
+                               dtype=dtype)
 
-    def _classify_batches(self, slide, level, filter_, max_MB_prediction):
-        slide_array = self._get_slide_array(slide, level)
-        if filter_ is None:
-            return self._classify_batches_no_filter(slide_array,
-                                                    max_MB_prediction)
+                for y in range(0, slide_array.size[1], chunk[1]):
+                    col_size = min(chunk[1], slide_array.size[1] - y)
+                    col_size = col_size - (col_size % self._patch_size[1])
+                    if not col_size:
+                        break
+                    chunked_array = slide_array[x:x + row_size,
+                                                y:y + col_size].convert(
+                                                    self.model.image_info)
+                    patches, channel_first = chunked_array.get_blocks(
+                        self._patch_size)
 
-        else:
-            return self._classify_batches_with_filter(slide, slide_array,
-                                                      level, filter_,
-                                                      max_MB_prediction)
+                    filter_block = filter_[
+                        x // self._patch_size[0]:(x + row_size) //
+                        self._patch_size[0],
+                        y // self._patch_size[1]:(y + col_size) //
+                        self._patch_size[1]]
+                    res = np.zeros(filter_block.shape, dtype='float32')
+                    to_predict = patches[:, filter_block,
+                                         ...] if channel_first else patches[
+                                             filter_block, :, ...]
+                    to_predict = to_predict.reshape((to_predict.shape[0] *
+                                                     to_predict.shape[1], ) +
+                                                    to_predict.shape[2:])
+                    if to_predict.shape[0] > 0:
+                        prediction = self._predict(to_predict)
+                        res[filter_block] = prediction
+                        res = self._threshold(res, threshold)
+                        res = self._round_to_0_100(res, round_to_0_100)
+
+                    row = self._append(row, res, 1)
+                predictions = self._append(predictions, row, 0)
+                progress_bar.next()
+        return predictions
 
     def _get_slide_array(self, slide, level):
         #  return slide[level].convert(self.model.image_info)
         return slide[level]
 
-    def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
-                                      max_MB_prediction):
-
-        filter_.rescale(slide_array.size)
-        res = np.zeros(slide_array.size[0] * slide_array.size[1],
-                       dtype='float32')
-        prediction = self._model.predict(slide_array.array[filter_.array])
-        res[filter_.array.reshape(res.shape)] = prediction
-        res = res.reshape(slide_array.size)
-        return res
-
-    def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
-        predictions = []
-        step = slide_array.size[0] if max_MB_prediction is None else round(
-            max_MB_prediction * 10**6 // (3 * slide_array.size[1]))
-        logger.info('max_MB_prediction %s, size_1 %s step %s, n_batch %s',
-                    max_MB_prediction, slide_array.size[1], step,
-                    slide_array.size[1] // step)
-        for i in range(0, slide_array.size[0], step):
-            area = slide_array[i:i + step, :]
-            n_px = area.size[0] * area.size[1]
-            area_reshaped = area.reshape((n_px, ))
-
-            prediction = self._predict(area_reshaped)
-
-            prediction = prediction.reshape(area.size[0], area.size[1])
-            predictions.append(prediction)
-        return self._concatenate(predictions, 0)
-
-    def _predict(self, area):
-        return self.model.predict(area.array)
-
-    def _classify_batch(self, batch, threshold, round_to_0_100):
-        logger.debug('classify batch %s', batch)
-        # FIXME
-        filter_ = None
-        array = batch.array()
-        logger.debug('get array')
-        orig_shape = batch.shape
-        if filter_ is not None:
-            indexes_pixel_to_process = filter_.filter(batch)
-            array = array[indexes_pixel_to_process]
-        else:
-            logger.debug('flattening batch')
-            array = batch.flatten()
-
-        logger.debug('start predictions')
-        prediction = self._classify_array(array, threshold, round_to_0_100)
-        #      self._classify_array(_, threshold, round_to_0_100)
-        #  prediction = np.concatenate([
-        #      self._classify_array(_, threshold, round_to_0_100)
-        #      for _ in np.array_split(array, 10000)
-        #  ])
-        #  logger.debug('end predictions')
-        #      self._classify_array(_, threshold, round_to_0_100)
-        if filter_ is not None:
-            res = np.zeros(orig_shape[:2], dtype=prediction.dtype)
-            res[indexes_pixel_to_process] = prediction
-        else:
-            res = prediction.reshape(orig_shape[:2])
-        return res
-
-    def _classify_array(self, array, threshold, round_to_0_100) -> np.ndarray:
-        logger.debug('classify array')
-        prediction = self.model.predict(array)
-        if round_to_0_100:
-            prediction = prediction * 100
-            return prediction.astype('uint8')
-        if threshold:
-            prediction[prediction >= threshold] = 1
-            prediction[prediction < threshold] = 0
-            return prediction.astype('uint8')
-
-        return prediction.astype('float32')
-
-    @staticmethod
-    def _concatenate(seq, axis):
-        return np.concatenate(seq, axis)
+    def _predict(self, array):
+        return self.model.predict(array)

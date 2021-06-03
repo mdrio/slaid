@@ -178,7 +178,7 @@ class TestParallelEddlClassifier(TestSerialEddlClassifier):
 
 class TestPatchClassifier:
     model = 'tests/models/all_one_by_patch.pkl'
-    cmd = 'parallel'
+    cmd = 'serial'
     feature = 'tumor'
 
     def test_classifies_with_default_args(self, tmp_path):

@@ -3,8 +3,8 @@ import logging
 import dask.array as da
 import numpy as np
 
-from slaid.classifiers.base import BasicClassifier, Filter
-from slaid.commons import BasicSlide, Slide
+from slaid.classifiers.base import BasicClassifier
+from slaid.commons import BasicSlide, Slide, Filter
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
 from dask import delayed

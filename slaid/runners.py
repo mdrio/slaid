@@ -73,7 +73,7 @@ class SerialRunner:
             print(args)
         else:
             gpu = cls.convert_gpu_params(gpu)
-            classifier = cls.get_classifier(model, feature, gpu, batch)
+            classifier = cls.get_classifier(model, feature, gpu, batch, writer)
             cls.prepare_output_dir(output_dir)
             slides = cls.classify_slides(input_path, output_dir, classifier,
                                          extraction_level, threshold, writer,
@@ -83,9 +83,14 @@ class SerialRunner:
             return classifier, slides
 
     @classmethod
-    def get_classifier(cls, model, feature, gpu, batch):
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
         model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
-        return cls.CLASSIFIER(model, feature)
+        return cls.CLASSIFIER(model, feature, STORAGE[writer].empty)
 
     @staticmethod
     def prepare_output_dir(output_dir):
@@ -154,19 +159,18 @@ class SerialRunner:
                     i]
 
         chunk = tuple(tmp_chunk)
-        dest_array = STORAGE[writer].open(
-            output_path, classifier.feature,
-            (0, slide.level_dimensions[extraction_level][0]), slide,
-            'uint8' if not no_round else 'float32')
         mask = classifier.classify(slide,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
                                    round_to_0_100=not no_round,
-                                   dest_array=dest_array,
                                    chunk=chunk)
         feature = classifier.feature
         slide.masks[feature] = mask
+        STORAGE[writer].dump(slide,
+                             output_path,
+                             overwrite=overwrite_output_if_exists,
+                             mask=feature)
         logging.info('output %s', output_path)
         return slide
 

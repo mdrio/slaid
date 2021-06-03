@@ -1,10 +1,11 @@
 import logging
 import os
 from datetime import datetime as dt
+from tempfile import TemporaryDirectory
 
 import zarr
 
-from slaid.commons import Mask, BasicSlide
+from slaid.commons import BasicSlide, Mask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.writers import _dump_masks, _get_slide_metadata
 
@@ -23,11 +24,9 @@ def dump(slide: BasicSlide,
     _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
 
 
-def open(path, array_name, shape, slide, dtype):
-    group = zarr.open_group(path, mode='w')
-    if not group.attrs:
-        group.attrs.update(_get_slide_metadata(slide))
-    return group.create(array_name, shape=shape, dtype=dtype)
+def empty(shape, dtype):
+    temp_dir = TemporaryDirectory(suffix='.zarr')
+    return zarr.open(temp_dir.name, shape=shape, dtype=dtype)
 
 
 def load(path: str) -> BasicSlide:
