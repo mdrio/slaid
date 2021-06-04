@@ -16,9 +16,8 @@ from slaid.models.eddl import TissueModel, TumorModel
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0, 1])
-@pytest.mark.parametrize('backend', ['basic'])
-@pytest.mark.parametrize('max_MB_prediction', [None])
-def test_classify_slide(green_slide_and_classifier, level, max_MB_prediction):
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
+def test_classify_slide(green_slide_and_classifier, level):
     green_slide, green_classifier = green_slide_and_classifier
     mask = green_classifier.classify(green_slide, level=level)
 
@@ -31,7 +30,7 @@ def test_classify_slide(green_slide_and_classifier, level, max_MB_prediction):
 
 @pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
 @pytest.mark.parametrize('level', [0, 1])
-@pytest.mark.parametrize('backend', ['basic'])
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
 @pytest.mark.parametrize('max_MB_prediction', [None])
 def test_classify_with_filter(green_slide_and_classifier, level,
                               max_MB_prediction):
@@ -56,11 +55,8 @@ def test_classify_with_filter(green_slide_and_classifier, level,
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
-#  @pytest.mark.parametrize('backend', ['basic', 'dask'])
-@pytest.mark.parametrize('backend', ['basic'])
-@pytest.mark.parametrize('max_MB_prediction', [None])
-def test_classify_slide_by_patches(green_slide_and_patch_classifier, level,
-                                   max_MB_prediction):
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
+def test_classify_slide_by_patches(green_slide_and_patch_classifier, level):
     green_slide, green_classifier = green_slide_and_patch_classifier
     mask = green_classifier.classify(green_slide, level=level)
 
@@ -78,11 +74,9 @@ def test_classify_slide_by_patches(green_slide_and_patch_classifier, level,
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
-#  @pytest.mark.parametrize('backend', ['basic', 'dask'])
-@pytest.mark.parametrize('backend', ['basic'])
-@pytest.mark.parametrize('max_MB_prediction', [None])
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide_by_patches_with_filter_all_zeros(
-        green_slide_and_patch_classifier, level, max_MB_prediction):
+        green_slide_and_patch_classifier, level):
     green_slide, green_classifier = green_slide_and_patch_classifier
     filter_array = np.zeros((green_slide.level_dimensions[level][1] //
                              green_classifier.model.patch_size[0],
@@ -102,11 +96,9 @@ def test_classify_slide_by_patches_with_filter_all_zeros(
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
-#  @pytest.mark.parametrize('backend', ['basic', 'dask'])
-@pytest.mark.parametrize('backend', ['basic'])
-@pytest.mark.parametrize('max_MB_prediction', [None])
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide_by_patches_with_filter(
-        green_slide_and_patch_classifier, level, max_MB_prediction):
+        green_slide_and_patch_classifier, level):
     green_slide, green_classifier = green_slide_and_patch_classifier
     filter_array = np.zeros((green_slide.level_dimensions[level][1] //
                              green_classifier.model.patch_size[0],

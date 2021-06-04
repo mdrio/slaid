@@ -214,6 +214,16 @@ class ParallelRunner(SerialRunner):
         cls._init_client(scheduler, processes)
         return super().run(**kwargs)
 
+    @classmethod
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
+        model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
+        return cls.CLASSIFIER(model, feature)
+
     @staticmethod
     def _init_client(scheduler, processes):
         init_client(address=scheduler, processes=processes)

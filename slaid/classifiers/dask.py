@@ -1,13 +1,14 @@
 import logging
+from datetime import datetime as dt
 
 import dask.array as da
 import numpy as np
+from dask import delayed
 
 from slaid.classifiers.base import BasicClassifier
-from slaid.commons import BasicSlide, Slide, Filter
+from slaid.commons import BasicSlide, Filter, Slide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
-from dask import delayed
 
 logger = logging.getLogger('dask')
 logger.setLevel(logging.DEBUG)
@@ -26,19 +27,39 @@ class Classifier(BasicClassifier):
                  threshold: float = None,
                  level: int = 2,
                  round_to_0_100: bool = True,
-                 max_MB_prediction=None) -> Mask:
-        mask = super().classify(slide, filter_, threshold, level,
-                                round_to_0_100, max_MB_prediction)
+                 chunk=None) -> Mask:
+        logger.info('patch size %s', self._patch_size)
+        if self._patch_size:
+            predictions = self._classify_patches(slide, self._patch_size,
+                                                 level, filter_, threshold,
+                                                 round_to_0_100, chunk)
+        else:
+            predictions = self._classify_batches(slide, level, filter_, chunk)
+        predictions = self._threshold(predictions, threshold)
+        predictions = self._round_to_0_100(predictions, round_to_0_100)
+        mask = self._get_mask(predictions, level,
+                              slide.level_downsamples[level], dt.now(),
+                              round_to_0_100)
+
         if self.compute_mask:
             mask.compute()
         return mask
+
+    def _classify_batches(self, slide, level, filter_, chunk):
+        slide_array = self._get_slide_array(slide, level)
+        if filter_ is None:
+            return self._classify_batches_no_filter(slide_array, chunk)
+
+        else:
+            return self._classify_batches_with_filter(slide, slide_array,
+                                                      level, filter_, chunk)
 
     def _predict_batch(self, array, model):
         n_px = array.shape[0] * array.shape[1]
         p = model.predict(array.reshape((n_px, 3))).reshape(array.shape[:2])
         return p
 
-    def _classify_batches_no_filter(self, slide_array, max_MB_prediction):
+    def _classify_batches_no_filter(self, slide_array, _chunk):
         prediction = slide_array.array.map_blocks(self._predict_batch,
                                                   delayed(self._model),
                                                   meta=np.array(
@@ -47,7 +68,7 @@ class Classifier(BasicClassifier):
         return prediction
 
     def _classify_batches_with_filter(self, slide, slide_array, level, filter_,
-                                      max_MB_prediction):
+                                      chunk):
 
         size = slide_array.size
         scale = (size[0] // filter_.array.shape[0],
@@ -55,8 +76,8 @@ class Classifier(BasicClassifier):
 
         filter_array = da.from_array(filter_.array, chunks=20)
         chunks = []
-        for i, chunk in enumerate(filter_array.chunks):
-            chunks.append([c * scale[i] for c in chunk])
+        for i, _chunk in enumerate(filter_array.chunks):
+            chunks.append([c * scale[i] for c in _chunk])
         filter_array = da.map_blocks(
             lambda x, scale: x.repeat(scale[0], 0).repeat(scale[1], 1),
             filter_array,
@@ -105,7 +126,7 @@ class Classifier(BasicClassifier):
                           filter_: Filter,
                           threshold,
                           round_to_0_100: bool = True,
-                          max_MB_prediction=None) -> Mask:
+                          chunk=None) -> Mask:
         slide_array = self._get_slide_array(slide, level).array
 
         shape_1 = slide_array.shape[1] - (slide_array.shape[1] %

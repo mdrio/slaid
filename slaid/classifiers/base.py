@@ -65,7 +65,7 @@ class BasicClassifier(Classifier):
                  round_to_0_100: bool = True,
                  chunk: Tuple[int, int] = None) -> Mask:
 
-        slide_array = self._get_slide_array(slide, level)
+        slide_array = slide[level]
         chunk = chunk or slide_array.size
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
 
@@ -202,8 +202,7 @@ class BasicClassifier(Classifier):
         return predictions
 
     def _get_slide_array(self, slide, level):
-        #  return slide[level].convert(self.model.image_info)
-        return slide[level]
+        return slide[level].convert(self.model.image_info)
 
     def _predict(self, array):
         return self.model.predict(array)
