@@ -90,6 +90,7 @@ class BasicClassifier(Classifier):
             filter_ = filter_.array
         else:
             filter_ = np.ones(slide_array.size, dtype='bool')
+
         with Bar('Processing', max=filter_.shape[0] // chunk[0]) as bar:
             for x in range(0, filter_.shape[0], chunk[0]):
                 row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
@@ -101,8 +102,8 @@ class BasicClassifier(Classifier):
                     filter_block = filter_[x:x + chunk[0], y:y + chunk[1]]
 
                     res = np.zeros(filter_block.shape, dtype='float32')
-                    to_predict = block[filter_block]
-                    if to_predict:
+                    if (filter_block == True).any():
+                        to_predict = block[filter_block]
                         prediction = self._predict(to_predict.array)
                         res[filter_block] = prediction
                     res = self._threshold(res, threshold)
