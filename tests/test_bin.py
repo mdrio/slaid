@@ -7,10 +7,11 @@ import subprocess
 import unittest
 
 import numpy as np
+import pytest
 import zarr
 
-from slaid.writers.zarr import ZarrDirectoryStorage
 from slaid.commons.ecvl import BasicSlide as Slide
+from slaid.writers import REGISTRY
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -26,6 +27,88 @@ def get_input_output(output):
     slide = Slide(input_)
     zarr_group = zarr.open_group(output)
     return slide, zarr_group
+
+
+def _test_output(feature, output, slide, level):
+    assert output.attrs['filename'] == slide.filename
+    assert tuple(output.attrs['resolution']) == slide.dimensions
+    assert output[feature].shape == slide.level_dimensions[level][::-1]
+    assert output[feature].attrs['extraction_level'] == level
+    assert output[feature].attrs[
+        'level_downsample'] == slide.level_downsamples[level]
+
+
+@pytest.mark.parametrize('cmd', ['serial', 'parallel'])
+@pytest.mark.parametrize(
+    'model',
+    ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
+def test_classifies_with_default_args(cmd, tmp_path, model):
+    feature = 'tissue'
+    path = str(tmp_path)
+    cmd = [
+        'classify.py', cmd, '-f', feature, '-m', model, '-l', '2', '-o', path,
+        input_
+    ]
+    subprocess.check_call(cmd)
+    logger.info('running cmd %s', ' '.join(cmd))
+    output_path = os.path.join(path, f'{input_basename}.zarr')
+    slide, output = get_input_output(output_path)
+
+    _test_output(feature, output, slide, 2)
+    assert output[feature].dtype == 'uint8'
+
+
+@pytest.mark.parametrize('cmd', ['serial', 'parallel'])
+@pytest.mark.parametrize(
+    'model',
+    ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
+def test_classifies_with_no_round(cmd, tmp_path, model):
+    path = str(tmp_path)
+    feature = 'tissue'
+    cmd = [
+        'classify.py', cmd, '-f', feature, '-m', model, '--no-round', '-l',
+        '2', '-o', path, input_
+    ]
+    subprocess.check_call(cmd)
+    logger.info('running cmd %s', ' '.join(cmd))
+    output_path = os.path.join(path, f'{input_basename}.zarr')
+    slide, output = get_input_output(output_path)
+
+    assert output[feature].dtype == 'float32'
+    assert (np.array(output[feature]) <= 1).all()
+
+
+#  @pytest.mark.parametrize('cmd', ['serial', 'parallel'])
+#  @pytest.mark.parametrize(
+#      'model',
+#      ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
+#  @pytest.mark.parametrize('storage', ['zarr', 'zarr-zip'])
+#  def test_classifies_with_array_input(cmd, tmp_path, model, slide_with_mask,
+#                                       storage):
+#      feature = 'tissue'
+#      slide = slide_with_mask(np.ones)
+#      path = str(tmp_path)
+#      slide_path = os.path.join(path,
+#                                f'{os.path.basename(slide.filename)}.{storage}')
+#      REGISTRY[storage].dump(slide, slide_path)
+#
+#      cmd = [
+#          'classify.py',
+#          cmd,
+#          '-f',
+#          feature,
+#          '-m',
+#          model,
+#          '-o',
+#          path,
+#          slide_path,
+#      ]
+#      logger.info('cmd %s', ' '.join(cmd))
+#      subprocess.check_call(cmd)
+#      output = REGISTRY[storage].load(slide_path)
+#      assert 'mask' in output.masks
+#      assert feature in output.masks
+#
 
 
 class TestSerialEddlClassifier:
@@ -131,10 +214,6 @@ class TestSerialEddlClassifier:
         self._test_output(output, slide, 2)
 
 
-class TestParallelEddlClassifier(TestSerialEddlClassifier):
-    cmd = 'parallel'
-
-
 class TestSerialPatchClassifier:
     model = 'tests/models/all_one_by_patch.pkl'
     cmd = 'serial'
@@ -191,16 +270,19 @@ class TestSerialPatchClassifier:
         assert (np.array(output[self.feature]) <= 1).all()
 
 
-def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
-                                tmpdir):
-    path = f'{tmp_path}.zarr'
+@pytest.mark.parametrize('cmd', ['serial'])
+@pytest.mark.parametrize('storage', ['zarr-zip'])
+def test_classifies_with_filter(cmd, slide_with_mask, tmp_path,
+                                model_all_ones_path, tmpdir, storage):
+    path = f'{tmp_path}.{storage}'
     slide = slide_with_mask(np.ones)
     condition = 'mask>2'
-    ZarrDirectoryStorage.dump(slide, path)
+    REGISTRY[storage].dump(slide, path)
+    REGISTRY[storage].load(path)
 
     cmd = [
         'classify.py',
-        'parallel',
+        cmd,
         '-f',
         'test',
         '-m',

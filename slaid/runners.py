@@ -21,10 +21,7 @@ class SerialRunner:
 
     @staticmethod
     def get_slide(path, slide_reader, tilesize):
-        try:
-            return SlideFactory(path, slide_reader, 'base').get_slide()
-        except Exception as ex:
-            logging.error('an error occurs with file %s: %s', path, ex)
+        return SlideFactory(path, slide_reader, 'base').get_slide()
 
     @staticmethod
     def convert_gpu_params(gpu: List[int]) -> List[int]:
