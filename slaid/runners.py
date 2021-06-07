@@ -63,7 +63,7 @@ class SerialRunner:
 
         """
         if chunk:
-            chunk = tuple(chunk, chunk)
+            chunk = (chunk, chunk)
             tilesize = chunk
         else:
             tilesize = DEFAULT_TILESIZE
