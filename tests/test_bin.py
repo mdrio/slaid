@@ -9,10 +9,8 @@ import unittest
 import numpy as np
 import zarr
 
-import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.commons.ecvl import BasicSlide as Slide
-from slaid.runners import SerialRunner
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -53,9 +51,9 @@ class TestSerialEddlClassifier:
         assert tuple(output.attrs['resolution']) == slide.dimensions
         assert output[
             self.feature].shape == slide.level_dimensions[level][::-1]
-        assert output[self.feature].attrs['extraction_level'] == level
-        assert output[self.feature].attrs[
-            'level_downsample'] == slide.level_downsamples[level]
+        #  assert output[self.feature].attrs['extraction_level'] == level
+        #  assert output[self.feature].attrs[
+        #      'level_downsample'] == slide.level_downsamples[level]
 
     def test_classifies_with_default_args(self, tmp_path):
         path = str(tmp_path)
@@ -85,28 +83,6 @@ class TestSerialEddlClassifier:
         assert output[self.feature].dtype == 'float32'
         assert (np.array(output[self.feature]) <= 1).all()
 
-    def test_classifies_with_tiledb_as_output(self, tmp_path):
-        level = 1
-        cmd = [
-            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            input_, '-w', 'tiledb', '-l',
-            str(level), '-o',
-            str(tmp_path)
-        ]
-        logger.info('cmd %s', ' '.join(cmd))
-        subprocess.check_call(cmd)
-        output_path = os.path.join(str(tmp_path), f'{input_basename}.tiledb')
-        logger.info('checking output_path %s', output_path)
-        output = tiledb_io.load(output_path)
-
-        assert os.path.basename(output.filename) == os.path.basename(
-            slide.filename)
-        assert output.masks[
-            self.feature].array.shape == slide.level_dimensions[level][::-1]
-        assert output.masks[self.feature].extraction_level == level
-        assert output.masks[
-            self.feature].level_downsample == slide.level_downsamples[level]
-
     def test_classifies_zarr_input(self, tmp_path, slide_with_mask):
         slide = slide_with_mask(np.ones)
         path = str(tmp_path)
@@ -128,23 +104,6 @@ class TestSerialEddlClassifier:
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
         output = zarr_io.load(slide_path)
-        assert 'mask' in output.masks
-        assert self.feature in output.masks
-
-    def test_classifies_tiledb_input(self, tmp_path, slide_with_mask):
-        slide = slide_with_mask(np.ones)
-        path = str(tmp_path)
-        slide_path = os.path.join(
-            path, f'{os.path.basename(slide.filename)}.tiledb')
-        tiledb_io.dump(slide, slide_path)
-
-        cmd = [
-            'classify.py', self.cmd, '-f', self.feature, '-m', self.model,
-            '-w', 'tiledb', '-o', path, slide_path
-        ]
-        logger.info('cmd %s', ' '.join(cmd))
-        subprocess.check_call(cmd)
-        output = tiledb_io.load(slide_path)
         assert 'mask' in output.masks
         assert self.feature in output.masks
 
@@ -176,9 +135,9 @@ class TestParallelEddlClassifier(TestSerialEddlClassifier):
     cmd = 'parallel'
 
 
-class TestPatchClassifier:
+class TestSerialPatchClassifier:
     model = 'tests/models/all_one_by_patch.pkl'
-    cmd = 'parallel'
+    cmd = 'serial'
     feature = 'tumor'
 
     def test_classifies_with_default_args(self, tmp_path):
@@ -256,6 +215,11 @@ class TestPatchClassifier:
 #      ]
 #      subprocess.check_call(cmd)
 #
+
+
+class TestParallelPatchClassifier(TestSerialPatchClassifier):
+    cmd = 'parallel'
+
 
 if __name__ == '__main__':
     unittest.main()

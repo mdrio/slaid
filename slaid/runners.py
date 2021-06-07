@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 from clize import parameters
@@ -52,6 +52,7 @@ class SerialRunner:
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             filter_slide: str = None,
+            chunk: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
             tilesize: ('T', int) = 1024,
@@ -64,26 +65,32 @@ class SerialRunner:
 
 
         """
+        chunk = tuple(int(i.strip())
+                      for i in chunk.split(',')) if chunk else None
         if dry_run:
             args = dict(locals())
             args.pop('cls')
             print(args)
         else:
             gpu = cls.convert_gpu_params(gpu)
-            classifier = cls.get_classifier(model, feature, gpu, batch)
+            classifier = cls.get_classifier(model, feature, gpu, batch, writer)
             cls.prepare_output_dir(output_dir)
-
             slides = cls.classify_slides(input_path, output_dir, classifier,
                                          extraction_level, threshold, writer,
                                          filter_, overwrite_output_if_exists,
-                                         no_round, filter_slide, slide_reader,
-                                         tilesize)
+                                         no_round, filter_slide, chunk,
+                                         slide_reader, tilesize)
             return classifier, slides
 
     @classmethod
-    def get_classifier(cls, model, feature, gpu, batch):
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
         model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
-        return cls.CLASSIFIER(model, feature)
+        return cls.CLASSIFIER(model, feature, STORAGE[writer].empty)
 
     @staticmethod
     def prepare_output_dir(output_dir):
@@ -105,14 +112,14 @@ class SerialRunner:
     def classify_slides(cls, input_path, output_dir, classifier,
                         extraction_level, threshold, writer, filter_,
                         overwrite_output_if_exists, no_round, filter_slide,
-                        slide_reader, tilesize):
+                        chunk, slide_reader, tilesize):
 
         slides = []
         for slide in cls.get_slides(input_path, slide_reader, tilesize):
             cls.classify_slide(slide, output_dir, classifier, extraction_level,
                                slide_reader, threshold, writer, filter_,
                                overwrite_output_if_exists, no_round,
-                               filter_slide)
+                               filter_slide, chunk)
             slides.append(slide)
         return slides
 
@@ -128,7 +135,8 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       filter_slide=None):
+                       filter_slide=None,
+                       chunk=None):
 
         if filter_:
             filter_slide = cls.get_slide(filter_slide, slide_reader, 256)
@@ -143,11 +151,20 @@ class SerialRunner:
                     'See flag overwrite', slide.filename, classifier.feature)
                 return slide
 
+        chunk = chunk or (-1, -1)
+        tmp_chunk = list(chunk)
+        for i in range(len(chunk)):
+            if chunk[i] < 0:
+                tmp_chunk[i] = slide.level_dimensions[extraction_level][::-1][
+                    i]
+
+        chunk = tuple(tmp_chunk)
         mask = classifier.classify(slide,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_0_100=not no_round)
+                                   round_to_0_100=not no_round,
+                                   chunk=chunk)
         feature = classifier.feature
         slide.masks[feature] = mask
         STORAGE[writer].dump(slide,
@@ -196,6 +213,16 @@ class ParallelRunner(SerialRunner):
             kwargs.pop(key)
         cls._init_client(scheduler, processes)
         return super().run(**kwargs)
+
+    @classmethod
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
+        model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
+        return cls.CLASSIFIER(model, feature)
 
     @staticmethod
     def _init_client(scheduler, processes):

@@ -35,9 +35,9 @@ def test_slide_level(slide):
 ])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
-def test_slice_slide(slide):
+def test_slice_slide(slide, image_info):
     for i in range(slide.level_count):
-        array = slide[i]
+        array = slide[i].convert(image_info)
         expected_shape = (
             3, 10,
             20) if slide.image_info.channel == ImageInfo.CHANNEL.FIRST else (
