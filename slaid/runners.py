@@ -10,7 +10,7 @@ import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons.base import do_filter
+from slaid.commons.base import DEFAULT_TILESIZE, do_filter
 from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
@@ -52,21 +52,22 @@ class SerialRunner:
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             filter_slide: str = None,
-            chunk: str = None,
+            chunk: int = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
-            tilesize: ('T', int) = 1024,
             batch: ('b', int) = None,
             dry_run: bool = False):
         """
-        :param batch: how many bytes will be predicted at once. Default: all tile is predicted (see tilesize)
-        :param tilesize: the size of the slide area read at once before prediction
-
-
+        :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
+        :param chunk: the size (square) of data processed at once.
 
         """
-        chunk = tuple(int(i.strip())
-                      for i in chunk.split(',')) if chunk else None
+        if chunk:
+            chunk = tuple(chunk, chunk)
+            tilesize = chunk
+        else:
+            tilesize = DEFAULT_TILESIZE
+
         if dry_run:
             args = dict(locals())
             args.pop('cls')
@@ -205,7 +206,7 @@ class ParallelRunner(SerialRunner):
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
-            tilesize: ('T', int) = 1024,
+            chunk: int = None,
             batch: ('b', int) = None,
             dry_run: bool = False):
         kwargs = dict(locals())
