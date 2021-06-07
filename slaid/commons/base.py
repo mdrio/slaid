@@ -19,7 +19,7 @@ from napari_lazy_openslide.store import ArgumentError, init_attrs
 from skimage.util import view_as_blocks
 from zarr.storage import init_array, init_group
 
-_TILESIZE = 2048
+DEFAULT_TILESIZE = 1024
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -442,7 +442,7 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = _TILESIZE):
+    def __init__(self, slide: "Slide", tilesize: int = DEFAULT_TILESIZE):
         self._path = slide.filename
         self._slide = slide
         self._tilesize = tilesize
@@ -491,7 +491,7 @@ class BaseSlideFactory(abc.ABC):
                  filename: str,
                  basic_slide_module: str,
                  slide_module: str,
-                 tilesize: int = _TILESIZE,
+                 tilesize: int = DEFAULT_TILESIZE,
                  image_info: ImageInfo = None):
         self._filename = filename.rstrip('/')
         self._basic_slide_module = basic_slide_module
