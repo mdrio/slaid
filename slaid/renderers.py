@@ -9,9 +9,9 @@ import tifffile
 import tiledb
 import zarr
 
-from slaid.commons import Mask, Slide
+from slaid.commons import Mask, BasicSlide
 from slaid.commons.base import Polygon
-from slaid.commons.ecvl import Slide as EcvlSlide
+from slaid.commons.ecvl import BasicSlide as EcvlSlide
 
 logger = logging.getLogger(__file__)
 
@@ -141,7 +141,7 @@ class JSONEncoder(json.JSONEncoder):
 
 class VectorialRenderer(Renderer):
     def render(self,
-               slide: Slide,
+               slide: BasicSlide,
                filename: str,
                one_file_per_patch: bool = False):
         if one_file_per_patch:

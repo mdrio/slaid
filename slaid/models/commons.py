@@ -2,34 +2,32 @@ from typing import List, Tuple
 
 import numpy as np
 from pyeddl.tensor import Tensor
+import pickle
 
 from slaid.commons import Slide
 from slaid.commons.base import Image, ImageInfo
+from slaid.models.base import Factory as BaseFactory
+from slaid.models.base import Model as BaseModel
 from slaid.models.eddl import Model as EddlModel
 
 
-class BaseModel:
-    image_info = ImageInfo('bgr', 'yx', 'first')
-
-    def __init__(self, patch_size=None):
-        self._patch_size = patch_size
-
-    def __str__(self):
-        return self.__class__.__name__
-
-    @property
-    def patch_size(self):
-        return self._patch_size
+class Factory(BaseFactory):
+    def get_model(self):
+        with open(self._filename, 'rb') as f:
+            return pickle.load(f)
 
 
 class GreenModel(BaseModel):
     image_info = ImageInfo('rgb', 'yx', 'last')
 
+    def __init__(self, patch_size=None):
+        self.patch_size = patch_size
+
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
 
 
-class EddlGreenModel(BaseModel, EddlModel):
+class EddlGreenModel(EddlModel):
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
 
@@ -44,9 +42,9 @@ class EddlGreenModel(BaseModel, EddlModel):
         return [tensor]
 
 
-class EddlGreenPatchModel(BaseModel, EddlModel):
+class EddlGreenPatchModel(EddlModel):
     def __init__(self, patch_size=(256, 256)):
-        self._patch_size = patch_size
+        self.patch_size = patch_size
 
     @staticmethod
     def _create_net():
@@ -63,7 +61,7 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
 class BaseDummyModel(BaseModel):
     def __init__(self, patch_size=None):
-        self._patch_size = patch_size
+        self.patch_size = patch_size
         self.array_predicted = []
 
     def predict(self, array):
@@ -73,13 +71,9 @@ class BaseDummyModel(BaseModel):
     def _predict(self, array):
         raise NotImplementedError
 
-    @property
-    def patch_size(self):
-        return self._patch_size
-
 
 class DummyModel(BaseDummyModel):
-    image_info = ImageInfo('bgr', 'yx', 'first')
+    image_info = ImageInfo('bgr', 'yx', 'last')
 
     def __init__(self, func, patch_size=None):
         self.func = func

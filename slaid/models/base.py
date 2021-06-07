@@ -1,20 +1,22 @@
 import abc
-import pickle
 
 import numpy as np
 
+from slaid.commons import ImageInfo
+
 
 class Model(abc.ABC):
+    image_info = ImageInfo('bgr', 'yx', 'first')
+
+    @abc.abstractmethod
     def predict(self, array: np.array) -> np.array:
-        return self._model.predict(array)
+        pass
 
 
-class PickledModel(Model):
-    def __init__(self, filename: str):
-        with open(filename, 'rb') as f:
-            self._model = pickle.load(f)
+class Factory(abc.ABC):
+    def __init__(self, filename):
+        self._filename = filename
 
-
-class RandomModel(Model):
-    def predict(self, array):
-        return np.random.uniform(0, 1, array.shape[0])
+    @abc.abstractmethod
+    def get_model(self) -> Model:
+        pass
