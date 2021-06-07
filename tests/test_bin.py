@@ -9,7 +9,7 @@ import unittest
 import numpy as np
 import zarr
 
-import slaid.writers.zarr as zarr_io
+from slaid.writers.zarr import ZarrDirectoryStorage
 from slaid.commons.ecvl import BasicSlide as Slide
 
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -51,9 +51,9 @@ class TestSerialEddlClassifier:
         assert tuple(output.attrs['resolution']) == slide.dimensions
         assert output[
             self.feature].shape == slide.level_dimensions[level][::-1]
-        #  assert output[self.feature].attrs['extraction_level'] == level
-        #  assert output[self.feature].attrs[
-        #      'level_downsample'] == slide.level_downsamples[level]
+        assert output[self.feature].attrs['extraction_level'] == level
+        assert output[self.feature].attrs[
+            'level_downsample'] == slide.level_downsamples[level]
 
     def test_classifies_with_default_args(self, tmp_path):
         path = str(tmp_path)
@@ -88,7 +88,7 @@ class TestSerialEddlClassifier:
         path = str(tmp_path)
         slide_path = os.path.join(path,
                                   f'{os.path.basename(slide.filename)}.zarr')
-        zarr_io.dump(slide, slide_path)
+        ZarrDirectoryStorage.dump(slide, slide_path)
 
         cmd = [
             'classify.py',
@@ -103,7 +103,7 @@ class TestSerialEddlClassifier:
         ]
         logger.info('cmd %s', ' '.join(cmd))
         subprocess.check_call(cmd)
-        output = zarr_io.load(slide_path)
+        output = ZarrDirectoryStorage.load(slide_path)
         assert 'mask' in output.masks
         assert self.feature in output.masks
 
@@ -196,7 +196,7 @@ def test_classifies_with_filter(slide_with_mask, tmp_path, model_all_ones_path,
     path = f'{tmp_path}.zarr'
     slide = slide_with_mask(np.ones)
     condition = 'mask>2'
-    zarr_io.dump(slide, path)
+    ZarrDirectoryStorage.dump(slide, path)
 
     cmd = [
         'classify.py',

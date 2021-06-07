@@ -1,6 +1,38 @@
+import abc
 import os
+import pkgutil
+import sys
 from typing import Dict, Tuple
-from slaid.commons.base import Mask, Image, BasicSlide
+
+from slaid.commons.base import BasicSlide, Image, Mask
+
+REGISTRY = {}
+
+
+class Storage(abc.ABC):
+    def __init_subclass__(cls, _name, **kwargs):
+        super().__init_subclass__(**kwargs)
+        REGISTRY[_name] = cls
+
+    @abc.abstractstaticmethod
+    def dump(slide: BasicSlide,
+             output_path: str,
+             mask: str = None,
+             overwrite: bool = False,
+             **kwargs):
+        ...
+
+    @abc.abstractstaticmethod
+    def load(path: str) -> BasicSlide:
+        ...
+
+    @abc.abstractstaticmethod
+    def empty_array(shape, dtype):
+        ...
+
+    @abc.abstractstaticmethod
+    def mask_exists(path: str, mask: 'str') -> bool:
+        ...
 
 
 def _get_slide_metadata(slide: BasicSlide) -> dict:
@@ -48,3 +80,15 @@ class ReducedSlide(BasicSlide):
     @property
     def level_downsamples(self):
         raise NotImplementedError
+
+
+"""
+Following code allows to automagically populate the REGISTRY
+with all Storage subclasses defined in submodules.
+
+"""
+__all__ = []
+for loader, module_name, is_pkg in pkgutil.walk_packages(__path__):
+    __all__.append(module_name)
+    _module = loader.find_module(module_name).load_module(module_name)
+    globals()[module_name] = _module
