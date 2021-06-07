@@ -248,6 +248,8 @@ def do_filter(slide: "Slide", condition: str) -> "Filter":
         '==': '__eq__',
         '!=': '__ne__',
     }
+
+    condition = condition.replace('"', '')
     parsed = re.match(
         r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
         condition).groupdict()
