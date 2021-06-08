@@ -63,8 +63,6 @@ class ZarrZipStorage(ZarrDirectoryStorage, _name='zarr-zip'):
     @staticmethod
     def load(path: str) -> BasicSlide:
         logger.info('loading slide from zarr at path %s', path)
-        import os
-        raise Exception(os.stat(path))
         storage = zarr.storage.ZipStore(path, mode='r')
         group = zarr.open_group(storage)
         try:
@@ -102,6 +100,7 @@ class ZarrZipStorage(ZarrDirectoryStorage, _name='zarr-zip'):
             for attr, value in mask_._get_attributes().items():
                 logger.info('writing attr %s %s', attr, value)
                 group[name].attrs[attr] = value
+        storage.close()
 
     @staticmethod
     def empty(shape, dtype):

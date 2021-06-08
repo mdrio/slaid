@@ -58,8 +58,8 @@ class SerialRunner:
 
         """
         if chunk:
-            chunk = (chunk, chunk)
             tilesize = chunk
+            chunk = (chunk, chunk)
         else:
             tilesize = DEFAULT_TILESIZE
 
