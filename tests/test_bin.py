@@ -175,7 +175,7 @@ class TestSerialPatchClassifier:
 
 
 @pytest.mark.parametrize('cmd', ['serial', 'parallel'])
-@pytest.mark.parametrize('storage', ['zarr', 'zarr-zip'])
+@pytest.mark.parametrize('storage', ['zarr', 'zip'])
 def test_classifies_with_filter(cmd, slide_with_mask, tmp_path,
                                 model_all_ones_path, tmpdir, storage):
     path = f'{tmp_path}.{storage}'

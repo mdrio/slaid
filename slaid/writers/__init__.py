@@ -1,7 +1,6 @@
 import abc
 import os
 import pkgutil
-import sys
 from typing import Dict, Tuple
 
 from slaid.commons.base import BasicSlide, Image, Mask
@@ -17,7 +16,7 @@ class Storage(abc.ABC):
     @abc.abstractstaticmethod
     def dump(slide: BasicSlide,
              output_path: str,
-             mask: str = None,
+             mask_name: str = None,
              overwrite: bool = False,
              **kwargs):
         ...

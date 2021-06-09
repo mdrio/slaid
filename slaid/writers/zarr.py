@@ -1,13 +1,13 @@
 import logging
 import os
 from datetime import datetime as dt
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 
 import zarr
 
 from slaid.commons import BasicSlide, Mask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
-from slaid.writers import Storage, _dump_masks, _get_slide_metadata
+from slaid.writers import Storage, _get_slide_metadata
 
 logger = logging.getLogger(__file__)
 
@@ -61,7 +61,7 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
         return mask in group.array_keys()
 
 
-class ZarrZipStorage(ZarrDirectoryStorage, _name='zarr-zip'):
+class ZarrZipStorage(ZarrDirectoryStorage, _name='zip'):
     @staticmethod
     def load(path: str) -> BasicSlide:
         logger.info('loading slide from zarr at path %s', path)
