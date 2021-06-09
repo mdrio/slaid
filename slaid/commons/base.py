@@ -148,10 +148,7 @@ class Mask:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
-    def to_zarr(self, path: str, overwrite: bool = False):
-        logger.info('dumping mask to zarr on path %s', path)
-        name = os.path.basename(path)
-        group = zarr.open_group(os.path.dirname(path))
+    def to_zarr(self, group, name: str, overwrite: bool = False):
         if overwrite and name in group:
             del group[name]
         array = group.array(name, self.array)

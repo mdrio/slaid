@@ -20,7 +20,7 @@ from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 @pytest.fixture
 def slide_with_mask():
     def _slide_with_mask(create_array_func):
-        slide = EcvlSlide('tests/data/PH10023-1.thumb.tif')
+        slide = EcvlSlide('tests/data/patch.tif')
         array = create_array_func(slide.dimensions[::-1])
         slide.masks['mask'] = Mask(array, 1, 1, dt.now(), False)
         return slide

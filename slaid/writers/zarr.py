@@ -16,14 +16,16 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
     @staticmethod
     def dump(slide: BasicSlide,
              output_path: str,
-             mask: str = None,
+             mask_name: str = None,
              overwrite: bool = False,
              **kwargs):
         logger.info('dumping slide to zarr on path %s', output_path)
         group = zarr.open_group(output_path)
         if not group.attrs:
             group.attrs.update(_get_slide_metadata(slide))
-        _dump_masks(output_path, slide, overwrite, 'to_zarr', mask, **kwargs)
+        masks = [mask_name] if mask_name else slide.masks.keys()
+        for _mask_name in masks:
+            slide.masks[_mask_name].to_zarr(group, _mask_name, overwrite)
 
     @staticmethod
     def empty(shape, dtype):
@@ -84,7 +86,7 @@ class ZarrZipStorage(ZarrDirectoryStorage, _name='zarr-zip'):
     @staticmethod
     def dump(slide: BasicSlide,
              output_path: str,
-             mask: str = None,
+             mask_name: str = None,
              overwrite: bool = False,
              **kwargs):
         # FIXME duplicated code
@@ -94,15 +96,15 @@ class ZarrZipStorage(ZarrDirectoryStorage, _name='zarr-zip'):
         if not group.attrs:
             group.attrs.update(_get_slide_metadata(slide))
 
-        for name, mask_ in slide.masks.items():
-            group[name] = mask_.array
-
-            for attr, value in mask_._get_attributes().items():
-                logger.info('writing attr %s %s', attr, value)
-                group[name].attrs[attr] = value
+        masks = [mask_name] if mask_name else slide.masks.keys()
+        for _mask_name in masks:
+            slide.masks[_mask_name].to_zarr(group, _mask_name, overwrite)
         storage.close()
 
     @staticmethod
-    def empty(shape, dtype):
-        temp_file = NamedTemporaryFile(suffix='zarr-zip')
-        return zarr.open(temp_file.name, shape=shape, dtype=dtype)
+    def mask_exists(path: str, mask: 'str') -> bool:
+        if not os.path.exists(path):
+            return False
+        store = zarr.storage.ZipStore(path)
+        group = zarr.open_group(store)
+        return mask in group.array_keys()

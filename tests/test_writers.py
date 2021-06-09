@@ -36,7 +36,8 @@ def test_slide_from_tiledb(slide_with_mask, tmp_path):
     assert slide.masks == tiledb_slide.masks
 
 
-@pytest.mark.parametrize('storage', [zarr_io.ZarrDirectoryStorage])
+@pytest.mark.parametrize(
+    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
 def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
@@ -46,7 +47,8 @@ def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
     assert res == slide
 
 
-@pytest.mark.parametrize('storage', [zarr_io.ZarrDirectoryStorage])
+@pytest.mark.parametrize(
+    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
 def test_checks_zarr_path_has_masks(storage, slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)

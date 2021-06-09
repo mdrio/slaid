@@ -166,7 +166,7 @@ class SerialRunner:
         STORAGE[writer].dump(slide,
                              output_path,
                              overwrite=overwrite_output_if_exists,
-                             mask=feature)
+                             mask_name=feature)
         logging.info('output %s', output_path)
         return slide
 

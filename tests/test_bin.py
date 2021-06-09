@@ -181,7 +181,7 @@ def test_classifies_with_filter(cmd, slide_with_mask, tmp_path,
     path = f'{tmp_path}.{storage}'
     slide = slide_with_mask(np.ones)
     condition = 'mask>2'
-    REGISTRY[storage].dump(slide, path)
+    REGISTRY[storage].dump(slide, path, 'mask')
 
     cmd = [
         'classify.py',
