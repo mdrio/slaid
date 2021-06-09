@@ -91,18 +91,18 @@ class BasicClassifier(Classifier):
         else:
             filter_ = np.ones(slide_array.size, dtype='bool')
 
-        with Bar('Processing', max=filter_.shape[0] // chunk[0]) as bar:
+        with Bar('Processing', max=filter_.shape[0] // chunk[0] or 1) as bar:
             for x in range(0, filter_.shape[0], chunk[0]):
                 row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
                                dtype=dtype)
                 for y in range(0, filter_.shape[1], chunk[1]):
-                    block = slide_array[x:x + chunk[0],
-                                        y:y + chunk[1]].convert(
-                                            self.model.image_info)
                     filter_block = filter_[x:x + chunk[0], y:y + chunk[1]]
 
                     res = np.zeros(filter_block.shape, dtype='float32')
                     if (filter_block == True).any():
+                        block = slide_array[x:x + chunk[0],
+                                            y:y + chunk[1]].convert(
+                                                self.model.image_info)
                         to_predict = block[filter_block]
                         prediction = self._predict(to_predict.array)
                         res[filter_block] = prediction
@@ -157,8 +157,8 @@ class BasicClassifier(Classifier):
                 raise InvalidChunkSize(
                     f'Invalid chunk size {chunk}: should be a multiple of {self._patch_size}'
                 )
-        with Bar('Processing',
-                 max=slide_array.size[0] // chunk[0]) as progress_bar:
+        with Bar('Processing', max=slide_array.size[0] // chunk[0]
+                 or 1) as progress_bar:
             for x in range(0, slide_array.size[0], chunk[0]):
                 row_size = min(chunk[0], slide_array.size[0] - x)
                 row_size = row_size - (row_size % self._patch_size[0])
@@ -172,11 +172,6 @@ class BasicClassifier(Classifier):
                     col_size = col_size - (col_size % self._patch_size[1])
                     if not col_size:
                         break
-                    chunked_array = slide_array[x:x + row_size,
-                                                y:y + col_size].convert(
-                                                    self.model.image_info)
-                    patches, channel_first = chunked_array.get_blocks(
-                        self._patch_size)
 
                     filter_block = filter_[
                         x // self._patch_size[0]:(x + row_size) //
@@ -184,17 +179,24 @@ class BasicClassifier(Classifier):
                         y // self._patch_size[1]:(y + col_size) //
                         self._patch_size[1]]
                     res = np.zeros(filter_block.shape, dtype='float32')
-                    to_predict = patches[:, filter_block,
-                                         ...] if channel_first else patches[
-                                             filter_block, :, ...]
-                    to_predict = to_predict.reshape((to_predict.shape[0] *
-                                                     to_predict.shape[1], ) +
-                                                    to_predict.shape[2:])
-                    if to_predict.shape[0] > 0:
-                        prediction = self._predict(to_predict)
-                        res[filter_block] = prediction
-                        res = self._threshold(res, threshold)
-                        res = self._round_to_0_100(res, round_to_0_100)
+
+                    if (filter_block == True).any():
+                        chunked_array = slide_array[x:x + row_size,
+                                                    y:y + col_size].convert(
+                                                        self.model.image_info)
+                        patches, channel_first = chunked_array.get_blocks(
+                            self._patch_size)
+                        to_predict = patches[:, filter_block,
+                                             ...] if channel_first else patches[
+                                                 filter_block, :, ...]
+                        to_predict = to_predict.reshape(
+                            (to_predict.shape[0] * to_predict.shape[1], ) +
+                            to_predict.shape[2:])
+                        if to_predict.shape[0] > 0:
+                            prediction = self._predict(to_predict)
+                            res[filter_block] = prediction
+                            res = self._threshold(res, threshold)
+                            res = self._round_to_0_100(res, round_to_0_100)
 
                     row = self._append(row, res, 1)
                 predictions = self._append(predictions, row, 0)
