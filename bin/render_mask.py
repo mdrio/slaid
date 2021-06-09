@@ -1,29 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import json
-import os
-
 from clize import run
+from slaid.writers import REGISTRY
 
-from slaid.writers import zarr
 
-
-def main(zarr_archive,
+def main(archive,
          mask_name,
          output,
          *,
          downsample: ('d', int) = 1,
          threshold: (float, 't') = None):
 
-    s = zarr.load(zarr_archive)
-    mask = s.masks[mask_name]
-    ext = os.path.splitext(output)[-1]
-
-    if ext == '.json':
-        pols = mask.to_polygons(0.8, downsample=downsample)
-        json.dump(pols, open(output, 'w'), cls=JSONEncoder)
-    else:
-        mask.to_image(downsample, threshold).save(output)
+    slide = REGISTRY[archive.splitext()[1:]].load(archive)
+    mask = slide.masks[mask_name]
+    mask.to_image(downsample, threshold).save(output)
 
 
 if __name__ == '__main__':
