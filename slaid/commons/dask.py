@@ -1,5 +1,6 @@
 import logging
 import os
+from tempfile import TemporaryDirectory
 
 import dask.array as da
 import tiledb
@@ -7,7 +8,8 @@ import zarr
 from dask.distributed import Client, progress
 
 from slaid.commons import Mask as BaseMask
-from slaid.commons.base import Slide as BaseSlide, SlideArray
+from slaid.commons.base import Slide as BaseSlide
+from slaid.commons.base import SlideArray
 
 logger = logging.getLogger()
 
@@ -34,22 +36,24 @@ class Mask(BaseMask):
         self._write_meta_tiledb(path)
 
     #  FIXME: duplicate code
-    def to_zarr(self, path: str, overwrite: bool = False, **kwargs):
-        logger.info('dumping mask to zarr on path %s', path)
-        name = os.path.basename(path)
-        group = zarr.open_group(os.path.dirname(path))
+    def to_zarr(self, group, name: str, overwrite: bool = False):
         if overwrite and name in group:
             del group[name]
         if isinstance(self.array, da.Array):
-            task = da.to_zarr(self.array,
-                              path,
-                              compute=True,
-                              return_stored=True)
-            progress(task)
-
+            # workaround since directly store dask
+            # array to zarr group does not seem to work
+            with TemporaryDirectory() as tmp_dir:
+                array = da.to_zarr(self.array,
+                                   tmp_dir,
+                                   compute=True,
+                                   overwrite=True,
+                                   return_stored=True)
+                progress(array)
+                array = zarr.open(tmp_dir, mode='r')
+                group[name] = array
+                array = group[name]
         else:
-            zarr.save(path, self.array)
-        array = group[os.path.basename(path)]
+            array = group.array(name, self.array)
         for attr, value in self._get_attributes().items():
             logger.info('writing attr %s %s', attr, value)
             array.attrs[attr] = value

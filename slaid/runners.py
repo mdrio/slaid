@@ -1,13 +1,11 @@
 import logging
 import os
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
-import slaid.writers.tiledb as tiledb_io
-import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons.base import DEFAULT_TILESIZE, do_filter
@@ -15,7 +13,7 @@ from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
 
-STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
+from slaid.writers import REGISTRY as STORAGE
 
 
 class SerialRunner:
@@ -23,10 +21,7 @@ class SerialRunner:
 
     @staticmethod
     def get_slide(path, slide_reader, tilesize):
-        try:
-            return SlideFactory(path, slide_reader, 'base').get_slide()
-        except Exception as ex:
-            logging.error('an error occurs with file %s: %s', path, ex)
+        return SlideFactory(path, slide_reader, 'base').get_slide()
 
     @staticmethod
     def convert_gpu_params(gpu: List[int]) -> List[int]:
@@ -63,8 +58,8 @@ class SerialRunner:
 
         """
         if chunk:
-            chunk = (chunk, chunk)
             tilesize = chunk
+            chunk = (chunk, chunk)
         else:
             tilesize = DEFAULT_TILESIZE
 
@@ -171,7 +166,7 @@ class SerialRunner:
         STORAGE[writer].dump(slide,
                              output_path,
                              overwrite=overwrite_output_if_exists,
-                             mask=feature)
+                             mask_name=feature)
         logging.info('output %s', output_path)
         return slide
 
