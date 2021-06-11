@@ -1,3 +1,4 @@
+import abc
 import logging
 import os
 from typing import List
@@ -15,37 +16,46 @@ from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
 
 
-def run(input_path,
-        *,
-        mode: parameters.one_of('serial', 'parallel'),
-        output_dir: 'o',
-        model: 'm',
-        extraction_level: ('l', int) = 2,
-        feature: 'f',
-        threshold: ('t', float) = None,
-        gpu: (int, parameters.multi()) = None,
-        writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
-            STORAGE.keys())[0],
-        filter_: 'F' = None,
-        overwrite_output_if_exists: 'overwrite' = False,
-        no_round: bool = False,
-        filter_slide: str = None,
-        chunk: int = None,
-        slide_reader: ('r', parameters.one_of('ecvl', 'openslide')) = 'ecvl',
-        batch: ('b', int) = None):
-    """
-    :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
-    :param chunk: the size (square) of data processed at once.
-
-    """
-
-    kwargs = dict(locals())
-    kwargs.pop('mode')
-    runners = {'serial': SerialRunner, 'parallel': ParallelRunner}
-    return runners[mode]().run(**kwargs)
+class bidict(dict):
+    def inverse(self):
+        res = {}
+        for k, v in self.items():
+            res[v] = k
+        return res
 
 
-class SerialRunner:
+RUNNERS = bidict()
+
+
+class Runner(abc.ABC):
+    def __init_subclass__(cls, _name, **kwargs):
+        RUNNERS[_name] = cls
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def run(cls,
+            input_path,
+            *,
+            output_dir: 'o',
+            model: 'm',
+            extraction_level: ('l', int) = 2,
+            feature: 'f',
+            threshold: ('t', float) = None,
+            gpu: (int, parameters.multi()) = None,
+            writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+                STORAGE.keys())[0],
+            filter_: 'F' = None,
+            overwrite_output_if_exists: 'overwrite' = False,
+            no_round: bool = False,
+            filter_slide: str = None,
+            chunk: int = None,
+            slide_reader: ('r', parameters.one_of('ecvl',
+                                                  'openslide')) = 'ecvl',
+            batch: ('b', int) = None):
+        ...
+
+
+class SerialRunner(Runner, _name='serial'):
     CLASSIFIER = BasicClassifier
 
     @staticmethod
@@ -80,11 +90,6 @@ class SerialRunner:
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
             batch: ('b', int) = None):
-        """
-        :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
-        :param chunk: the size (square) of data processed at once.
-
-        """
         if chunk:
             tilesize = chunk
             chunk = (chunk, chunk)
@@ -201,7 +206,7 @@ class SerialRunner:
         return output_filename
 
 
-class ParallelRunner(SerialRunner):
+class ParallelRunner(SerialRunner, _name='parallel'):
     CLASSIFIER = DaskClassifier
 
     @classmethod
@@ -253,3 +258,34 @@ class ParallelRunner(SerialRunner):
                                 tilesize).get_slide()
         except Exception as ex:
             logging.error('an error occurs with file %s: %s', path, ex)
+
+
+def run(input_path,
+        *,
+        mode: parameters.one_of(*list(RUNNERS.keys())) = RUNNERS.inverse()
+        [SerialRunner],
+        output_dir: 'o',
+        model: 'm',
+        extraction_level: ('l', int) = 2,
+        feature: 'f',
+        threshold: ('t', float) = None,
+        gpu: (int, parameters.multi()) = None,
+        writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+            STORAGE.keys())[0],
+        filter_: 'F' = None,
+        overwrite_output_if_exists: 'overwrite' = False,
+        no_round: bool = False,
+        filter_slide: str = None,
+        chunk: int = None,
+        slide_reader: ('r', parameters.one_of('ecvl', 'openslide')) = 'ecvl',
+        batch: ('b', int) = None):
+    """
+    :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
+    :param chunk: the size (square) of data processed at once.
+
+    """
+
+    kwargs = dict(locals())
+    kwargs.pop('mode')
+    runner = RUNNERS[mode]
+    return runner.run(**kwargs)

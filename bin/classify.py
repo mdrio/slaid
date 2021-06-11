@@ -33,6 +33,7 @@ def load_config_file(config_file: str, backend: str):
 
 if __name__ == '__main__':
 
+    from slaid.runners import RUNNERS
     model = os.environ.get("SLAID_MODEL")
     if model:
         model = pkg_resources.resource_filename('slaid',
