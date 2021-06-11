@@ -12,8 +12,37 @@ from slaid.commons.base import DEFAULT_TILESIZE, do_filter
 from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
-
 from slaid.writers import REGISTRY as STORAGE
+
+
+def run(input_path,
+        *,
+        mode: parameters.one_of('serial', 'parallel'),
+        output_dir: 'o',
+        model: 'm',
+        extraction_level: ('l', int) = 2,
+        feature: 'f',
+        threshold: ('t', float) = None,
+        gpu: (int, parameters.multi()) = None,
+        writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+            STORAGE.keys())[0],
+        filter_: 'F' = None,
+        overwrite_output_if_exists: 'overwrite' = False,
+        no_round: bool = False,
+        filter_slide: str = None,
+        chunk: int = None,
+        slide_reader: ('r', parameters.one_of('ecvl', 'openslide')) = 'ecvl',
+        batch: ('b', int) = None):
+    """
+    :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
+    :param chunk: the size (square) of data processed at once.
+
+    """
+
+    kwargs = dict(locals())
+    kwargs.pop('mode')
+    runners = {'serial': SerialRunner, 'parallel': ParallelRunner}
+    return runners[mode]().run(**kwargs)
 
 
 class SerialRunner:
@@ -50,8 +79,7 @@ class SerialRunner:
             chunk: int = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
-            batch: ('b', int) = None,
-            dry_run: bool = False):
+            batch: ('b', int) = None):
         """
         :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
         :param chunk: the size (square) of data processed at once.
@@ -63,20 +91,15 @@ class SerialRunner:
         else:
             tilesize = DEFAULT_TILESIZE
 
-        if dry_run:
-            args = dict(locals())
-            args.pop('cls')
-            print(args)
-        else:
-            gpu = cls.convert_gpu_params(gpu)
-            classifier = cls.get_classifier(model, feature, gpu, batch, writer)
-            cls.prepare_output_dir(output_dir)
-            slides = cls.classify_slides(input_path, output_dir, classifier,
-                                         extraction_level, threshold, writer,
-                                         filter_, overwrite_output_if_exists,
-                                         no_round, filter_slide, chunk,
-                                         slide_reader, tilesize)
-            return classifier, slides
+        gpu = cls.convert_gpu_params(gpu)
+        classifier = cls.get_classifier(model, feature, gpu, batch, writer)
+        cls.prepare_output_dir(output_dir)
+        slides = cls.classify_slides(input_path, output_dir, classifier,
+                                     extraction_level, threshold, writer,
+                                     filter_, overwrite_output_if_exists,
+                                     no_round, filter_slide, chunk,
+                                     slide_reader, tilesize)
+        return classifier, slides
 
     @classmethod
     def get_classifier(cls,
@@ -202,8 +225,7 @@ class ParallelRunner(SerialRunner):
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
             chunk: int = None,
-            batch: ('b', int) = None,
-            dry_run: bool = False):
+            batch: ('b', int) = None):
         kwargs = dict(locals())
         for key in ('cls', '__class__', 'processes', 'scheduler'):
             kwargs.pop(key)
