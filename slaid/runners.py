@@ -213,8 +213,6 @@ class ParallelRunner(SerialRunner, _name='parallel'):
     def run(cls,
             input_path,
             *,
-            processes: 'p' = False,
-            scheduler: str = None,
             output_dir: 'o',
             model: 'm',
             extraction_level: ('l', int) = 2,
@@ -232,9 +230,9 @@ class ParallelRunner(SerialRunner, _name='parallel'):
             chunk: int = None,
             batch: ('b', int) = None):
         kwargs = dict(locals())
-        for key in ('cls', '__class__', 'processes', 'scheduler'):
+        for key in ('cls', '__class__'):
             kwargs.pop(key)
-        cls._init_client(scheduler, processes)
+        cls._init_client()
         return super().run(**kwargs)
 
     @classmethod
@@ -248,8 +246,9 @@ class ParallelRunner(SerialRunner, _name='parallel'):
         return cls.CLASSIFIER(model, feature)
 
     @staticmethod
-    def _init_client(scheduler, processes):
-        init_client(address=scheduler, processes=processes)
+    def _init_client():
+        #TODO this should be somehow configurable
+        init_client(processes=False, threads_per_worker=4, n_workers=1)
 
     @staticmethod
     def get_slide(path, slide_reader, tilesize):

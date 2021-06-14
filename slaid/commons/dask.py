@@ -1,5 +1,4 @@
 import logging
-import os
 from tempfile import TemporaryDirectory
 
 import dask.array as da
@@ -14,11 +13,11 @@ from slaid.commons.base import SlideArray
 logger = logging.getLogger()
 
 
-def init_client(address=None, processes=False):
+def init_client(address=None, processes=False, **kwargs):
     if address:
-        return Client(address)
+        return Client(address, **kwargs)
     else:
-        return Client(processes=processes)
+        return Client(processes=processes, **kwargs)
 
 
 class Mask(BaseMask):
