@@ -1,7 +1,7 @@
 import logging
-import os
 from tempfile import TemporaryDirectory
 
+import dask
 import dask.array as da
 import tiledb
 import zarr
@@ -14,11 +14,11 @@ from slaid.commons.base import SlideArray
 logger = logging.getLogger()
 
 
-def init_client(address=None, processes=False):
+def init_client(address=None, processes=False, **kwargs):
     if address:
-        return Client(address)
-    else:
-        return Client(processes=processes)
+        return Client(address, **kwargs)
+    dask.config.config['distributed']['comm']['timeouts']['connect'] = '20s'
+    return Client(processes=processes, **kwargs)
 
 
 class Mask(BaseMask):
