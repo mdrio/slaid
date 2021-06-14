@@ -3,11 +3,11 @@
 import logging
 import os
 
+import clize
 import pkg_resources
 import tiledb
-from clize import run
 
-from slaid.runners import ParallelRunner, SerialRunner
+from slaid.runners import run
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -22,20 +22,6 @@ def set_model(func, model):
     return wrapper
 
 
-def set_feature(func, feature):
-    def wrapper(*args, **kwargs):
-        return func(*args, feature=feature, **kwargs)
-
-    return wrapper
-
-
-def get_parallel_classifier(model, feature):
-    from slaid.classifiers.dask import Classifier
-    from slaid.commons.dask import init_client
-    init_client()
-    return Classifier(model, feature)
-
-
 def load_config_file(config_file: str, backend: str):
     if config_file is None:
         return
@@ -47,12 +33,11 @@ def load_config_file(config_file: str, backend: str):
 
 if __name__ == '__main__':
 
-    runners = {'serial': SerialRunner.run, 'parallel': ParallelRunner.run}
+    from slaid.runners import RUNNERS
     model = os.environ.get("SLAID_MODEL")
     if model:
         model = pkg_resources.resource_filename('slaid',
                                                 f'resources/models/{model}')
-        for k, v in runners.items():
-            runners[k] = set_model(v, model)
+        run = set_model(run, model)
 
-    run(runners)
+    clize.run(run)
