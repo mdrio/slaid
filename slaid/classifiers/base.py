@@ -86,6 +86,11 @@ class BasicClassifier(Classifier):
         predictions = self._array_factory((0, slide_array.size[1]),
                                           dtype=dtype)
         if filter_:
+            if (filter_.array == 0).all():
+                predictions = self._append(
+                    predictions, np.zeros(slide_array.size, dtype=dtype), 0)
+                return predictions
+
             filter_.rescale(slide_array.size)
             filter_ = filter_.array
         else:

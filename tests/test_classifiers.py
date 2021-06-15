@@ -53,6 +53,26 @@ def test_classify_with_filter(green_slide_and_classifier, level,
     assert (mask.array[ones_row:, :] == 0).all()
 
 
+@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
+@pytest.mark.parametrize('level', [0, 1])
+@pytest.mark.parametrize('backend', ['basic', 'dask'])
+@pytest.mark.parametrize('max_MB_prediction', [None])
+def test_classify_with_zeros_as_filter(green_slide_and_classifier, level,
+                                       max_MB_prediction):
+    green_slide, green_classifier = green_slide_and_classifier
+    filter_level = 2
+    filter_downsample = green_slide.level_downsamples[filter_level]
+    filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
+    filter_mask = Mask(filter_array, filter_level, filter_downsample)
+
+    mask = green_classifier.classify(green_slide,
+                                     level=level,
+                                     filter_=filter_mask >= 1)
+
+    assert mask.array.shape == green_slide.level_dimensions[level][::-1]
+    assert (mask.array[:, :] == 0).all()
+
+
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
