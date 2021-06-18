@@ -114,7 +114,7 @@ class SerialRunner(Runner, _name='serial'):
                        batch,
                        writer=list(STORAGE.keys())[0]):
         model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
-        return cls.CLASSIFIER(model, feature, STORAGE[writer].empty)
+        return cls.CLASSIFIER(model, feature, STORAGE[writer])
 
     @staticmethod
     def prepare_output_dir(output_dir):

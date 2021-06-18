@@ -38,7 +38,7 @@ class BasicClassifier(Classifier):
     def __init__(self,
                  model: "Model",
                  feature: str,
-                 array_factory: Callable = np.empty):
+                 array_factory: Callable = np):
         self._model = model
         self.feature = feature
         self._array_factory = array_factory
@@ -83,19 +83,17 @@ class BasicClassifier(Classifier):
 
     def _classify_pixels(self, slide_array, filter_, chunk, threshold,
                          round_to_0_100, dtype):
-        predictions = self._array_factory((0, slide_array.size[1]),
-                                          dtype=dtype)
         if filter_:
             if (filter_.array == 0).all():
-                predictions = self._append(
-                    predictions, np.zeros(slide_array.size, dtype=dtype), 0)
-                return predictions
+                return self._array_factory.zeros(slide_array.size, dtype=dtype)
 
             filter_.rescale(slide_array.size)
             filter_ = filter_.array
         else:
             filter_ = np.ones(slide_array.size, dtype='bool')
 
+        predictions = self._array_factory.empty((0, slide_array.size[1]),
+                                                dtype=dtype)
         with Bar('Processing', max=filter_.shape[0] // chunk[0] or 1) as bar:
             for x in range(0, filter_.shape[0], chunk[0]):
                 row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
@@ -150,7 +148,7 @@ class BasicClassifier(Classifier):
 
     def _classify_patches(self, slide_array, filter_, chunk, threshold,
                           round_to_0_100, dtype):
-        predictions = self._array_factory(
+        predictions = self._array_factory.empty(
             (0, slide_array.size[1] // self._patch_size[1]), dtype=dtype)
         filter_ = filter_ if filter_ else np.ones(
             (slide_array.size[0] // self._patch_size[0],
