@@ -33,6 +33,10 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
         return zarr.open(temp_dir.name, shape=shape, dtype=dtype)
 
     @staticmethod
+    def zeros(shape, dtype):
+        return zarr.zeros(shape=shape, dtype=dtype)
+
+    @staticmethod
     def load(path: str) -> BasicSlide:
         logger.info('loading slide from zarr at path %s', path)
         group = zarr.open_group(path)
