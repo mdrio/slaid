@@ -18,6 +18,6 @@ jobs:
     - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
     - run:  pip install pytest wheel
     - run: pip install -e .
-    - run: make docker
+    - run: sudo make docker
 
 
