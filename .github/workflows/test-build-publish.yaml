@@ -10,9 +10,18 @@ jobs:
 
   build:
 
-    runs-on: dhealth/pylibs-toolkit:0.10.1-gpu
+    runs-on: ubuntu-latest
+    env:
+      PATH: "/opt/conda/bin:${PATH}"
+
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: make docker
+    - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
+    - run: apt-get -y update && apt-get -y install wget gcc &&     wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &&     bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda &&     conda update -y conda &&     conda install -y conda-build &&     conda update -y conda-build
+      conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
+    - run:  pip install pytest wheel
+    - run: pip install -e .
+    - run: make docker
+
+
