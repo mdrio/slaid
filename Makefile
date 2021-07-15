@@ -25,7 +25,8 @@ install:
 	touch install
 
 test: install
-	tests/run_all_tests.sh
+
+	PYTHONPATH=$PYTHONPATH:$(PWD)/tests tests/run_all_tests.sh
 	touch test
 
 docker-per-model:
