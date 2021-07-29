@@ -108,6 +108,7 @@ class Mask:
     round_to_0_100: bool = False
     threshold: float = None
     model: str = None
+    tile_size: int = None
 
     def __post_init__(self):
         print('self.slide_levels', self.slide_levels)
@@ -174,6 +175,7 @@ class Mask:
             attrs['threshold'] = self.threshold
         if self.model:
             attrs['model'] = self.model
+            attrs['tile_size'] = self.tile_size
         return attrs
 
     def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
