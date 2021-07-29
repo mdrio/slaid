@@ -23,7 +23,6 @@ def test_classify_slide(green_slide_and_classifier, level):
 
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
     green_zone = int(300 // green_slide.level_downsamples[level])
-    print(mask.array)
     assert (mask.array[:green_zone, :] == 100).all()
     assert (mask.array[green_zone:, :] == 0).all()
 
@@ -40,7 +39,8 @@ def test_classify_with_filter(green_slide_and_classifier, level,
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
     ones_row = 50
     filter_array[:ones_row, :] = 1
-    filter_mask = Mask(filter_array, filter_level, filter_downsample)
+    filter_mask = Mask(filter_array, filter_level, filter_downsample,
+                       green_slide.level_dimensions)
 
     mask = green_classifier.classify(green_slide,
                                      level=level,
@@ -63,7 +63,8 @@ def test_classify_with_zeros_as_filter(green_slide_and_classifier, level,
     filter_level = 2
     filter_downsample = green_slide.level_downsamples[filter_level]
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
-    filter_mask = Mask(filter_array, filter_level, filter_downsample)
+    filter_mask = Mask(filter_array, filter_level, filter_downsample,
+                       green_slide.level_dimensions)
 
     mask = green_classifier.classify(green_slide,
                                      level=level,
