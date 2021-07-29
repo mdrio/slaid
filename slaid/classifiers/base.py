@@ -1,5 +1,6 @@
 import abc
 import logging
+import math
 from datetime import datetime as dt
 from typing import Callable, Tuple
 
@@ -77,7 +78,7 @@ class BasicClassifier(Classifier):
             predictions = self._classify_pixels(slide_array, filter_, chunk,
                                                 threshold, round_to_0_100,
                                                 dtype)
-        return self._get_mask(predictions, level,
+        return self._get_mask(slide, predictions, level,
                               slide.level_downsamples[level], dt.now(),
                               round_to_0_100)
 
@@ -138,10 +139,13 @@ class BasicClassifier(Classifier):
             return array.astype('uint8')
         return array
 
-    def _get_mask(self, array, level, downsample, datetime, round_to_0_100):
+    def _get_mask(self, slide, array, level, downsample, datetime,
+                  round_to_0_100):
+
         return self.MASK_CLASS(array,
                                level,
                                downsample,
+                               slide.level_dimensions,
                                datetime,
                                round_to_0_100,
                                model=str(self._model))
