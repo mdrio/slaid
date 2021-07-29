@@ -148,7 +148,9 @@ class BasicClassifier(Classifier):
                                slide.level_dimensions,
                                datetime,
                                round_to_0_100,
-                               model=str(self._model))
+                               model=str(self._model),
+                               tile_size=self._model.patch_size[0]
+                               if self._model.patch_size else 1)
 
     def _classify_patches(self, slide_array, filter_, chunk, threshold,
                           round_to_0_100, dtype):

@@ -91,6 +91,7 @@ def test_classify_slide_by_patches(green_slide_and_patch_classifier, level):
     print(mask.array[green_zone:, :])
     assert (mask.array[:green_zone, :] == 100).all()
     assert (mask.array[green_zone:, :] == 0).all()
+    assert mask.tile_size == 10
 
 
 @pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])

@@ -56,6 +56,7 @@ def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
     mask = group['mask']
     mask_metadata = mask.attrs.asdict()
     assert mask_metadata['dzi_sampling_level'] == 8
+    assert mask_metadata['tile_size'] == 10
 
 
 @pytest.mark.parametrize(

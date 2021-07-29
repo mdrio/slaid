@@ -22,8 +22,14 @@ def slide_with_mask():
     def _slide_with_mask(create_array_func):
         slide = EcvlSlide('tests/data/patch.tif')
         array = create_array_func(slide.dimensions[::-1])
-        slide.masks['mask'] = Mask(array, 0, 1, slide.level_dimensions,
-                                   dt.now(), False)
+        slide.masks['mask'] = Mask(array,
+                                   0,
+                                   1,
+                                   slide.level_dimensions,
+                                   dt.now(),
+                                   False,
+                                   model='model',
+                                   tile_size=10)
         return slide
 
     return _slide_with_mask
