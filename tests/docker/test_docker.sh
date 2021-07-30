@@ -11,7 +11,7 @@ for mode in serial parallel; do
   for ext in  zarr zip; do 
     docker run  --rm -v $DIR/../data:/data  -v $MODEL_DIR:/models  slaid --mode $mode -w ${ext}  -m /models/$model -l 0 /data/$IMAGE --overwrite  -f tissue  -o/data
     ls -l $OUTDIR/${IMAGE}.${ext}
-    rm -r $OUTDIR/${IMAGE}.${ext}
+    sudo rm -r $OUTDIR/${IMAGE}.${ext}
 
   done
 done
