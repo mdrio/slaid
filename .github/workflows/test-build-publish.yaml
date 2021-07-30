@@ -19,6 +19,6 @@ jobs:
     - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
     - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
     - run: export PATH=/opt/conda/bin:$PATH && pip install -e .
-    - run: export PATH=/opt/conda/bin:$PATH && sudo make docker
+    - run: export PATH=/opt/conda/bin:$PATH && sudo -E make docker
 
 
