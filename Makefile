@@ -24,7 +24,7 @@ install:
 	pip install -e .
 	touch install
 
-test: install
+test: 
 
 	PYTHONPATH=$PYTHONPATH:$(PWD)/tests tests/run_all_tests.sh
 	touch test
