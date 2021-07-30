@@ -66,8 +66,6 @@ def test_slice_read(slide):
     image = slide.read_region((0, 0), 0, slide.dimensions)
     slide_array = slide[0][:, :]
     image_array = image.to_array()
-    import numpy as np
-    np.save('test.npy', slide_array.array)
     assert (slide_array.array == image_array).all()
 
 
