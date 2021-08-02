@@ -1,4 +1,4 @@
-TAG := $(shell cd docker; ./get_docker_tag.sh)
+TAG := $(shell python -c "import utils; print(utils.get_version())")
 
 ifndef skip_test
 	extra_dep_docker:= test
@@ -12,7 +12,8 @@ docker: $(extra_dep_docker) docker-main docker-per-model
 docker-main:
 	mkdir -p docker-build
 	cp setup.py docker-build/
-	cp VERSION docker-build/
+	cp VERSION docker-build/ || echo "VERSION not found"
+	cp utils.py docker-build/
 	cp requirements.txt docker-build/
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
@@ -38,4 +39,5 @@ clean:
 	rm -rf docker-build
 
 docker-push: docker
-	cd docker/; ./docker-push.sh $(DOCKER_ARGS)
+	cd docker/; ./docker-push.sh $(TAG) $(DOCKER_ARGS)
+
