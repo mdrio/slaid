@@ -2,7 +2,7 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ $default-branch feat/github-actions ]
+    branches: [ $default-branch ]
   pull_request:
     branches: [ $default-branch ]
 
