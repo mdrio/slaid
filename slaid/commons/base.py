@@ -1,6 +1,7 @@
 import abc
 import inspect
 import logging
+import math
 import os
 import re
 import sys
@@ -102,10 +103,17 @@ class Mask:
     array: np.ndarray
     extraction_level: int
     level_downsample: int
+    slide_levels: List[Tuple[int, int]]
     datetime: dt = None
     round_to_0_100: bool = False
     threshold: float = None
     model: str = None
+    tile_size: int = None
+
+    def __post_init__(self):
+        print('self.slide_levels', self.slide_levels)
+        self.dzi_sampling_level = math.log2(
+            max(*self.slide_levels[self.extraction_level]))
 
     def _filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.array)
@@ -159,6 +167,7 @@ class Mask:
     def _get_attributes(self):
         attrs = {}
         attrs['extraction_level'] = self.extraction_level
+        attrs['dzi_sampling_level'] = self.dzi_sampling_level
         attrs['level_downsample'] = self.level_downsample
         attrs['datetime'] = self.datetime.timestamp()
         attrs['round_to_0_100'] = self.round_to_0_100
@@ -166,6 +175,7 @@ class Mask:
             attrs['threshold'] = self.threshold
         if self.model:
             attrs['model'] = self.model
+            attrs['tile_size'] = self.tile_size
         return attrs
 
     def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
@@ -267,6 +277,8 @@ class BasicSlide(abc.ABC):
         self.masks: Dict[str, Mask] = {}
 
     def __eq__(self, other):
+        print(self._filename, other.filename)
+        print(self.masks, other.masks)
         return self._filename == other.filename and self.masks == other.masks
 
     @abc.abstractproperty

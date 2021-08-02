@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pytest
 import tiledb
+import zarr
 
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
@@ -41,10 +42,21 @@ def test_slide_from_tiledb(slide_with_mask, tmp_path):
 def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
-    slide_path = os.path.join(path, f'{os.path.basename(slide.filename)}.zarr')
+    ext = 'zip' if storage == zarr_io.ZarrZipStorage else 'zarr'
+    slide_path = os.path.join(path,
+                              f'{os.path.basename(slide.filename)}.{ext}')
     storage.dump(slide, slide_path)
     res = storage.load(slide_path)
     assert res == slide
+
+    group = zarr.open(slide_path)
+    slide_metadata = group.attrs.asdict()
+    assert tuple(slide_metadata['resolution']) == slide.dimensions
+
+    mask = group['mask']
+    mask_metadata = mask.attrs.asdict()
+    assert mask_metadata['dzi_sampling_level'] == 8
+    assert mask_metadata['tile_size'] == 10
 
 
 @pytest.mark.parametrize(
