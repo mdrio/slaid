@@ -1,3 +1,4 @@
+TAG := $(shell python -c "import utils; print(utils.get_version())")
 
 ifndef skip_test
 	extra_dep_docker:= test

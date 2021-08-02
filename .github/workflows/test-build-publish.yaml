@@ -41,6 +41,7 @@ jobs:
       env:
         DOCKER_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}
       run: echo "$DOCKER_REPO" > docker/repo.txt
-    - run: export PATH=/opt/conda/bin:$PATH && make docker-push TAG=${{ needs.bump-version.outputs.new_tag }}
+    - run: echo  "${{ needs.bump-version.outputs.new_tag }}" > VERSION
+    - run: export PATH=/opt/conda/bin:$PATH && make docker-push
 
 
