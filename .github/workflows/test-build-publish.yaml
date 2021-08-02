@@ -19,6 +19,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         WITH_V: false
+        RELEASE_BRANCHES: master,develop
 
     outputs:
       new_tag: ${{ steps.tag-creation.outputs.new_tag }}
