@@ -26,6 +26,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: bump-version
+    container: dhealth/pylibs-toolkit:0.10.1-gpu
     steps:
     - uses: actions/checkout@v2
     - name: Login to Docker Hub
@@ -33,16 +34,11 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-    - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
-    - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
-    - run: conda install -c anaconda python=3.8
-    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
-    - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
     - shell: bash
       env:
         DOCKER_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}
       run: echo "$DOCKER_REPO" > docker/repo.txt
     - run: echo  "${{ needs.bump-version.outputs.new_tag }}" > VERSION
-    - run: export PATH=/opt/conda/bin:$PATH && make docker-push
+    - run: make docker-push
 
 
