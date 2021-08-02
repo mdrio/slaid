@@ -1,4 +1,3 @@
-TAG := $(shell cd docker; ./get_docker_tag.sh)
 
 ifndef skip_test
 	extra_dep_docker:= test
@@ -39,3 +38,4 @@ clean:
 
 docker-push: docker
 	cd docker/; ./docker-push.sh $(DOCKER_ARGS)
+
