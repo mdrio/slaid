@@ -1,3 +1,4 @@
+import abc
 import logging
 import os
 from typing import List
@@ -6,27 +7,60 @@ import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
-import slaid.writers.tiledb as tiledb_io
-import slaid.writers.zarr as zarr_io
 from slaid.classifiers import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons.base import do_filter
+from slaid.commons.base import DEFAULT_TILESIZE, do_filter
 from slaid.commons.dask import init_client
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
+from slaid.writers import REGISTRY as STORAGE
 
-STORAGE = {'zarr': zarr_io, 'tiledb': tiledb_io}
+
+class bidict(dict):
+    def inverse(self):
+        res = {}
+        for k, v in self.items():
+            res[v] = k
+        return res
 
 
-class SerialRunner:
+RUNNERS = bidict()
+
+
+class Runner(abc.ABC):
+    def __init_subclass__(cls, _name, **kwargs):
+        RUNNERS[_name] = cls
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def run(cls,
+            input_path,
+            *,
+            output_dir: 'o',
+            model: 'm',
+            extraction_level: ('l', int) = 2,
+            feature: 'f',
+            threshold: ('t', float) = None,
+            gpu: (int, parameters.multi()) = None,
+            writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+                STORAGE.keys())[0],
+            filter_: 'F' = None,
+            overwrite_output_if_exists: 'overwrite' = False,
+            no_round: bool = False,
+            filter_slide: str = None,
+            chunk: int = None,
+            slide_reader: ('r', parameters.one_of('ecvl',
+                                                  'openslide')) = 'ecvl',
+            batch: ('b', int) = None):
+        ...
+
+
+class SerialRunner(Runner, _name='serial'):
     CLASSIFIER = BasicClassifier
 
     @staticmethod
     def get_slide(path, slide_reader, tilesize):
-        try:
-            return SlideFactory(path, slide_reader, 'base').get_slide()
-        except Exception as ex:
-            logging.error('an error occurs with file %s: %s', path, ex)
+        return SlideFactory(path, slide_reader, 'base').get_slide()
 
     @staticmethod
     def convert_gpu_params(gpu: List[int]) -> List[int]:
@@ -52,38 +86,35 @@ class SerialRunner:
             overwrite_output_if_exists: 'overwrite' = False,
             no_round: bool = False,
             filter_slide: str = None,
+            chunk: int = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
-            tilesize: ('T', int) = 1024,
-            batch: ('b', int) = None,
-            dry_run: bool = False):
-        """
-        :param batch: how many bytes will be predicted at once. Default: all tile is predicted (see tilesize)
-        :param tilesize: the size of the slide area read at once before prediction
-
-
-
-        """
-        if dry_run:
-            args = dict(locals())
-            args.pop('cls')
-            print(args)
+            batch: ('b', int) = None):
+        if chunk:
+            tilesize = chunk
+            chunk = (chunk, chunk)
         else:
-            gpu = cls.convert_gpu_params(gpu)
-            classifier = cls.get_classifier(model, feature, gpu, batch)
-            cls.prepare_output_dir(output_dir)
+            tilesize = DEFAULT_TILESIZE
 
-            slides = cls.classify_slides(input_path, output_dir, classifier,
-                                         extraction_level, threshold, writer,
-                                         filter_, overwrite_output_if_exists,
-                                         no_round, filter_slide, slide_reader,
-                                         tilesize)
-            return classifier, slides
+        gpu = cls.convert_gpu_params(gpu)
+        classifier = cls.get_classifier(model, feature, gpu, batch, writer)
+        cls.prepare_output_dir(output_dir)
+        slides = cls.classify_slides(input_path, output_dir, classifier,
+                                     extraction_level, threshold, writer,
+                                     filter_, overwrite_output_if_exists,
+                                     no_round, filter_slide, chunk,
+                                     slide_reader, tilesize)
+        return classifier, slides
 
     @classmethod
-    def get_classifier(cls, model, feature, gpu, batch):
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
         model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
-        return cls.CLASSIFIER(model, feature)
+        return cls.CLASSIFIER(model, feature, STORAGE[writer])
 
     @staticmethod
     def prepare_output_dir(output_dir):
@@ -105,14 +136,14 @@ class SerialRunner:
     def classify_slides(cls, input_path, output_dir, classifier,
                         extraction_level, threshold, writer, filter_,
                         overwrite_output_if_exists, no_round, filter_slide,
-                        slide_reader, tilesize):
+                        chunk, slide_reader, tilesize):
 
         slides = []
         for slide in cls.get_slides(input_path, slide_reader, tilesize):
             cls.classify_slide(slide, output_dir, classifier, extraction_level,
                                slide_reader, threshold, writer, filter_,
                                overwrite_output_if_exists, no_round,
-                               filter_slide)
+                               filter_slide, chunk)
             slides.append(slide)
         return slides
 
@@ -128,7 +159,8 @@ class SerialRunner:
                        filter_=None,
                        overwrite_output_if_exists=True,
                        no_round: bool = False,
-                       filter_slide=None):
+                       filter_slide=None,
+                       chunk=None):
 
         if filter_:
             filter_slide = cls.get_slide(filter_slide, slide_reader, 256)
@@ -143,17 +175,26 @@ class SerialRunner:
                     'See flag overwrite', slide.filename, classifier.feature)
                 return slide
 
+        chunk = chunk or (-1, -1)
+        tmp_chunk = list(chunk)
+        for i in range(len(chunk)):
+            if chunk[i] < 0:
+                tmp_chunk[i] = slide.level_dimensions[extraction_level][::-1][
+                    i]
+
+        chunk = tuple(tmp_chunk)
         mask = classifier.classify(slide,
                                    filter_=filter_,
                                    threshold=threshold,
                                    level=extraction_level,
-                                   round_to_0_100=not no_round)
+                                   round_to_0_100=not no_round,
+                                   chunk=chunk)
         feature = classifier.feature
         slide.masks[feature] = mask
         STORAGE[writer].dump(slide,
                              output_path,
                              overwrite=overwrite_output_if_exists,
-                             mask=feature)
+                             mask_name=feature)
         logging.info('output %s', output_path)
         return slide
 
@@ -165,15 +206,13 @@ class SerialRunner:
         return output_filename
 
 
-class ParallelRunner(SerialRunner):
+class ParallelRunner(SerialRunner, _name='parallel'):
     CLASSIFIER = DaskClassifier
 
     @classmethod
     def run(cls,
             input_path,
             *,
-            processes: 'p' = False,
-            scheduler: str = None,
             output_dir: 'o',
             model: 'm',
             extraction_level: ('l', int) = 2,
@@ -188,18 +227,28 @@ class ParallelRunner(SerialRunner):
             filter_slide: str = None,
             slide_reader: ('r', parameters.one_of('ecvl',
                                                   'openslide')) = 'ecvl',
-            tilesize: ('T', int) = 1024,
-            batch: ('b', int) = None,
-            dry_run: bool = False):
+            chunk: int = None,
+            batch: ('b', int) = None):
         kwargs = dict(locals())
-        for key in ('cls', '__class__', 'processes', 'scheduler'):
+        for key in ('cls', '__class__'):
             kwargs.pop(key)
-        cls._init_client(scheduler, processes)
+        cls._init_client()
         return super().run(**kwargs)
 
+    @classmethod
+    def get_classifier(cls,
+                       model,
+                       feature,
+                       gpu,
+                       batch,
+                       writer=list(STORAGE.keys())[0]):
+        model = ModelFactory(model, gpu=gpu, batch=batch).get_model()
+        return cls.CLASSIFIER(model, feature)
+
     @staticmethod
-    def _init_client(scheduler, processes):
-        init_client(address=scheduler, processes=processes)
+    def _init_client():
+        #TODO this should be somehow configurable
+        init_client(processes=False, threads_per_worker=4, n_workers=1)
 
     @staticmethod
     def get_slide(path, slide_reader, tilesize):
@@ -208,3 +257,34 @@ class ParallelRunner(SerialRunner):
                                 tilesize).get_slide()
         except Exception as ex:
             logging.error('an error occurs with file %s: %s', path, ex)
+
+
+def run(input_path,
+        *,
+        mode: parameters.one_of(*list(RUNNERS.keys())) = RUNNERS.inverse()
+        [SerialRunner],
+        output_dir: 'o',
+        model: 'm',
+        extraction_level: ('l', int) = 2,
+        feature: 'f',
+        threshold: ('t', float) = None,
+        gpu: (int, parameters.multi()) = None,
+        writer: ('w', parameters.one_of(*list(STORAGE.keys()))) = list(
+            STORAGE.keys())[0],
+        filter_: 'F' = None,
+        overwrite_output_if_exists: 'overwrite' = False,
+        no_round: bool = False,
+        filter_slide: str = None,
+        chunk: int = None,
+        slide_reader: ('r', parameters.one_of('ecvl', 'openslide')) = 'ecvl',
+        batch: ('b', int) = None):
+    """
+    :param batch: how many bytes will be predicted at once. Default: all chunk is predicted (see chunk)
+    :param chunk: the size (square) of data processed at once.
+
+    """
+
+    kwargs = dict(locals())
+    kwargs.pop('mode')
+    runner = RUNNERS[mode]
+    return runner.run(**kwargs)

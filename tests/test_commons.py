@@ -35,9 +35,9 @@ def test_slide_level(slide):
 ])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
-def test_slice_slide(slide):
+def test_slice_slide(slide, image_info):
     for i in range(slide.level_count):
-        array = slide[i]
+        array = slide[i].convert(image_info)
         expected_shape = (
             3, 10,
             20) if slide.image_info.channel == ImageInfo.CHANNEL.FIRST else (
@@ -66,8 +66,6 @@ def test_slice_read(slide):
     image = slide.read_region((0, 0), 0, slide.dimensions)
     slide_array = slide[0][:, :]
     image_array = image.to_array()
-    import numpy as np
-    np.save('test.npy', slide_array.array)
     assert (slide_array.array == image_array).all()
 
 

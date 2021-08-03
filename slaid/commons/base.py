@@ -16,9 +16,10 @@ import tiledb
 import zarr
 from napari_lazy_openslide import OpenSlideStore
 from napari_lazy_openslide.store import ArgumentError, init_attrs
+from skimage.util import view_as_blocks
 from zarr.storage import init_array, init_group
 
-_TILESIZE = 2048
+DEFAULT_TILESIZE = 1024
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -147,10 +148,7 @@ class Mask:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
-    def to_zarr(self, path: str, overwrite: bool = False):
-        logger.info('dumping mask to zarr on path %s', path)
-        name = os.path.basename(path)
-        group = zarr.open_group(os.path.dirname(path))
+    def to_zarr(self, group, name: str, overwrite: bool = False):
         if overwrite and name in group:
             del group[name]
         array = group.array(name, self.array)
@@ -230,7 +228,6 @@ class Filter:
             return self._array
         scale = (size[0] // int(self._array.shape[0]),
                  size[1] // int(self._array.shape[1]))
-        print(scale)
         res = np.zeros(size, dtype='bool')
         for x in range(self._array.shape[0]):
             for y in range(self._array.shape[1]):
@@ -248,6 +245,8 @@ def do_filter(slide: "Slide", condition: str) -> "Filter":
         '==': '__eq__',
         '!=': '__ne__',
     }
+
+    condition = condition.replace('"', '')
     parsed = re.match(
         r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
         condition).groupdict()
@@ -317,7 +316,7 @@ class Slide(BasicSlide):
 
     def _create_slide(self, dataset):
         return SlideArray(self._read_from_store(dataset),
-                          self._slide.IMAGE_INFO).convert(self.image_info)
+                          self._slide.IMAGE_INFO)
 
     def _read_from_store(self, dataset):
         return zarr.open(store=self._store, path=dataset["path"], mode='r')
@@ -360,9 +359,11 @@ class SlideArray:
 
     def __getitem__(self, key) -> "SlideArray":
         if self._is_channel_first():
-            array = self._array[:, key[0], key[1]]
+            array = self._array[:, key[0], key[1]] if isinstance(
+                key, tuple) else self._array[:, key]
         else:
-            array = self._array[key[0], key[1], :]
+            array = self._array[key[0], key[1], :] if isinstance(
+                key, tuple) else self._array[key, :]
         return self.__class__(array, self._image_info)
 
     @property
@@ -386,6 +387,26 @@ class SlideArray:
     def convert(self, image_info: ImageInfo) -> "SlideArray":
         array = self._image_info.convert(self.array, image_info)
         return self.__class__(array, image_info)
+
+    def apply_filter(self, filter_: Filter) -> "SlideArray":
+        if self._is_channel_first():
+            array = self.array[:, filter_.array]
+        else:
+            array = self.array[filter_.array, :]
+
+        return self.__class__(array, self._image_info)
+
+    def get_blocks(self, block_shape: Tuple[int,
+                                            int]) -> Tuple[np.ndarray, bool]:
+        if self._is_channel_first():
+            block_shape = (3, ) + block_shape
+            channel_first = True
+        else:
+
+            block_shape = block_shape + (3, )
+            channel_first = False
+        array = view_as_blocks(self.array, block_shape)
+        return array, channel_first
 
 
 def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
@@ -420,7 +441,7 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = _TILESIZE):
+    def __init__(self, slide: "Slide", tilesize: int = DEFAULT_TILESIZE):
         self._path = slide.filename
         self._slide = slide
         self._tilesize = tilesize
@@ -469,7 +490,7 @@ class BaseSlideFactory(abc.ABC):
                  filename: str,
                  basic_slide_module: str,
                  slide_module: str,
-                 tilesize: int = _TILESIZE,
+                 tilesize: int = DEFAULT_TILESIZE,
                  image_info: ImageInfo = None):
         self._filename = filename.rstrip('/')
         self._basic_slide_module = basic_slide_module
