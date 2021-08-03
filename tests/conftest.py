@@ -20,7 +20,7 @@ from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 @pytest.fixture
 def slide_with_mask():
     def _slide_with_mask(create_array_func):
-        slide = EcvlSlide('tests/data/PH10023-1.thumb.tif')
+        slide = EcvlSlide('tests/data/patch.tif')
         array = create_array_func(slide.dimensions[::-1])
         slide.masks['mask'] = Mask(array, 1, 1, dt.now(), False)
         return slide
@@ -136,7 +136,8 @@ def green_slide_and_patch_classifier(backend, image_info):
     slide_path = 'tests/data/test.tif'
     if backend == 'basic':
         return Slide(SlideStore(EcvlSlide(slide_path)),
-                     image_info), BasicClassifier(GreenModel(), 'tissue')
+                     image_info), BasicClassifier(
+                         EddlGreenPatchModel(patch_size=(10, 10)), 'tissue')
     elif backend == 'dask':
         return DaskSlide(SlideStore(EcvlSlide(slide_path), tilesize=90),
                          image_info), DaskClassifier(ActorModel.create(

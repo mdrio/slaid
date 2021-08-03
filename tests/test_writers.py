@@ -36,18 +36,22 @@ def test_slide_from_tiledb(slide_with_mask, tmp_path):
     assert slide.masks == tiledb_slide.masks
 
 
-def test_slide_to_zarr(slide_with_mask, tmp_path):
+@pytest.mark.parametrize(
+    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
+def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
     slide_path = os.path.join(path, f'{os.path.basename(slide.filename)}.zarr')
-    zarr_io.dump(slide, slide_path)
-    res = zarr_io.load(slide_path)
+    storage.dump(slide, slide_path)
+    res = storage.load(slide_path)
     assert res == slide
 
 
-def test_checks_zarr_path_has_masks(slide_with_mask, tmp_path):
+@pytest.mark.parametrize(
+    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
+def test_checks_zarr_path_has_masks(storage, slide_with_mask, tmp_path):
     slide = slide_with_mask(np.ones)
     path = str(tmp_path)
     slide_path = os.path.join(path, f'{os.path.basename(slide.filename)}.zarr')
-    zarr_io.dump(slide, slide_path)
-    assert zarr_io.mask_exists(slide_path, 'mask')
+    storage.dump(slide, slide_path)
+    assert storage.mask_exists(slide_path, 'mask')
