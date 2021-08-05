@@ -7,12 +7,23 @@ on:
     branches: [ master, develop ]
 
 jobs:
-  bump-version:
+  build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       with:
         fetch-depth: '0'
+
+    - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
+    - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
+    - run: conda install -c anaconda python=3.8
+    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
+    - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
+
+
+    - name: test
+      run: make test
+
     - name: Bump version and push tag
       id: tag-creation
       uses: anothrNick/github-tag-action@1.34.0
@@ -21,28 +32,22 @@ jobs:
         WITH_V: false
         RELEASE_BRANCHES: master
 
-    outputs:
-      new_tag: ${{ steps.tag-creation.outputs.new_tag }}
-  build:
-    runs-on: ubuntu-latest
-    needs: bump-version
-    steps:
-    - uses: actions/checkout@v2
+    - name: update VERSION file
+      run: echo  "${{ steps.tag-creation.outputs.new_tag }}" > VERSION
+
+    - name: set docker repo
+      shell: bash
+      env:
+        DOCKER_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}
+      run: echo "$DOCKER_REPO" > docker/repo.txt
+
     - name: Login to Docker Hub
       uses: docker/login-action@v1
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-    - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
-    - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
-    - run: conda install -c anaconda python=3.8
-    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
-    - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
-    - shell: bash
-      env:
-        DOCKER_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}
-      run: echo "$DOCKER_REPO" > docker/repo.txt
-    - run: echo  "${{ needs.bump-version.outputs.new_tag }}" > VERSION
-    - run: export PATH=/opt/conda/bin:$PATH && make docker-push
+
+    - name: build and push docker images
+      run: make docker-push skip_test=true
 
 
