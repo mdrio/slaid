@@ -40,7 +40,12 @@ Classify tumor:
 classify.py -f tissue -m  slaid/resources/models/tumor_model-classify_tumor_eddl_0.1.bin -l 2 -o <OUTPUT_DIR> <SLIDE>
 ```
 
+### Run on Docker
+Slaid is released as docker images, one for each DL model available. 
+Example:
+```
+docker run  --rm -v $DIR/../data:/data    slaid:0.62.0-tissue_model-extract_tissue_eddl_1.1 -l 0 /data/$IMAGE --overwrite  -f tissue  -o/data
 
- 
+```
 
 
