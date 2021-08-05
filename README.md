@@ -1,0 +1,43 @@
+# slaid
+[![Docker Image CI](https://github.com/mdrio/slaid/actions/workflows/test-build-publish.yaml/badge.svg)](https://github.com/mdrio/slaid/actions/workflows/test-build-publish.yaml)
+
+## Installation
+Prerequisites: 
+ * conda
+ * python >=3.6, <= 3.8 (tested on 3.8)
+ * Installation of dependencies pyecvl, pyeddl with conda is recommended. Be sure pip on your path is the one that comes with conda.
+
+Run:
+```
+python setup.py install
+```
+
+## Docker image build
+
+Run:
+```
+make docker
+```
+
+## Usage
+For slide classification, use the installed bin classify.py. Get help typing:
+
+```
+classify.py --help
+```
+
+Examples:
+Extract tissue
+```
+classify.py -f tissue -m  slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin -l 2 -o <OUTPUT_DIR> <SLIDE>
+```
+
+Classify tumor:
+```
+classify.py -f tissue -m  slaid/resources/models/tumor_model-classify_tumor_eddl_0.1.bin -l 2 -o <OUTPUT_DIR> <SLIDE>
+```
+
+
+ 
+
+
