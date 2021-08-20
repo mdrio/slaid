@@ -111,8 +111,8 @@ class Mask:
     tile_size: int = None
 
     def __post_init__(self):
-        self.dzi_sampling_level = math.log2(
-            max(*self.slide_levels[self.extraction_level]))
+        self.dzi_sampling_level = math.ceil(
+            math.log2(max(*self.slide_levels[self.extraction_level])))
 
     def _filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.array)
