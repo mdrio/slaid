@@ -49,6 +49,7 @@ class Mask(BaseMask):
                                    overwrite=True,
                                    return_stored=True)
                 progress(array)
+                print('tmp_dir', tmp_dir)
                 array = zarr.open(tmp_dir, mode='r')
                 group[name] = array
                 array = group[name]
