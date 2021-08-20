@@ -39,7 +39,7 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
     @staticmethod
     def load(path: str) -> BasicSlide:
         logger.info('loading slide from zarr at path %s', path)
-        group = zarr.open_group(path)
+        group = zarr.open(path)
         try:
             slide = EcvlSlide(group.attrs['filename'])
         except BasicSlide.InvalidFile:
@@ -51,7 +51,13 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
                 kwargs = value.attrs.asdict()
                 if 'datetime' in kwargs:
                     kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
-                slide.masks[name] = Mask(value, **kwargs)
+                slide.masks[name] = Mask(value, kwargs['extraction_level'],
+                                         kwargs['level_downsample'],
+                                         slide.level_dimensions,
+                                         kwargs.get('datetime'),
+                                         kwargs.get('round_to_0_100'),
+                                         kwargs.get('threshold'),
+                                         kwargs.get('model'))
             except Exception as ex:
                 logger.error('skipping mask %s, exception: %s ', name, ex)
                 raise ex
@@ -66,27 +72,6 @@ class ZarrDirectoryStorage(Storage, _name='zarr'):
 
 
 class ZarrZipStorage(ZarrDirectoryStorage, _name='zip'):
-    @staticmethod
-    def load(path: str) -> BasicSlide:
-        logger.info('loading slide from zarr at path %s', path)
-        storage = zarr.storage.ZipStore(path, mode='r')
-        group = zarr.open_group(storage)
-        try:
-            slide = EcvlSlide(group.attrs['filename'])
-        except BasicSlide.InvalidFile:
-            # FIXME: workaround for cwl
-            slide = EcvlSlide(os.path.basename(group.attrs['filename']))
-        for name, value in group.arrays():
-            try:
-                logger.info('loading mask %s, %s', name, value.attrs.asdict())
-                kwargs = value.attrs.asdict()
-                if 'datetime' in kwargs:
-                    kwargs['datetime'] = dt.fromtimestamp(kwargs['datetime'])
-                slide.masks[name] = Mask(value, **kwargs)
-            except Exception as ex:
-                logger.error('skipping mask %s, exception: %s ', name, ex)
-        return slide
-
     @staticmethod
     def dump(slide: BasicSlide,
              output_path: str,

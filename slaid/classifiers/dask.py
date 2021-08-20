@@ -37,7 +37,7 @@ class Classifier(BasicClassifier):
             predictions = self._classify_batches(slide, level, filter_, chunk)
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)
-        mask = self._get_mask(predictions, level,
+        mask = self._get_mask(slide, predictions, level,
                               slide.level_downsamples[level], dt.now(),
                               round_to_0_100)
 
