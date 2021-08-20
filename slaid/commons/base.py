@@ -111,7 +111,6 @@ class Mask:
     tile_size: int = None
 
     def __post_init__(self):
-        print('self.slide_levels', self.slide_levels)
         self.dzi_sampling_level = math.log2(
             max(*self.slide_levels[self.extraction_level]))
 
@@ -277,8 +276,6 @@ class BasicSlide(abc.ABC):
         self.masks: Dict[str, Mask] = {}
 
     def __eq__(self, other):
-        print(self._filename, other.filename)
-        print(self.masks, other.masks)
         return self._filename == other.filename and self.masks == other.masks
 
     @abc.abstractproperty
