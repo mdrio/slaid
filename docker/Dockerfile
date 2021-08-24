@@ -1,4 +1,4 @@
-FROM  dhealth/pylibs-toolkit:0.10.1-gpu
+FROM  dhealth/pylibs-toolkit:0.10.1-cudnn
 
 # RUN useradd -ms  /bin/bash slaid && \
 #     chown slaid /tmp/slaid && \
