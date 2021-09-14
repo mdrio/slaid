@@ -18,7 +18,7 @@ class Factory(BaseFactory):
 
 
 class GreenModel(BaseModel):
-    image_info = ImageInfo('rgb', 'yx', 'last')
+    image_info = ImageInfo.create('rgb', 'yx', 'last')
 
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
@@ -73,7 +73,7 @@ class BaseDummyModel(BaseModel):
 
 
 class DummyModel(BaseDummyModel):
-    image_info = ImageInfo('bgr', 'yx', 'last')
+    image_info = ImageInfo.create('bgr', 'yx', 'last')
 
     def __init__(self, func, patch_size=None):
         self.func = func

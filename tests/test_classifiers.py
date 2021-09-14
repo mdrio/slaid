@@ -14,7 +14,8 @@ from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.models.eddl import TissueModel, TumorModel
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0, 1])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide(green_slide_and_classifier, level):
@@ -27,7 +28,7 @@ def test_classify_slide(green_slide_and_classifier, level):
     assert (mask.array[green_zone:, :] == 0).all()
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
+@pytest.mark.parametrize('image_info', [ImageInfo.create('rgb', 'yx', 'last')])
 @pytest.mark.parametrize('level', [0, 1])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 @pytest.mark.parametrize('max_MB_prediction', [None])
@@ -53,7 +54,7 @@ def test_classify_with_filter(green_slide_and_classifier, level,
     assert (mask.array[ones_row:, :] == 0).all()
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
+@pytest.mark.parametrize('image_info', [ImageInfo.create('rgb', 'yx', 'last')])
 @pytest.mark.parametrize('level', [0, 1])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 @pytest.mark.parametrize('max_MB_prediction', [None])
@@ -74,7 +75,8 @@ def test_classify_with_zeros_as_filter(green_slide_and_classifier, level,
     assert (mask.array[:, :] == 0).all()
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide_by_patches(green_slide_and_patch_classifier, level):
@@ -94,7 +96,8 @@ def test_classify_slide_by_patches(green_slide_and_patch_classifier, level):
     assert mask.tile_size == 10
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide_by_patches_with_filter_all_zeros(
@@ -116,7 +119,8 @@ def test_classify_slide_by_patches_with_filter_all_zeros(
     assert (mask.array == 0).all()
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('level', [0])
 @pytest.mark.parametrize('backend', ['basic', 'dask'])
 def test_classify_slide_by_patches_with_filter(
@@ -146,7 +150,8 @@ def test_classify_slide_by_patches_with_filter(
 @pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [DaskSlide])
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 def test_classifies_tumor(slide, patch_tissue_mask):
     model = TumorModel(
         'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin')
@@ -166,7 +171,7 @@ def test_classifies_tumor(slide, patch_tissue_mask):
 @pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [DaskSlide])
-@pytest.mark.parametrize('image_info', [ImageInfo('rgb', 'yx', 'last')])
+@pytest.mark.parametrize('image_info', [ImageInfo.create('rgb', 'yx', 'last')])
 def test_classifies_tissue(slide, patch_tissue_mask):
     model = TissueModel(
         'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
