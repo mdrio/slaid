@@ -14,10 +14,10 @@ IMAGE = 'tests/data/test.tif'
 
 
 @pytest.mark.parametrize('image_info', [
-    ImageInfo('bgr', 'yx', 'first'),
-    ImageInfo('rgb', 'yx', 'first'),
-    ImageInfo('rgb', 'yx', 'last'),
-    ImageInfo('bgr', 'yx', 'last')
+    ImageInfo.create('bgr', 'yx', 'first'),
+    ImageInfo.create('rgb', 'yx', 'first'),
+    ImageInfo.create('rgb', 'yx', 'last'),
+    ImageInfo.create('bgr', 'yx', 'last')
 ])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
@@ -28,10 +28,10 @@ def test_slide_level(slide):
 
 
 @pytest.mark.parametrize('image_info', [
-    ImageInfo('bgr', 'yx', 'first'),
-    ImageInfo('rgb', 'yx', 'first'),
-    ImageInfo('rgb', 'yx', 'last'),
-    ImageInfo('bgr', 'yx', 'last')
+    ImageInfo.create('bgr', 'yx', 'first'),
+    ImageInfo.create('rgb', 'yx', 'first'),
+    ImageInfo.create('rgb', 'yx', 'last'),
+    ImageInfo.create('bgr', 'yx', 'last')
 ])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
@@ -45,7 +45,8 @@ def test_slice_slide(slide, image_info):
         assert array[:10, :20]._array.shape == expected_shape
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_read_region(slide):
@@ -59,7 +60,8 @@ def test_read_region(slide):
     )
 
 
-@pytest.mark.parametrize('image_info', [ImageInfo('bgr', 'yx', 'first')])
+@pytest.mark.parametrize('image_info',
+                         [ImageInfo.create('bgr', 'yx', 'first')])
 @pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slice_read(slide):

@@ -6,7 +6,7 @@ from slaid.commons import ImageInfo
 
 
 class Model(abc.ABC):
-    image_info = ImageInfo('bgr', 'yx', 'first')
+    image_info = ImageInfo.create('bgr', 'yx', 'first')
 
     @abc.abstractmethod
     def predict(self, array: np.array) -> np.array:
