@@ -30,7 +30,7 @@ def get_class(name, module):
 
 
 @dataclass
-class ImageInfo(abc.ABC):
+class ImageInfo:
     class COLORTYPE(Enum):
         RGB = 'rgb'
         BGR = 'bgr'
@@ -47,13 +47,10 @@ class ImageInfo(abc.ABC):
     coord: COORD
     channel: CHANNEL
 
-    def __post_init__(self):
-        if isinstance(self.color_type, str):
-            self.color_type = ImageInfo.COLORTYPE(self.color_type)
-        if isinstance(self.coord, str):
-            self.coord = ImageInfo.COORD(self.coord)
-        if isinstance(self.channel, str):
-            self.channel = ImageInfo.CHANNEL(self.channel)
+    @staticmethod
+    def create(color_type: str, coord: str, channel: str) -> "ImageInfo":
+        return ImageInfo(ImageInfo.COLORTYPE(color_type),
+                         ImageInfo.COORD(coord), ImageInfo.CHANNEL(channel))
 
     def convert(self, array: np.ndarray,
                 array_image_info: "ImageInfo") -> np.ndarray:
@@ -266,7 +263,7 @@ def do_filter(slide: "Slide", condition: str) -> "Filter":
 
 
 class BasicSlide(abc.ABC):
-    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+    IMAGE_INFO = ImageInfo.create('bgr', 'yx', 'first')
 
     class InvalidFile(Exception):
         pass

@@ -9,7 +9,7 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class BaseModel:
-    image_info = ImageInfo('bgr', 'yx', 'first')
+    image_info = ImageInfo.create('bgr', 'yx', 'first')
 
     def __init__(self, patch_size=None):
         self._patch_size = patch_size
@@ -23,7 +23,7 @@ class BaseModel:
 
 
 class GreenModel(BaseModel):
-    image_info = ImageInfo('rgb', 'yx', 'last')
+    image_info = ImageInfo.create('rgb', 'yx', 'last')
 
     def predict(self, array: np.array) -> np.array:
         return array[:, 1] / 255
@@ -79,7 +79,7 @@ class BaseDummyModel(BaseModel):
 
 
 class DummyModel(BaseDummyModel):
-    image_info = ImageInfo('bgr', 'yx', 'first')
+    image_info = ImageInfo.create('bgr', 'yx', 'first')
 
     def __init__(self, func, patch_size=None):
         self.func = func
