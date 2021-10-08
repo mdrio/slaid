@@ -44,7 +44,7 @@ logger = logging.getLogger('ecvl')
 
 
 class Image(BaseImage):
-    IMAGE_INFO = ImageInfo('bgr', 'yx', 'first')
+    IMAGE_INFO = ImageInfo.create('bgr', 'yx', 'first')
 
     def __init__(self, image: EcvlImage):
         self._image = image
