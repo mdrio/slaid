@@ -90,7 +90,8 @@ def tissue_model():
 @pytest.fixture
 def slide_array(cls):
     return cls(
-        np.arange(16 * 3).reshape(3, 4, 4), ImageInfo('bgr', 'yx', 'first'))
+        np.arange(16 * 3).reshape(3, 4, 4),
+        ImageInfo.create('bgr', 'yx', 'first'))
 
 
 @pytest.fixture
@@ -129,10 +130,9 @@ def green_slide_and_classifier(backend, image_info):
                      image_info), BasicClassifier(GreenModel(), 'tissue')
     elif backend == 'dask':
         return DaskSlide(SlideStore(EcvlSlide(slide_path)),
-                         image_info), DaskClassifier(
-                             ActorModel.create(GreenModel),
-                             'tissue',
-                             compute_mask=True)
+                         image_info), DaskClassifier(GreenModel(),
+                                                     'tissue',
+                                                     compute_mask=True)
     else:
         return NotImplementedError(backend)
 
