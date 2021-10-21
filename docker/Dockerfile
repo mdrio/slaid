@@ -1,4 +1,6 @@
-FROM  dhealth/pylibs-toolkit:0.10.1-cudnn
+# ARG PARENT=dhealth/pylibs-toolkit:0.10.1-gpu
+ARG PARENT
+FROM  $PARENT
 
 # RUN useradd -ms  /bin/bash slaid && \
 #     chown slaid /tmp/slaid && \

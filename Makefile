@@ -17,7 +17,7 @@ docker-main:
 	cp requirements.txt docker-build/
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
-	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(TAG)
+	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(TAG) --build-arg $(BUILD_ARG)
 	docker tag slaid:$(TAG) slaid
 	tests/docker/test_docker.sh
 
@@ -32,12 +32,12 @@ test: install
 
 docker-per-model:
 	mkdir -p docker-build
-	cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build
+	cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build --build-arg $(BUILD_ARG) -e $(EXTRA_TAGS)
 clean:
 	rm -f install
 	rm -f test
 	rm -rf docker-build
 
 docker-push: docker
-	cd docker/; ./docker-push.sh $(TAG) $(DOCKER_ARGS)
+	cd docker/; ./docker-push.sh $(TAG) $(EXTRA_TAGS)
 
