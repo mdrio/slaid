@@ -122,7 +122,7 @@ def docker_tag(repo, image, tag, docker_args=""):
 
 
 def get_models():
-    with open("docker/filter-models.txt", "r") as f_obj:
+    with open("filter-models.txt", "r") as f_obj:
         models = f_obj.read().splitlines()
     for model in models:
         model_no_ext = os.path.splitext(model)[0]
