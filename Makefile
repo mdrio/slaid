@@ -39,5 +39,5 @@ clean:
 	rm -rf docker-build
 
 docker-push: docker
-	cd docker/; ./docker-push.sh $(TAG) $(DOCKER_ARGS)
+	cd docker/; ./docker-push.sh $(TAG) $(EXTRA_TAGS)
 
