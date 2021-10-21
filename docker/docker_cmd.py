@@ -122,11 +122,11 @@ def docker_tag(repo, image, tag, docker_args=""):
 
 
 def get_models():
-    models = glob.glob("../slaid/resources/models/*.bin")
+    with open("docker/filter-models.txt", "r") as f_obj:
+        models = f_obj.read().splitlines()
     for model in models:
-        model_path = os.path.basename(model)
-        model_name = os.path.splitext(model_path)[0]
-        yield model_path, model_name
+        model_no_ext = os.path.splitext(model)[0]
+        yield model, model_no_ext
 
 
 if __name__ == "__main__":
