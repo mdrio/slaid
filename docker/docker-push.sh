@@ -4,6 +4,6 @@ set -ex
 TAG=$1
 EXTRA_TAGS=$2
 while read repo; do
-  ./docker_cmd.py $DOCKER_ARGS  -v $TAG tag  -r $repo -e $EXTRA_TAGS | xargs  docker push 
+  ./docker_cmd.py $DOCKER_ARGS  -v $TAG tag  -r $repo -e $EXTRA_TAGS | xargs -I{}  docker push {}
 
 done < repo.txt
