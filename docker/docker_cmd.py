@@ -81,23 +81,10 @@ def docker_build(
     subprocess.run(command, shell=True, check=True)
 
 
-def push(image="slaid", lib_version="", repo="", docker_args=""):
-    kwargs_list = [
-        dict(image=image, tag=f"{lib_version}", repo=repo, docker_args=docker_args)
-    ]
-
-    for model_path, model_name in get_models():
-        kwargs_list.append(
-            dict(
-                image=image,
-                tag=f'{lib_version + "-" if lib_version else ""}{model_name}',
-                repo=repo,
-                docker_args=docker_args,
-            )
-        )
-
-    for kwargs in kwargs_list:
-        docker_push(**kwargs)
+def push(image, **kwargs):
+    command = f"docker  push {image}"
+    logging.debug(command)
+    #  docker_push(**kwargs)
 
 
 def docker_push(image, tag, repo, docker_args=""):
@@ -114,7 +101,6 @@ def tag(repo, image="slaid", lib_version="", docker_args="", extra_tags=None):
         dict(repo=repo, image=image, tag=f"{lib_version}", docker_args=docker_args)
     ]
 
-    extra_tags = extra_tags or []
     for _, model_name in get_models():
         tag = _get_tag(lib_version, model_name, extra_tags)
         kwargs_list.append(
@@ -127,14 +113,16 @@ def tag(repo, image="slaid", lib_version="", docker_args="", extra_tags=None):
         )
 
     for kwargs in kwargs_list:
-        docker_tag(**kwargs)
+        print(docker_tag(**kwargs))
 
 
 def docker_tag(repo, image, tag, docker_args=""):
     tag = ":" + tag if tag else ""
-    command = f"docker {docker_args} tag {image}{tag} {repo}/{image}{tag}"
+    final_tag = f"{repo}/{image}{tag}"
+    command = f"docker {docker_args} tag {image}{tag} {final_tag}"
     logging.debug(command)
     subprocess.run(command, shell=True, check=True)
+    return final_tag
 
 
 def _get_tag(lib_version, model_name, extra_tags=None):
@@ -176,7 +164,7 @@ if __name__ == "__main__":
     )
 
     push_parser = subparsers.add_parser("push")
-    push_parser.add_argument("-r", dest="repo")
+    push_parser.add_argument("image", action="append")
     push_parser.set_defaults(func=push)
 
     tag_parser = subparsers.add_parser("tag")
