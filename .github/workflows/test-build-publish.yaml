@@ -70,7 +70,7 @@ jobs:
     - name: build and push docker images
       env:
         BUILD_ARG: PARENT=${{ matrix.parent_image }}
-        EXTRA_TAGS: PARENT=${{ matrix.tag }}
+        EXTRA_TAGS: ${{ matrix.tag }}
       run: make docker-push skip_test=true
 
 
