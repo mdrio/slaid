@@ -6,7 +6,7 @@ pyeddl==1.0.0
 clize==4.2.1
 dask[complete]==2021.03.0
 zarr==2.8.3
-dataclasses==0.8
+dataclasses==0.6
 tiledb==0.7.0
 progress==1.6
 stringcase==1.2.0
