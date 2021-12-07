@@ -44,11 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-       include:
-        - parent_image: dhealth/pylibs-toolkit:${{ need.test.steps.get_pyecvl_version.outputs.pyecvl-version }}-gpu
-          tag: gpu
-        - parent_image: dhealth/pylibs-toolkit:${{ need.test.steps.get_pyecvl_version.outputs.pyecvl-version }}-cudnn
-          tag: cudnn
+          tag: [gpu, cudnn]
 
     steps:
     - uses: actions/checkout@v2
@@ -72,7 +68,7 @@ jobs:
 
     - name: build and push docker images
       env:
-        BUILD_ARG: PARENT=${{ matrix.parent_image }}
+        BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.steps.get_pyecvl_version.outputs.pyecvl-version }}-${{ matrix.tag }}
         EXTRA_TAGS: ${{ matrix.tag }}
       run: make docker-push skip_test=true
 
