@@ -17,10 +17,13 @@ jobs:
       with:
         fetch-depth: '0'
 
+    - id: get_pyecvl_version
+      run: echo "::set-output name=pyecvl-version::$(cat requirements.txt | grep -oP 'pyecvl==\K(\d+\.\d+\.\d+)')"
+
     - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
     - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
     - run: conda install -c anaconda python=3.8
-    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
+    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu==${{ steps.get_pyecvl_version.outputs.pyecvl-version }}
     - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
 
 
@@ -41,11 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-       include:
-        - parent_image: dhealth/pylibs-toolkit:0.10.1-gpu
-          tag: gpu
-        - parent_image: dhealth/pylibs-toolkit:0.10.1-cudnn
-          tag: cudnn
+          tag: [gpu, cudnn]
 
     steps:
     - uses: actions/checkout@v2
@@ -69,7 +68,7 @@ jobs:
 
     - name: build and push docker images
       env:
-        BUILD_ARG: PARENT=${{ matrix.parent_image }}
+        BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.steps.get_pyecvl_version.outputs.pyecvl-version }}-${{ matrix.tag }}
         EXTRA_TAGS: ${{ matrix.tag }}
       run: make docker-push skip_test=true
 
