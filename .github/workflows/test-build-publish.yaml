@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag-creation.outputs.new_tag }}
+      pyecvl_version: ${{ steps.get_pyecvl_version.outputs.pyecvl-version }}
 
     steps:
     - uses: actions/checkout@v2
@@ -68,7 +69,7 @@ jobs:
 
     - name: build and push docker images
       env:
-        BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.steps.get_pyecvl_version.outputs.pyecvl-version }}-${{ matrix.tag }}
+        BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.outputs.pyecvl_version }}-${{ matrix.tag }}
         EXTRA_TAGS: ${{ matrix.tag }}
       run: make docker-push skip_test=true
 
