@@ -7,8 +7,11 @@ on:
     branches: [ master, develop ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag-creation.outputs.new_tag }}
+
     steps:
     - uses: actions/checkout@v2
       with:
@@ -32,8 +35,25 @@ jobs:
         WITH_V: false
         RELEASE_BRANCHES: master
 
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+       include:
+        - parent_image: dhealth/pylibs-toolkit:0.10.1-gpu
+          tag: gpu
+        - parent_image: dhealth/pylibs-toolkit:0.10.1-cudnn
+          tag: cudnn
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+
     - name: update VERSION file
-      run: echo  "${{ steps.tag-creation.outputs.new_tag }}" > VERSION
+      run: echo  "${{ needs.test.outputs.tag }}" > VERSION
 
     - name: set docker repo
       shell: bash
@@ -48,6 +68,9 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
     - name: build and push docker images
+      env:
+        BUILD_ARG: PARENT=${{ matrix.parent_image }}
+        EXTRA_TAGS: ${{ matrix.tag }}
       run: make docker-push skip_test=true
 
 
