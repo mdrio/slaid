@@ -6,9 +6,11 @@ import tiledb
 
 from slaid.commons import Mask
 from slaid.commons.base import ImageInfo, Slide, SlideArray
-from slaid.commons.dask import Slide as DaskSlide, DaskSlideArray
+from slaid.commons.dask import DaskSlideArray
 from slaid.commons.dask import Mask as DaskMask
+from slaid.commons.dask import Slide as DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.commons.openslide import Slide as OpenSlide
 
 IMAGE = 'tests/data/test.tif'
 
@@ -19,7 +21,7 @@ IMAGE = 'tests/data/test.tif'
     ImageInfo.create('rgb', 'yx', 'last'),
     ImageInfo.create('bgr', 'yx', 'last')
 ])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide, OpenSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slide_level(slide):
     for i in range(slide.level_count):
@@ -33,7 +35,7 @@ def test_slide_level(slide):
     ImageInfo.create('rgb', 'yx', 'last'),
     ImageInfo.create('bgr', 'yx', 'last')
 ])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide, OpenSlide])
 @pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
 def test_slice_slide(slide, image_info):
     for i in range(slide.level_count):
@@ -62,8 +64,8 @@ def test_read_region(slide):
 
 @pytest.mark.parametrize('image_info',
                          [ImageInfo.create('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
+@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide, OpenSlide])
+@pytest.mark.parametrize('slide_cls', [Slide])
 def test_slice_read(slide):
     image = slide.read_region((0, 0), 0, slide.dimensions)
     slide_array = slide[0][:, :]
