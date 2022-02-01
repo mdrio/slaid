@@ -62,10 +62,10 @@ class Slide(BaseSlide):
 
     def __init__(self, filename: str):
         super().__init__(filename)
-        slide = open_slide(filename)  # not serializable...
-        self._dimensions = slide.dimensions
-        self._level_dimensions = slide.level_dimensions
-        self._level_downsamples = slide.level_downsamples
+        self._slide = open_slide(filename)  # not serializable...
+        self._dimensions = self._slide.dimensions
+        self._level_dimensions = self._slide.level_dimensions
+        self._level_downsamples = self._slide.level_downsamples
 
     def __eq__(self, other):
         return self._filename == other.filename and self.masks == other.masks
@@ -80,12 +80,10 @@ class Slide(BaseSlide):
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> BaseImage:
-        return Image(
-            open_slide(self.filename).read_region(location, level, size))
+        return Image(self._slide.read_region(location, level, size))
 
     def get_best_level_for_downsample(self, downsample: int):
-        return open_slide(
-            self.filename).get_best_level_for_downsample(downsample)
+        return self._slide.get_best_level_for_downsample(downsample)
 
     @property
     def level_dimensions(self):
