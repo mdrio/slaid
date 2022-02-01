@@ -37,47 +37,47 @@ def _test_output(feature, output, slide, level):
         'level_downsample'] == slide.level_downsamples[level]
 
 
-@pytest.mark.parametrize('mode', ['serial', 'parallel'])
+@pytest.mark.parametrize('classifier', ['serial'])
 @pytest.mark.parametrize(
     'model',
     ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
-@pytest.mark.parametrize('chunk', [None, 16])
-def test_classify(mode, tmp_path, model, chunk):
-    feature = 'tissue'
+@pytest.mark.parametrize('chunk', [None, 256])
+def test_classify(classifier, tmp_path, model, chunk):
+    label = 'tissue'
     path = str(tmp_path)
     cmd = [
-        'classify.py', '--mode', mode, '-f', feature, '-m', model, '-l', '2',
-        '-o', path, input_
+        'classify.py', classifier, '-L', label, '-m', model, '-l', '2', '-o',
+        path, input_
     ]
     if chunk:
-        cmd += ['--chunk', str(chunk)]
+        cmd += ['--chunk-size', str(chunk)]
     subprocess.check_call(cmd)
     logger.info('running cmd %s', ' '.join(cmd))
     output_path = os.path.join(path, f'{input_basename}.zarr')
     slide, output = get_input_output(output_path)
 
-    _test_output(feature, output, slide, 2)
-    assert output[feature].dtype == 'uint8'
+    _test_output(label, output, slide, 2)
+    assert output[label].dtype == 'uint8'
 
 
-@pytest.mark.parametrize('mode', ['serial', 'parallel'])
+@pytest.mark.parametrize('classifier', ['serial'])
 @pytest.mark.parametrize(
     'model',
     ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
-def test_classifies_with_no_round(mode, tmp_path, model):
+def test_classifies_with_no_round(classifier, tmp_path, model):
     path = str(tmp_path)
-    feature = 'tissue'
+    label = 'tissue'
     cmd = [
-        'classify.py', '--mode', mode, '-f', feature, '-m', model,
-        '--no-round', '-l', '2', '-o', path, input_
+        'classify.py', classifier, '-L', label, '-m', model, '--no-round',
+        '-l', '2', '-o', path, input_
     ]
     subprocess.check_call(cmd)
     logger.info('running cmd %s', ' '.join(cmd))
     output_path = os.path.join(path, f'{input_basename}.zarr')
     slide, output = get_input_output(output_path)
 
-    assert output[feature].dtype == 'float32'
-    assert (np.array(output[feature]) <= 1).all()
+    assert output[label].dtype == 'float32'
+    assert (np.array(output[label]) <= 1).all()
 
 
 @pytest.mark.skip(reason="to be updated")
@@ -137,9 +137,9 @@ class TestSerialPatchClassifier:
         assert (np.array(output[self.feature]) <= 1).all()
 
 
-@pytest.mark.parametrize('mode', ['serial', 'parallel'])
+@pytest.mark.parametrize('classifier', ['serial'])
 @pytest.mark.parametrize('storage', ['zarr', 'zip'])
-def test_classifies_with_filter(mode, slide_with_mask, tmp_path,
+def test_classifies_with_filter(classifier, slide_with_mask, tmp_path,
                                 model_all_ones_path, tmpdir, storage):
     path = f'{tmp_path}.{storage}'
     slide = slide_with_mask(np.ones)
@@ -148,9 +148,10 @@ def test_classifies_with_filter(mode, slide_with_mask, tmp_path,
 
     cmd = [
         'classify.py',
-        '--mode',
-        mode,
-        '-f',
+        classifier,
+        '-l',
+        '2',
+        '-L',
         'test',
         '-m',
         model_all_ones_path,
@@ -169,6 +170,10 @@ def test_classifies_with_filter(mode, slide_with_mask, tmp_path,
 @pytest.mark.skip(reason="to be updated")
 class TestParallelPatchClassifier(TestSerialPatchClassifier):
     cmd = 'parallel'
+
+
+def test_classifies_patches():
+    raise NotImplementedError()
 
 
 if __name__ == '__main__':

@@ -478,7 +478,7 @@ class SlideStore(OpenSlideStore):
             raise err
         except Exception as ex:
             logger.error('ex %s', ex)
-            raise KeyError(key)
+            raise KeyError(key) from ex
 
         return tile.to_array().tobytes()
 
@@ -492,16 +492,17 @@ class SlideStore(OpenSlideStore):
 
 
 class BaseSlideFactory(abc.ABC):
+
     def __init__(self,
                  filename: str,
                  basic_slide_module: str,
                  slide_module: str,
-                 tilesize: int = DEFAULT_TILESIZE,
+                 tilesize: int = None,
                  image_info: ImageInfo = None):
         self._filename = filename.rstrip('/')
         self._basic_slide_module = basic_slide_module
         self._slide_module = slide_module
-        self._tilesize = tilesize
+        self._tilesize = tilesize or DEFAULT_TILESIZE
         self._image_info = image_info
 
     @abc.abstractmethod
