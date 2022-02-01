@@ -7,7 +7,7 @@ import clize
 import pkg_resources
 import tiledb
 
-from slaid.runners import run
+from slaid.runners import serial, serial_patch
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -16,6 +16,7 @@ logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
 
 
 def set_model(func, model):
+
     def wrapper(*args, **kwargs):
         return func(*args, model=model, **kwargs)
 
@@ -38,6 +39,7 @@ if __name__ == '__main__':
     if model:
         model = pkg_resources.resource_filename('slaid',
                                                 f'resources/models/{model}')
-        run = set_model(run, model)
+        serial_patch = set_model(serial_patch, model)
+        serial = set_model(serial, model)
 
-    clize.run(run)
+    clize.run(serial_patch, serial)
