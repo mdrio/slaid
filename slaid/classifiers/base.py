@@ -1,13 +1,13 @@
 import abc
 import logging
-import math
 from datetime import datetime as dt
+from functools import partial
 from typing import Callable, Tuple
 
 import numpy as np
 from progress.bar import Bar
 
-from slaid.commons import BasicSlide, Mask, Slide
+from slaid.commons import Mask, Slide
 from slaid.commons.base import ImageInfo
 from slaid.models import Model
 
@@ -21,30 +21,19 @@ class InvalidChunkSize(Exception):
 
 
 class Classifier(abc.ABC):
-    @abc.abstractmethod
-    def classify(self,
-                 slide: BasicSlide,
-                 filter_=None,
-                 threshold: float = None,
-                 level: int = 2,
-                 n_batch: int = 1,
-                 round_to_0_100: bool = True,
-                 chunk: Tuple[int, int] = None) -> Mask:
-        pass
-
-
-class BasicClassifier(Classifier):
     MASK_CLASS = Mask
 
-    def __init__(self,
-                 model: "Model",
-                 feature: str,
-                 array_factory: Callable = np):
-        self._model = model
+    def __init__(
+        self,
+        model: "Model",
+        feature: str,
+        array_factory: Callable = np,
+    ):
+        self.model = model
         self.feature = feature
         self._array_factory = array_factory
         try:
-            self._patch_size = self._model.patch_size
+            self._patch_size = self.model.patch_size
             self._image_info = model.image_info
         except AttributeError as ex:
             logger.error(ex)
@@ -54,20 +43,61 @@ class BasicClassifier(Classifier):
                                          ImageInfo.COORD('yx'),
                                          ImageInfo.CHANNEL('last'))
 
-    @property
-    def model(self):
-        return self._model
+    @abc.abstractmethod
+    def classify(self,
+                 slide: Slide,
+                 filter_=None,
+                 threshold: float = None,
+                 level: int = 2,
+                 n_batch: int = 1,
+                 round_to_0_100: bool = True) -> Mask:
+        pass
+
+    def _get_mask(self, slide, array, level, downsample, datetime,
+                  round_to_0_100):
+
+        return self.MASK_CLASS(
+            array,
+            level,
+            downsample,
+            slide.level_dimensions,
+            datetime,
+            round_to_0_100,
+            model=str(self.model),
+            tile_size=self.model.patch_size[0] if self.model.patch_size else 1)
+
+    @staticmethod
+    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
+        return (array * 100).astype('uint8') if round_ else array
+
+    @staticmethod
+    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
+        if threshold is not None:
+            array[array >= threshold] = 1
+            array[array < threshold] = 0
+            return array.astype('uint8')
+        return array
+
+
+class BasicClassifier(Classifier):
+
+    def __init__(self,
+                 model: "Model",
+                 feature: str,
+                 array_factory: Callable = np,
+                 chunk: Tuple[int, int] = None):
+        super().__init__(model, feature, array_factory)
+        self.chunk = chunk
 
     def classify(self,
                  slide: Slide,
                  filter_=None,
                  threshold: float = None,
                  level: int = 2,
-                 round_to_0_100: bool = True,
-                 chunk: Tuple[int, int] = None) -> Mask:
+                 round_to_0_100: bool = True) -> Mask:
 
         slide_array = slide[level]
-        chunk = chunk or slide_array.size
+        chunk = self.chunk or slide_array.size
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
 
         if self._patch_size:
@@ -126,31 +156,6 @@ class BasicClassifier(Classifier):
         elif isinstance(array, zarr.core.Array):
             array.append(values, axis)
             return array
-
-    @staticmethod
-    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
-        return (array * 100).astype('uint8') if round_ else array
-
-    @staticmethod
-    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
-        if threshold is not None:
-            array[array >= threshold] = 1
-            array[array < threshold] = 0
-            return array.astype('uint8')
-        return array
-
-    def _get_mask(self, slide, array, level, downsample, datetime,
-                  round_to_0_100):
-
-        return self.MASK_CLASS(array,
-                               level,
-                               downsample,
-                               slide.level_dimensions,
-                               datetime,
-                               round_to_0_100,
-                               model=str(self._model),
-                               tile_size=self._model.patch_size[0]
-                               if self._model.patch_size else 1)
 
     def _classify_patches(self, slide_array, filter_, chunk, threshold,
                           round_to_0_100, dtype):
@@ -214,6 +219,69 @@ class BasicClassifier(Classifier):
 
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
+
+    def _predict(self, array):
+        return self.model.predict(array)
+
+
+class PatchClassifier(Classifier):
+
+    def classify(self,
+                 slide: Slide,
+                 filter_=None,
+                 threshold: float = None,
+                 level: int = 2,
+                 batch_size: int = 8,
+                 round_to_0_100: bool = True) -> Mask:
+        if not self._patch_size:
+            raise RuntimeError(f'invalid patch size {self._patch_size}')
+
+        slide_array = slide[level]
+
+        filter_array = filter_.array if filter_ else np.ones(
+            (slide_array.size[0] // self._patch_size[0],
+             slide_array.size[1] // self._patch_size[1]),
+            dtype='bool')
+        patch_coords = np.argwhere(filter_array) * self._patch_size
+        patch_coords = list(
+            filter(partial(self._remove_borders, slide_array),
+                   iter(patch_coords)))
+
+        n_patches = len(patch_coords)
+        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
+        res = np.zeros((slide_array.size[0] // self._patch_size[0],
+                        slide_array.size[1] // self._patch_size[1]),
+                       dtype=dtype)
+
+        predictions = np.empty(n_patches)
+        patches = []
+        for patch_coord in patch_coords:
+            x, y = patch_coord
+
+            patch = slide_array[x:x + self._patch_size[0],
+                                y:y + self._patch_size[1]].convert(
+                                    self.model.image_info).array
+            patches.append(patch)
+
+        for index in range(0, n_patches, batch_size):
+
+            to_predict = np.array(patches[index:index + batch_size])
+            prediction = self._predict(to_predict)
+            predictions[index:index + batch_size] = prediction
+
+        res[filter_array] = predictions
+        res = self._threshold(res, threshold)
+        res = self._round_to_0_100(res, round_to_0_100)
+
+        return self._get_mask(slide,
+                              res, level, slide.level_downsamples[level],
+                              dt.now(), round_to_0_100)
+
+    def _remove_borders(self, slide_array: np.ndarray,
+                        coord: np.ndarray) -> bool:
+        return coord[0] <= (slide_array.size[0] -
+                            self._patch_size[0]) and coord[1] <= (
+                                slide_array.size[1] - self._patch_size[1])
 
     def _predict(self, array):
         return self.model.predict(array)

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.classifiers.base import BasicClassifier
+from slaid.classifiers.base import BasicClassifier, PatchClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import ImageInfo, Mask
 from slaid.commons.base import Slide, SlideStore
@@ -101,9 +101,16 @@ def slide(slide_path, basic_slide_cls, slide_cls, image_info):
 
 
 @pytest.fixture
-def green_slide(basic_slide_cls, slide_cls, image_info):
+def green_slide(
+    basic_slide_cls,
+    image_info,
+    tile_size,
+    slide_cls=Slide,
+):
     slide_path = 'tests/data/test.tif'
-    return slide_cls(SlideStore(basic_slide_cls(slide_path)), image_info)
+    return slide_cls(
+        SlideStore(basic_slide_cls(slide_path), tilesize=tile_size),
+        image_info)
 
 
 def green_classifier(classifier_cls):
@@ -120,6 +127,12 @@ def green_classifier(classifier_cls):
 def dummy_classifier(classifier_cls):
     model = DummyModel(np.zeros)
     return classifier_cls(model, 'tissue')
+
+
+@pytest.fixture
+def classifier(classifier_cls, model, feature='test'):
+    if classifier_cls in (BasicClassifier, PatchClassifier):
+        return classifier_cls(model, feature)
 
 
 @pytest.fixture
