@@ -7,7 +7,7 @@ from typing import Callable, Tuple
 import numpy as np
 from progress.bar import Bar
 
-from slaid.commons import Mask, Slide
+from slaid.commons import Filter, Mask, Slide
 from slaid.commons.base import ImageInfo
 from slaid.models import Model
 
@@ -77,6 +77,9 @@ class Classifier(abc.ABC):
             array[array < threshold] = 0
             return array.astype('uint8')
         return array
+
+    def _predict(self, array):
+        return self.model.predict(array)
 
 
 class BasicClassifier(Classifier):
@@ -220,9 +223,6 @@ class BasicClassifier(Classifier):
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
 
-    def _predict(self, array):
-        return self.model.predict(array)
-
 
 class PatchClassifier(Classifier):
 
@@ -283,5 +283,58 @@ class PatchClassifier(Classifier):
                             self._patch_size[0]) and coord[1] <= (
                                 slide_array.size[1] - self._patch_size[1])
 
-    def _predict(self, array):
-        return self.model.predict(array)
+
+class PixelClassifier(Classifier):
+
+    def classify(self,
+                 slide: Slide,
+                 filter_: Filter,
+                 threshold: float = None,
+                 level: int = 2,
+                 batch_size: int = 8,
+                 round_to_0_100: bool = True) -> Mask:
+        if self._patch_size:
+            raise RuntimeError(
+                f'Not expecting patch size, found {self._patch_size}')
+
+        slide_array = slide[level]
+        filter_array = filter_.array
+        zoom_factor = (
+            slide_array.size[0] // filter_array.shape[0],
+            slide_array.size[1] // filter_array.shape[1],
+        )
+        tile_size = zoom_factor
+        patch_coords = np.argwhere(filter_array) * tile_size
+        #  patch_coords = list(
+        #      filter(partial(self._remove_borders, slide_array),
+        #             iter(patch_coords)))
+        #
+        n_patches = len(patch_coords)
+        predictions = np.empty(n_patches)
+        patches = []
+        for patch_coord in patch_coords:
+            x, y = patch_coord
+
+            patch = slide_array[x:x + tile_size[0],
+                                y:y + tile_size[1]].convert(
+                                    self.model.image_info).array
+            patches.append(patch.reshape(-1, 3))
+
+        to_predict = np.concatenate(patches) if patches else np.empty(
+            (0, 3), dtype='uint8')
+        predictions = self._predict(to_predict)
+
+        dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
+        res = self._array_factory.zeros(slide_array.size, dtype=dtype)
+        patch_area = tile_size[0] * tile_size[1]
+        for i in range(n_patches):
+            patch_coord = patch_coords[i]
+            x, y = patch_coord
+            patch = predictions[i:i + patch_area].reshape(tile_size)
+            res[x:x + tile_size[0], y:y + tile_size[1]] = patch
+
+        res = self._threshold(res, threshold)
+        res = self._round_to_0_100(res, round_to_0_100)
+        return self._get_mask(slide,
+                              res, level, slide.level_downsamples[level],
+                              dt.now(), round_to_0_100)

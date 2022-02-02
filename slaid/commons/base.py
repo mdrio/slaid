@@ -447,12 +447,22 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = DEFAULT_TILESIZE):
+
+    def __init__(self, slide: "Slide", tilesize: int = None):
         self._path = slide.filename
         self._slide = slide
-        self._tilesize = tilesize
-        self._store = _create_metastore(self._slide, tilesize)
+        self._tilesize = tilesize or DEFAULT_TILESIZE
+        self._store = _create_metastore(self._slide, self._tilesize)
         #  self._image_info = image_info if image_info else ImageInfo()
+
+    @property
+    def tilesize(self):
+        return self._tilesize
+
+    @tilesize.setter
+    def tilesize(self, value):
+        self._tilesize = value
+        self._store = _create_metastore(self._slide, value)
 
     @property
     def slide(self):
