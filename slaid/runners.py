@@ -97,7 +97,7 @@ class SerialRunner(Runner):
 class SerialPatchRunner(Runner):
 
     def __post_init__(self):
-        super().__post_init__(self)
+        super().__post_init__()
         if self.model.patch_size is None:
             raise RuntimeError(
                 f'model {self.model_name} does not work with patch')
