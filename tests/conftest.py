@@ -131,8 +131,7 @@ def dummy_classifier(classifier_cls):
 
 @pytest.fixture
 def classifier(classifier_cls, model, feature='test'):
-    if classifier_cls in (BasicClassifier, PatchClassifier):
-        return classifier_cls(model, feature)
+    return classifier_cls(model, feature)
 
 
 @pytest.fixture

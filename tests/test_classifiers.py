@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pytest
 
-from slaid.classifiers import BasicClassifier, PatchClassifier
+from slaid.classifiers import BasicClassifier, PatchClassifier, PixelClassifier
 from slaid.commons import Mask
 from slaid.commons.base import Filter, ImageInfo, Slide
 from slaid.commons.dask import init_client
@@ -29,18 +29,22 @@ def test_classify_slide(green_slide, classifier, level):
 
 
 @pytest.mark.parametrize("image_info", [ImageInfo.create("rgb", "yx", "last")])
-@pytest.mark.parametrize("level", [0, 1])
+@pytest.mark.parametrize("level", [0])
 @pytest.mark.parametrize("max_MB_prediction", [None])
-@pytest.mark.parametrize("basic_slide_cls", [EcvlSlide, OpenSlide])
-@pytest.mark.parametrize("classifier_cls", [BasicClassifier])
+@pytest.mark.parametrize("basic_slide_cls", [OpenSlide, EcvlSlide])
+@pytest.mark.parametrize("classifier_cls", [PixelClassifier, BasicClassifier])
 @pytest.mark.parametrize("model", [GreenModel()])
-@pytest.mark.parametrize("tile_size", [1024])
+@pytest.mark.parametrize("tile_size", [None])
 def test_classify_with_filter(green_slide, classifier, level, max_MB_prediction):
     filter_level = 2
     filter_downsample = green_slide.level_downsamples[filter_level]
+    green_slide._store.tile_size = filter_downsample
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
-    ones_row = 50
-    filter_array[:ones_row, :] = 1
+    tile_size = green_slide[0].size[0] // filter_array.shape[0]
+    green_slide._store.tile_size = tile_size
+    ones_row = 10
+    ones_col = 10
+    filter_array[:ones_row, :ones_col] = 1
     filter_mask = Mask(
         filter_array, filter_level, filter_downsample, green_slide.level_dimensions
     )
@@ -51,17 +55,17 @@ def test_classify_with_filter(green_slide, classifier, level, max_MB_prediction)
         ones_row * filter_downsample // green_slide.level_downsamples[level]
     )
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
-    assert (mask.array[:ones_row, :] == 100).all()
-    assert (mask.array[ones_row:, :] == 0).all()
+    assert (mask.array[:ones_row, :ones_col] == 100).all()
+    assert (mask.array[ones_row:, :ones_col] == 0).all()
 
 
 @pytest.mark.parametrize("image_info", [ImageInfo.create("rgb", "yx", "last")])
 @pytest.mark.parametrize("level", [0, 1])
 @pytest.mark.parametrize("max_MB_prediction", [None])
 @pytest.mark.parametrize("basic_slide_cls", [EcvlSlide, OpenSlide])
-@pytest.mark.parametrize("classifier_cls", [BasicClassifier])
+@pytest.mark.parametrize("classifier_cls", [PixelClassifier, BasicClassifier])
 @pytest.mark.parametrize("model", [GreenModel()])
-@pytest.mark.parametrize("tile_size", [1024])
+@pytest.mark.parametrize("tile_size", [None])
 def test_classify_with_zeros_as_filter(
     green_slide, classifier, level, max_MB_prediction
 ):
