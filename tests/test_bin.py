@@ -28,10 +28,12 @@ def get_input_output(output):
     return slide, zarr_group
 
 
-def _test_output(feature, output, slide, level):
+def _test_output(feature, output, slide, level, patch_size=1):
     assert output.attrs['filename'] == slide.filename
     assert tuple(output.attrs['resolution']) == slide.dimensions
-    assert output[feature].shape == slide.level_dimensions[level][::-1]
+    level_dims = slide.level_dimensions[level][::-1]
+    level_dims = (level_dims[0] // patch_size, level_dims[1] // patch_size)
+    assert output[feature].shape == level_dims
     assert output[feature].attrs['extraction_level'] == level
     assert output[feature].attrs[
         'level_downsample'] == slide.level_downsamples[level]
@@ -172,8 +174,23 @@ class TestParallelPatchClassifier(TestSerialPatchClassifier):
     cmd = 'parallel'
 
 
-def test_classifies_patches():
-    raise NotImplementedError()
+@pytest.mark.parametrize('classifier', ['serial-patch'])
+@pytest.mark.parametrize('model',
+                         ['slaid/resources/models/tumor_model-level_1.bin'])
+def test_classifies_patches(classifier, tmp_path, model):
+    label = 'tumor'
+    path = str(tmp_path)
+    cmd = [
+        'classify.py', classifier, '-L', label, '-m', model, '-l', '1', '-o',
+        path, input_
+    ]
+    subprocess.check_call(cmd)
+    logger.info('running cmd %s', ' '.join(cmd))
+    output_path = os.path.join(path, f'{input_basename}.zarr')
+    slide, output = get_input_output(output_path)
+
+    _test_output(label, output, slide, 1, 256)
+    assert output[label].dtype == 'uint8'
 
 
 if __name__ == '__main__':
