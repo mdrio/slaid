@@ -57,7 +57,7 @@ class Image(BaseImage):
         return array
 
 
-class Slide(BaseSlide):
+class BasicSlide(BaseSlide):
     IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'last')
 
     def __init__(self, filename: str):

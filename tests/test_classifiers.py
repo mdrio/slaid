@@ -8,7 +8,7 @@ from slaid.commons import Mask
 from slaid.commons.base import Filter, ImageInfo, Slide
 from slaid.commons.dask import init_client
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
-from slaid.commons.openslide import Slide as OpenSlide
+from slaid.commons.openslide import BasicSlide as OpenSlide
 from slaid.models.eddl import TissueModel, TumorModel
 from tests.commons import EddlGreenPatchModel, GreenModel
 

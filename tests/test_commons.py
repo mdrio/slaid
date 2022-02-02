@@ -10,7 +10,7 @@ from slaid.commons.dask import DaskSlideArray
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.dask import Slide as DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
-from slaid.commons.openslide import Slide as OpenSlide
+from slaid.commons.openslide import BasicSlide as OpenSlide
 
 IMAGE = 'tests/data/test.tif'
 
