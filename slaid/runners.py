@@ -8,7 +8,7 @@ import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
-from slaid.classifiers import BasicClassifier, PatchClassifier
+from slaid.classifiers import BasicClassifier, FilteredPatchClassifier
 from slaid.commons.base import do_filter
 from slaid.commons.factory import SlideFactory
 from slaid.models.factory import Factory as ModelFactory
@@ -106,7 +106,7 @@ class SerialPatchRunner(Runner):
     @property
     def classifier(self):
         if self._classifier is None:
-            self._classifier = PatchClassifier(self.model, self.label)
+            self._classifier = FilteredPatchClassifier(self.model, self.label)
         return self._classifier
 
 

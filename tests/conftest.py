@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.classifiers.base import BasicClassifier, PatchClassifier
+from slaid.classifiers.base import BasicClassifier, FilteredPatchClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import ImageInfo, Mask
 from slaid.commons.base import Slide, SlideStore

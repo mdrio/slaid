@@ -31,6 +31,7 @@ def get_class(name, module):
 
 @dataclass
 class ImageInfo:
+
     class COLORTYPE(Enum):
         RGB = 'rgb'
         BGR = 'bgr'
@@ -73,6 +74,7 @@ class ImageInfo:
 
 
 class Image(abc.ABC):
+
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
@@ -208,6 +210,7 @@ class Mask:
 
 
 class Filter:
+
     def __init__(self, mask: Mask, array: np.ndarray):
         self._mask = mask
 
@@ -306,6 +309,7 @@ class BasicSlide(abc.ABC):
 
 
 class Slide(BasicSlide):
+
     def __init__(self, store: "SlideStore", image_info: ImageInfo = None):
         self._store = store
         self._slide = store.slide
@@ -359,6 +363,7 @@ class Slide(BasicSlide):
 
 
 class SlideArray:
+
     def __init__(self, array: np.ndarray, image_info: ImageInfo = None):
         self._array = array
         self._image_info = image_info
