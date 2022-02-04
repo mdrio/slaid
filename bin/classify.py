@@ -7,7 +7,7 @@ import clize
 import pkg_resources
 import tiledb
 
-from slaid.runners import serial, serial_patch
+from slaid.runners import basic, fixed_batch
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -41,4 +41,4 @@ if __name__ == '__main__':
         serial_patch = set_model(serial_patch, model)
         serial = set_model(serial, model)
 
-    clize.run(serial_patch, serial)
+    clize.run(basic, fixed_batch)
