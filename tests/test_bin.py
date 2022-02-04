@@ -39,7 +39,7 @@ def _test_output(feature, output, slide, level, patch_size=1):
         'level_downsample'] == slide.level_downsamples[level]
 
 
-@pytest.mark.parametrize('classifier', ['serial'])
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
 @pytest.mark.parametrize(
     'model',
     ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
@@ -62,7 +62,7 @@ def test_classify(classifier, tmp_path, model, chunk):
     assert output[label].dtype == 'uint8'
 
 
-@pytest.mark.parametrize('classifier', ['serial'])
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
 @pytest.mark.parametrize(
     'model',
     ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
@@ -139,7 +139,8 @@ class TestSerialPatchClassifier:
         assert (np.array(output[self.feature]) <= 1).all()
 
 
-@pytest.mark.parametrize('classifier', ['serial'])
+@pytest.mark.skip('patch size too large, TBF')
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
 @pytest.mark.parametrize('storage', ['zarr', 'zip'])
 def test_classifies_with_filter(classifier, slide_with_mask, tmp_path,
                                 model_all_ones_path, tmpdir, storage):
@@ -152,7 +153,7 @@ def test_classifies_with_filter(classifier, slide_with_mask, tmp_path,
         'classify.py',
         classifier,
         '-l',
-        '2',
+        '0',
         '-L',
         'test',
         '-m',
@@ -174,7 +175,8 @@ class TestParallelPatchClassifier(TestSerialPatchClassifier):
     cmd = 'parallel'
 
 
-@pytest.mark.parametrize('classifier', ['serial-patch'])
+@pytest.mark.skip(reason="patch prediction without filtering not supported")
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
 @pytest.mark.parametrize('model',
                          ['slaid/resources/models/tumor_model-level_1.bin'])
 def test_classifies_patches(classifier, tmp_path, model):

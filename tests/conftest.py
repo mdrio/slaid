@@ -5,12 +5,13 @@ import numpy as np
 import pytest
 import tiledb
 
-from slaid.classifiers.base import BasicClassifier, FilteredPatchClassifier
+from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.dask import Classifier as DaskClassifier
 from slaid.commons import ImageInfo, Mask
 from slaid.commons.base import Slide, SlideStore
 from slaid.commons.dask import Slide as DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.commons.factory import MetaSlideFactory
 from slaid.models.dask import ActorModel
 #  from slaid.commons.openslide import Slide as OpenSlide
 from slaid.models.eddl import load_model
@@ -96,8 +97,9 @@ def slide_array(cls):
 
 
 @pytest.fixture
-def slide(slide_path, basic_slide_cls, slide_cls, image_info):
-    return slide_cls(SlideStore(basic_slide_cls(slide_path)), image_info)
+def slide(slide_cls, slide_path, args):
+    return MetaSlideFactory().get_factory(slide_cls, slide_path,
+                                          *args).get_slide()
 
 
 @pytest.fixture

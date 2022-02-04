@@ -310,6 +310,138 @@ class BasicSlide(abc.ABC):
 
 class Slide(BasicSlide):
 
+    def __init__(self, slide_reader: BasicSlide):
+        self._slide_reader = slide_reader
+
+    @property
+    def masks(self):
+        return self._slide_reader.masks
+
+    @property
+    def image_info(self):
+        return self._slide_reader.IMAGE_INFO
+
+    def __getitem__(self, key) -> "SlideArray":
+        return BasicSlideArray(self._slide_reader, key, self.image_info)
+
+    @property
+    def dimensions(self) -> Tuple[int, int]:
+        return self._slide_reader.dimensions
+
+    @property
+    def filename(self):
+        return self._slide_reader.filename
+
+    def read_region(self, location: Tuple[int, int], level: int,
+                    size: Tuple[int, int]) -> Image:
+        return self._slide_reader.read_region(location, level, size)
+
+    def get_best_level_for_downsample(self, downsample: int):
+        return self._slide_reader.get_best_level_for_downsample(downsample)
+
+    @property
+    def level_dimensions(self):
+        return self._slide_reader.level_dimensions
+
+    @property
+    def level_downsamples(self):
+        return self._slide_reader.level_downsamples
+
+
+class SlideArray(abc.ABC):
+
+    @abc.abstractmethod
+    def __getitem__(self, key) -> "SlideArray":
+        ...
+
+    @abc.abstractproperty
+    def array(self):
+        ...
+
+    @abc.abstractmethod
+    def convert(self, image_info: ImageInfo) -> "SlideArray":
+        ...
+
+    @abc.abstractproperty
+    def size(self) -> Tuple[int, int]:
+        ...
+
+
+class BasicSlideArray(SlideArray):
+
+    def __init__(self, slide: BasicSlide, level: int, image_info: ImageInfo):
+        self._slide = slide
+        self._level = level
+        self.image_info = image_info
+        self._array: np.ndarray = None
+
+    @property
+    def array(self):
+        if self._array is not None:
+            return self._array
+        logger.warn('reading the whole slide...')
+
+        image = self._slide.read_region(
+            (0, 0), self._level, self._slide.level_dimensions[self._level])
+        self._array = image.to_array()
+        return self._array
+
+    def __getitem__(self, key: Tuple[slice, slice]) -> "SlideArray":
+
+        def get_slice_stop(slice_value: int, limit: int):
+            return min(slice_value,
+                       limit) if slice_value is not None else limit
+
+        if self._array is not None:
+            array = self._array[:, key[0], key[1]] if self._is_channel_first(
+            ) else self._array[key[0], key[1], :]
+        else:
+            slice_x = key[1]
+            slice_y = key[0]
+
+            slice_x_start = slice_x.start or 0
+            slice_x_stop = get_slice_stop(
+                slice_x.stop, self._slide.level_dimensions[self._level][0])
+
+            slice_y_start = slice_y.start or 0
+            slice_y_stop = get_slice_stop(
+                slice_y.stop, self._slide.level_dimensions[self._level][1])
+
+            slice_x = slice(slice_x_start, slice_x_stop)
+            slice_y = slice(slice_y_start, slice_y_stop)
+
+            location = (slice_x.start, slice_y.start)
+            size = (slice_x.stop - slice_x.start, slice_y.stop - slice_y.start)
+            array = self._slide.read_region(location, self._level,
+                                            size).to_array()
+        slide_array = self._clone(array)
+        return slide_array
+
+    def convert(self, image_info: ImageInfo) -> SlideArray:
+        array = self.image_info.convert(self.array, image_info)
+        return self._clone(array, image_info)
+
+    @property
+    def size(self) -> Tuple[int, int]:
+        if self._array is not None:
+            return self._array.shape[1:] if self._is_channel_first(
+            ) else self._array.shape[:2]
+        return self._slide.level_dimensions[self._level][::-1]
+
+    def _clone(self,
+               array: np.ndarray = None,
+               image_info: ImageInfo = None) -> SlideArray:
+        slide_array = BasicSlideArray(self._slide, self._level, image_info
+                                      or self.image_info)
+        slide_array._array = array
+        return slide_array
+
+    def _is_channel_first(self):
+        return self.image_info.channel == ImageInfo.CHANNEL.FIRST
+
+
+class NapariSlide(BasicSlide):
+
     def __init__(self, store: "SlideStore", image_info: ImageInfo = None):
         self._store = store
         self._slide = store.slide
@@ -325,8 +457,8 @@ class Slide(BasicSlide):
         return self._slide.masks
 
     def _create_slide(self, dataset):
-        return SlideArray(self._read_from_store(dataset),
-                          self._slide.IMAGE_INFO)
+        return NapariSlideArray(self._read_from_store(dataset),
+                                self._slide.IMAGE_INFO)
 
     def _read_from_store(self, dataset):
         return zarr.open(store=self._store, path=dataset["path"], mode='r')
@@ -362,7 +494,7 @@ class Slide(BasicSlide):
         return self._slide.level_downsamples
 
 
-class SlideArray:
+class NapariSlideArray:
 
     def __init__(self, array: np.ndarray, image_info: ImageInfo = None):
         self._array = array
@@ -504,22 +636,3 @@ class SlideStore(OpenSlideStore):
         if self._slide.IMAGE_INFO.channel == ImageInfo.CHANNEL.LAST:
             y, x, _ = _, y, x
         return x, y, int(level)
-
-
-class BaseSlideFactory(abc.ABC):
-
-    def __init__(self,
-                 filename: str,
-                 basic_slide_module: str,
-                 slide_module: str,
-                 tilesize: int = None,
-                 image_info: ImageInfo = None):
-        self._filename = filename.rstrip('/')
-        self._basic_slide_module = basic_slide_module
-        self._slide_module = slide_module
-        self._tilesize = tilesize or DEFAULT_TILESIZE
-        self._image_info = image_info
-
-    @abc.abstractmethod
-    def get_slide(self) -> Slide:
-        pass
