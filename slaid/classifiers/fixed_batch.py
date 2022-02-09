@@ -150,9 +150,9 @@ class FilteredPatchClassifier(FilteredClassifier):
             prediction = self._predict(to_predict)
             predictions[index:index + batch_size] = prediction
 
+        predictions = self._threshold(predictions, threshold)
+        predictions = self._round_to_0_100(predictions, round_to_0_100)
         res[filter_array] = predictions
-        res = self._threshold(res, threshold)
-        res = self._round_to_0_100(res, round_to_0_100)
 
         return self._get_mask(slide,
                               res, level, slide.level_downsamples[level],
