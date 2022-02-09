@@ -411,8 +411,12 @@ class BasicSlideArray(SlideArray):
             slice_y = slice(slice_y_start, slice_y_stop)
 
             location = (slice_x.start, slice_y.start)
+            location_at_level_0 = tuple([
+                int(c * self._slide.level_downsamples[self._level])
+                for c in location
+            ])
             size = (slice_x.stop - slice_x.start, slice_y.stop - slice_y.start)
-            array = self._slide.read_region(location, self._level,
+            array = self._slide.read_region(location_at_level_0, self._level,
                                             size).to_array()
         slide_array = self._clone(array)
         return slide_array
