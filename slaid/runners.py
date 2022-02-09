@@ -63,14 +63,11 @@ class Runner(abc.ABC):
     no_round: bool = False
     filter_slide: str = None
     slide_reader: str = None
-    batch_size: int = DEFAULT_BATCH_SIZE
+    batch_size: int = None
 
     def __post_init__(self):
         self.gpu = _convert_gpu_params(self.gpu)
         self.model = ModelFactory(self.model_name, gpu=self.gpu).get_model()
-        if self.model.patch_size:
-            self.batch_size = self.batch_size // (self.model.patch_size[0] *
-                                                  self.model.patch_size[1])
 
         _prepare_output_dir(self.output_dir)
         self._classifier = None
@@ -144,6 +141,7 @@ class FilteredPatchRunner(FilteredRunner):
             raise NotImplementedError(
                 'Prediction patch based without filtering not implemented.')
         self._tile_size = self.model.patch_size[0]
+        self.batch_size = self.batch_size or 10
 
     @property
     def classifier(self):
@@ -157,6 +155,9 @@ class FilteredPatchRunner(FilteredRunner):
 class PixelRunner(Runner):
     chunk_size: int = None
 
+    def __post_init__(self):
+        self.batch_size = self.batch_size or DEFAULT_BATCH_SIZE
+
     @property
     def classifier(self):
         if self._classifier is None:
@@ -169,6 +170,10 @@ class PixelRunner(Runner):
 
 @dataclass
 class FilteredPixelRunner(FilteredRunner):
+
+    def __post_init__(self):
+        super().__post_init__(self)
+        self.batch_size = self.batch_size or DEFAULT_BATCH_SIZE
 
     @property
     def classifier(self):
@@ -231,7 +236,7 @@ def fixed_batch(input_path: str,
                 slide_reader: ('r', parameters.one_of('ecvl',
                                                       'openslide')) = 'ecvl',
                 chunk_size: int = None,
-                batch_size: ('b', int) = DEFAULT_BATCH_SIZE):
+                batch_size: ('b', int) = None):
     kwargs = dict(input_path=input_path,
                   model_name=model,
                   level=level,
