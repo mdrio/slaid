@@ -168,7 +168,7 @@ class PixelRunner(Runner):
 
 
 @dataclass
-class FilteredPixelRunner(Runner):
+class FilteredPixelRunner(FilteredRunner):
 
     @property
     def classifier(self):
