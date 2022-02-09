@@ -64,11 +64,11 @@ class Runner(abc.ABC):
     batch_size: int = None
 
     def __post_init__(self):
+        self.gpu = _convert_gpu_params(self.gpu)
         self.model = ModelFactory(self.model_name,
                                   gpu=self.gpu,
                                   batch=self.batch_size).get_model()
         _prepare_output_dir(self.output_dir)
-        self.gpu = _convert_gpu_params(self.gpu)
         self._classifier = None
         self._tile_size = None
 
