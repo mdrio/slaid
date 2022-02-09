@@ -98,7 +98,7 @@ class PixelClassifier(Classifier):
 
             res = append_array(res, np.concatenate(predictions), 0)
 
-        append_array(res, self._predict(batch_iterator.buffer), 0)
+        res = append_array(res, self._predict(batch_iterator.buffer), 0)
 
         res = res.reshape(slide_array.size)
         res = self._threshold(res, threshold)
