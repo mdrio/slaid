@@ -85,8 +85,6 @@ class PixelClassifier(Classifier):
 
         channel_first = self.model.image_info.CHANNEL == ImageInfo.CHANNEL.FIRST
         batch_iterator = BatchIterator(batch_size, channel_first)
-        #  import pudb
-        #  pudb.set_trace()
         for row_idx in range(0, slide_array.size[0], row_size):
             row = slide_array[row_idx:row_idx + row_size, :].convert(
                 self.model.image_info).array
