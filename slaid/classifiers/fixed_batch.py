@@ -213,10 +213,10 @@ class FilteredPixelClassifier(FilteredClassifier):
             x, y = patch_coord
             i = i * patch_area
             patch = predictions[i:i + patch_area].reshape(tile_size)
+            patch = self._threshold(patch, threshold)
+            patch = self._round_to_0_100(patch, round_to_0_100)
             res[x:x + tile_size[0], y:y + tile_size[1]] = patch
 
-        res = self._threshold(res, threshold)
-        res = self._round_to_0_100(res, round_to_0_100)
         return self._get_mask(slide,
                               res, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
