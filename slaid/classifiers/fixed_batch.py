@@ -94,7 +94,8 @@ class PixelClassifier(Classifier):
             for batch in batch_iterator.iter():
                 predictions.append(self._predict(batch))
 
-            res = append_array(res, np.concatenate(predictions), 0)
+            res = append_array(res, np.concatenate(predictions),
+                               0) if predictions else res
 
         res = append_array(res, self._predict(batch_iterator.buffer), 0)
 
