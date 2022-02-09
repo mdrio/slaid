@@ -80,12 +80,11 @@ class Runner(abc.ABC):
         classifiled_slides = []
         for slide in _get_slides(self.input_path, self.slide_reader,
                                  self._tile_size):
-            mask = self.classifier.classify(
-                slide,
-                level=self.level,
-                threshold=self.threshold,
-                round_to_0_100=not self.no_round,
-            )
+            mask = self.classifier.classify(slide,
+                                            level=self.level,
+                                            threshold=self.threshold,
+                                            round_to_0_100=not self.no_round,
+                                            batch_size=self.batch_size)
             slide.masks[self.label] = mask
 
             output_path = os.path.join(
