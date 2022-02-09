@@ -18,6 +18,8 @@ from slaid.commons.base import do_filter
 from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
 
+DEFAULT_BATCH_SIZE = 10000
+
 
 class SlideFactory:
 
@@ -61,13 +63,15 @@ class Runner(abc.ABC):
     no_round: bool = False
     filter_slide: str = None
     slide_reader: str = None
-    batch_size: int = None
+    batch_size: int = DEFAULT_BATCH_SIZE
 
     def __post_init__(self):
         self.gpu = _convert_gpu_params(self.gpu)
-        self.model = ModelFactory(self.model_name,
-                                  gpu=self.gpu,
-                                  batch=self.batch_size).get_model()
+        self.model = ModelFactory(self.model_name, gpu=self.gpu).get_model()
+        if self.model.patch_size:
+            self.batch_size = self.batch_size // (self.model.patch_size[0] *
+                                                  self.model.patch_size[1])
+
         _prepare_output_dir(self.output_dir)
         self._classifier = None
         self._tile_size = None
@@ -227,7 +231,7 @@ def fixed_batch(input_path: str,
                 slide_reader: ('r', parameters.one_of('ecvl',
                                                       'openslide')) = 'ecvl',
                 chunk_size: int = None,
-                batch_size: ('b', int) = None):
+                batch_size: ('b', int) = DEFAULT_BATCH_SIZE):
     kwargs = dict(input_path=input_path,
                   model_name=model,
                   level=level,
