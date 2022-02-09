@@ -3,14 +3,13 @@ import unittest
 import numpy as np
 import pytest
 
-from slaid.classifiers import BasicClassifier
 from slaid.classifiers.fixed_batch import (
     FilteredPatchClassifier,
     FilteredPixelClassifier,
     PixelClassifier,
 )
 from slaid.commons import Mask
-from slaid.commons.base import Filter, ImageInfo, Slide
+from slaid.commons.base import Filter, Slide
 from slaid.commons.dask import init_client
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.openslide import BasicSlide as OpenSlide
