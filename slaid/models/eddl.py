@@ -139,7 +139,7 @@ class TissueModel(Model):
 class TumorModel(Model):
     patch_size = (256, 256)
     normalization_factor = 255
-    index_prediction = 0
+    index_prediction = 1
 
     @staticmethod
     def _create_net():

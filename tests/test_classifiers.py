@@ -152,12 +152,12 @@ def test_classify_slide_by_patches_with_filter(
 @pytest.mark.parametrize('slide_cls', [DaskSlide])
 @pytest.mark.parametrize('image_info',
                          [ImageInfo.create('bgr', 'yx', 'first')])
-def test_classifies_tumor(slide, patch_tissue_mask):
+def test_classifies_tumor(slide):
     model = TumorModel(
         'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin')
     classifier = DaskClassifier(model, 'tumor')
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
-    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
+    assert round(float(mask.array[0]), 4) == round(1 - 0.11082522, 4)
 
     mask = classifier.classify(slide,
                                level=0,
@@ -165,7 +165,7 @@ def test_classifies_tumor(slide, patch_tissue_mask):
                                filter_=Filter(None,
                                               np.ones((1, 1), dtype='bool')))
     print(mask.array.shape, type(mask.array))
-    assert round(float(mask.array[0]), 4) == round(0.11082522, 4)
+    assert round(float(mask.array[0]), 4) == round(1 - 0.11082522, 4)
 
 
 @pytest.mark.parametrize('slide_path', ['tests/data/patch.tif'])
