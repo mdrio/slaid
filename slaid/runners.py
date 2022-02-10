@@ -13,7 +13,7 @@ from slaid.classifiers import BasicClassifier
 from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
                                            FilteredPixelClassifier,
                                            PixelClassifier)
-from slaid.commons import DEFAULT_TILESIZE, ImageInfo, SlideStore
+from slaid.commons import ImageInfo
 from slaid.commons.base import do_filter
 from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
@@ -27,12 +27,10 @@ class SlideFactory:
                  filename: str,
                  basic_slide_module: str,
                  slide_module: str,
-                 tilesize: int = None,
                  image_info: ImageInfo = None):
         self._filename = filename.rstrip('/')
         self._basic_slide_module = basic_slide_module
         self._slide_module = slide_module
-        self._tilesize = tilesize or DEFAULT_TILESIZE
         self._image_info = image_info
 
     def get_slide(self):
@@ -71,7 +69,6 @@ class Runner(abc.ABC):
 
         _prepare_output_dir(self.output_dir)
         self._classifier = None
-        self._tile_size = None
 
     @abc.abstractproperty
     def classifier(self):
@@ -79,8 +76,7 @@ class Runner(abc.ABC):
 
     def run(self):
         classifiled_slides = []
-        for slide in _get_slides(self.input_path, self.slide_reader,
-                                 self._tile_size):
+        for slide in _get_slides(self.input_path, self.slide_reader):
             mask = self.classifier.classify(slide,
                                             level=self.level,
                                             threshold=self.threshold,
@@ -140,7 +136,6 @@ class FilteredPatchRunner(FilteredRunner):
         if self._filter is None:
             raise NotImplementedError(
                 'Prediction patch based without filtering not implemented.')
-        self._tile_size = self.model.patch_size[0]
         self.batch_size = self.batch_size or 10
 
     @property
@@ -156,6 +151,7 @@ class PixelRunner(Runner):
     chunk_size: int = None
 
     def __post_init__(self):
+        super().__post_init__()
         self.batch_size = self.batch_size or DEFAULT_BATCH_SIZE
 
     @property
@@ -172,7 +168,7 @@ class PixelRunner(Runner):
 class FilteredPixelRunner(FilteredRunner):
 
     def __post_init__(self):
-        super().__post_init__(self)
+        super().__post_init__()
         self.batch_size = self.batch_size or DEFAULT_BATCH_SIZE
 
     @property
@@ -290,7 +286,7 @@ def _prepare_output_dir(output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
 
-def _get_slides(input_path, slide_reader, tile_size):
+def _get_slides(input_path, slide_reader):
 
     inputs = [
         os.path.abspath(os.path.join(input_path, f))
@@ -299,7 +295,7 @@ def _get_slides(input_path, slide_reader, tile_size):
         input_path)[-1][1:] not in STORAGE.keys() else [input_path]
     logging.info('processing inputs %s', inputs)
     for f in inputs:
-        yield SlideFactory(f, slide_reader, 'base', tile_size).get_slide()
+        yield SlideFactory(f, slide_reader, 'base').get_slide()
 
-    def _get_slide(path, slide_reader, tile_size):
-        return SlideFactory(path, slide_reader, 'base', tile_size).get_slide()
+    def _get_slide(path, slide_reader):
+        return SlideFactory(path, slide_reader, 'base').get_slide()
