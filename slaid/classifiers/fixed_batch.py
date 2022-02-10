@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from datetime import datetime as dt
 from functools import partial
 from typing import Callable
-from slaid.classifiers.base import Classifier, append_array
 
 import numpy as np
 
-from slaid.commons import Filter, Mask, NapariSlide
-from slaid.commons.base import ImageInfo
+from slaid.classifiers.base import Classifier as BaseClassifier, append_array
+from slaid.commons import Filter, Mask
+from slaid.commons.base import ImageInfo, Slide
 from slaid.models import Model
 
 logger = logging.getLogger()
@@ -47,6 +47,19 @@ class BatchIterator:
             1] if self.channel_first else self._buffer.shape[0]
 
 
+class Classifier(BaseClassifier):
+
+    def _predict_by_batch(self, batch_iterator: BatchIterator) -> np.ndarray:
+
+        predictions = []
+        for batch in batch_iterator.iter():
+            predictions.append(self._predict(batch))
+
+        predictions.append(self._predict(batch_iterator.buffer))
+        predictions = np.concatenate(predictions)
+        return predictions
+
+
 class FilteredClassifier(Classifier):
 
     def __init__(
@@ -71,7 +84,7 @@ class PixelClassifier(Classifier):
         self.chunk_size = chunk_size
 
     def classify(self,
-                 slide: NapariSlide,
+                 slide: Slide,
                  level,
                  threshold: float = None,
                  batch_size: int = 8,
@@ -111,7 +124,7 @@ class PixelClassifier(Classifier):
 class FilteredPatchClassifier(FilteredClassifier):
 
     def classify(self,
-                 slide: NapariSlide,
+                 slide: Slide,
                  level: int,
                  threshold: float = None,
                  batch_size: int = 8,
@@ -168,9 +181,9 @@ class FilteredPatchClassifier(FilteredClassifier):
 class FilteredPixelClassifier(FilteredClassifier):
 
     def classify(self,
-                 slide: NapariSlide,
-                 threshold: float = None,
+                 slide: Slide,
                  level: int = 2,
+                 threshold: float = None,
                  batch_size: int = 4096,
                  round_to_0_100: bool = True) -> Mask:
         if self._patch_size:
@@ -202,7 +215,18 @@ class FilteredPixelClassifier(FilteredClassifier):
 
         to_predict = np.concatenate(patches) if patches else np.empty(
             (0, 3), dtype='uint8')
-        predictions = self._predict(to_predict)
+        channel_first = (
+            self.model.image_info.CHANNEL == ImageInfo.CHANNEL.FIRST)
+        batch_iterator = BatchIterator(batch_size, channel_first)
+        batch_iterator.append(to_predict)
+
+        predictions = self._predict_by_batch(batch_iterator)
+        #  predictions = []
+        #  for batch in batch_iterator.iter():
+        #      predictions.append(self._predict(batch))
+        #
+        #  predictions.append(self._predict(batch_iterator.buffer))
+        #  predictions = np.concatenate(predictions)
 
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         res = self._array_factory.zeros(slide_array.size, dtype=dtype)
