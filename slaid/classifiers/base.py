@@ -1,7 +1,7 @@
 import abc
 import logging
 from datetime import datetime as dt
-from typing import Callable, Tuple
+from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
@@ -25,11 +25,11 @@ class Classifier(abc.ABC):
 
     def __init__(self,
                  model: "Model",
-                 feature: str,
+                 label: str,
                  array_factory: ArrayFactory = None):
         self.model = model
-        self.feature = feature
-        self._array_factory = array_factory or NumpyArrayFactory()
+        self.label = label
+        self.array_factory = array_factory or NumpyArrayFactory()
 
         try:
             self._patch_size = self.model.patch_size
@@ -62,7 +62,7 @@ class Classifier(abc.ABC):
             datetime,
             round_to_0_100,
             model=str(self.model),
-            tile_size=self.model.patch_size[0] if self.model.patch_size else 1)
+        )
 
     @staticmethod
     def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
@@ -121,15 +121,15 @@ class BasicClassifier(Classifier):
                          dtype):
         if self._filter:
             if (self._filter.array == 0).all():
-                return self._array_factory.zeros(slide_array.size, dtype=dtype)
+                return self.array_factory.zeros(slide_array.size, dtype=dtype)
 
             self._filter.rescale(slide_array.size)
             _filter = self._filter.array
         else:
             _filter = np.ones(slide_array.size, dtype='bool')
 
-        predictions = self._array_factory.empty((0, slide_array.size[1]),
-                                                dtype=dtype)
+        predictions = self.array_factory.empty((0, slide_array.size[1]),
+                                               dtype=dtype)
         with Bar('Processing', max=_filter.shape[0] // chunk[0] or 1) as bar:
             for x in range(0, _filter.shape[0], chunk[0]):
                 row = np.empty((min(chunk[0], _filter.shape[0] - x), 0),
@@ -167,7 +167,7 @@ class BasicClassifier(Classifier):
 
     def _classify_patches(self, slide_array, chunk, threshold, round_to_0_100,
                           dtype):
-        predictions = self._array_factory.empty(
+        predictions = self.array_factory.empty(
             (0, slide_array.size[1] // self._patch_size[1]), dtype=dtype)
         _filter = self._filter if self._filter else np.ones(
             (slide_array.size[0] // self._patch_size[0],

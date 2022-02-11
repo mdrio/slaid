@@ -2,14 +2,14 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime as dt
 from functools import partial
-from typing import Callable
+from typing import Tuple, Union
 
 import numpy as np
 
 from slaid.classifiers.base import Classifier as BaseClassifier
 from slaid.classifiers.base import append_array
 from slaid.commons import Filter, Mask
-from slaid.commons.base import ImageInfo, Slide, ArrayFactory
+from slaid.commons.base import ArrayFactory, ImageInfo, Slide
 from slaid.models import Model
 
 logger = logging.getLogger()
@@ -96,10 +96,12 @@ class PixelClassifier(Classifier):
         row_size = self.chunk_size if self.chunk_size else slide_array.size[0]
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
 
-        res = self._array_factory.empty((0, ), dtype=dtype)
+        res = self.array_factory.empty(slide_array.size, dtype=dtype)
 
         channel_first = self.model.image_info.CHANNEL == ImageInfo.CHANNEL.FIRST
         batch_iterator = BatchIterator(batch_size, channel_first)
+        row_splitter = RowSplitter(slide_array.size[1])
+
         for row_idx in range(0, slide_array.size[0], row_size):
             row = slide_array[row_idx:row_idx + row_size, :].convert(
                 self.model.image_info).array
@@ -107,18 +109,27 @@ class PixelClassifier(Classifier):
 
             batch_iterator.append(row)
             predictions = self._predict_by_batch(batch_iterator, False)
-            res = append_array(res, predictions, 0)
+            row_splitter.append(predictions)
+            self._set_rows(res, row_splitter, threshold, round_to_0_100)
 
         remaining_predictions = self._predict_by_batch(batch_iterator, True)
-        res = append_array(res, remaining_predictions, 0)
-
-        res = res.reshape(slide_array.size)
-        res = self._threshold(res, threshold)
-        res = self._round_to_0_100(res, round_to_0_100)
+        row_splitter.append(remaining_predictions)
+        self._set_rows(res, row_splitter, threshold, round_to_0_100)
 
         return self._get_mask(slide,
                               res, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
+
+    def _set_rows(self, array, row_splitter: "RowSplitter", threshold: float,
+                  round_to_0_100: bool):
+        try:
+            row_index, rows = row_splitter.split()
+        except RowSplitter.RowsNotFound:
+            ...
+        else:
+            rows = self._threshold(rows, threshold)
+            rows = self._round_to_0_100(rows, round_to_0_100)
+            array[row_index:row_index + rows.shape[0], :] = rows
 
 
 class FilteredPatchClassifier(FilteredClassifier):
@@ -142,7 +153,7 @@ class FilteredPatchClassifier(FilteredClassifier):
 
         n_patches = len(patch_coords)
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        res = self._array_factory.zeros(
+        res = self.array_factory.zeros(
             (slide_array.size[0] // self._patch_size[0],
              slide_array.size[1] // self._patch_size[1]),
             dtype=dtype)
@@ -198,10 +209,6 @@ class FilteredPixelClassifier(FilteredClassifier):
         )
         tile_size = zoom_factor
         patch_coords = np.argwhere(filter_array) * tile_size
-        #  patch_coords = list(
-        #      filter(partial(self._remove_borders, slide_array),
-        #             iter(patch_coords)))
-        #
         n_patches = len(patch_coords)
         predictions = np.empty(n_patches)
         patches = []
@@ -223,7 +230,7 @@ class FilteredPixelClassifier(FilteredClassifier):
         predictions = self._predict_by_batch(batch_iterator, True)
 
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
-        res = self._array_factory.zeros(slide_array.size, dtype=dtype)
+        res = self.array_factory.zeros(slide_array.size, dtype=dtype)
         patch_area = tile_size[0] * tile_size[1]
 
         for i in range(n_patches):
@@ -238,3 +245,29 @@ class FilteredPixelClassifier(FilteredClassifier):
         return self._get_mask(slide,
                               res, level, slide.level_downsamples[level],
                               dt.now(), round_to_0_100)
+
+
+class RowSplitter:
+
+    def __init__(self, col_size: int):
+        self._col_size = col_size
+        self._buffer = np.empty((0), dtype='float32')
+        self._row_index = 0
+
+    class RowsNotFound(Exception):
+        ...
+
+    def append(self, data: np.ndarray):
+        self._buffer = np.append(self._buffer, data)
+
+    def split(self) -> Tuple[int, np.ndarray]:
+        n_rows = self._buffer.size // self._col_size
+        if n_rows:
+            rows = np.array(self._buffer[:n_rows * self._col_size]).reshape(
+                n_rows, self._col_size)
+            self._buffer = self._buffer[n_rows * self._col_size:]
+            row_index = self._row_index
+            self._row_index += n_rows
+            return (row_index, rows)
+        else:
+            raise RowSplitter.RowsNotFound()

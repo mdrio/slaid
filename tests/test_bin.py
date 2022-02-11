@@ -43,13 +43,14 @@ def _test_output(feature, output, slide, level, patch_size=1):
 @pytest.mark.parametrize(
     'model',
     ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
-@pytest.mark.parametrize('chunk', [None, 256])
-def test_classify(classifier, tmp_path, model, chunk):
+@pytest.mark.parametrize('chunk', [None, 10])
+@pytest.mark.parametrize('level', [2])
+def test_classify(classifier, tmp_path, model, chunk, level):
     label = 'tissue'
     path = str(tmp_path)
     cmd = [
-        'classify.py', classifier, '-L', label, '-m', model, '-l', '2', '-o',
-        path, input_
+        'classify.py', classifier, '-L', label, '-m', model, '-l',
+        str(level), '-o', path, input_
     ]
     if chunk:
         cmd += ['--chunk-size', str(chunk)]

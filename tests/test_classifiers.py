@@ -18,11 +18,10 @@ from tests.commons import EddlGreenPatchModel, GreenModel
 
 
 @pytest.mark.parametrize("level", [0])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize("model", [GreenModel()])
-@pytest.mark.parametrize("chunk_size", [None, 100])
+@pytest.mark.parametrize("chunk_size", [None, 11, 100])
 @pytest.mark.parametrize("slide_path", ["tests/data/test.tif"])
 @pytest.mark.parametrize("classifier_cls", [PixelClassifier])
 def test_classify_slide(slide, classifier_cls, model, level, chunk_size):
@@ -37,9 +36,8 @@ def test_classify_slide(slide, classifier_cls, model, level, chunk_size):
 
 
 @pytest.mark.parametrize("level", [0])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize("classifier_cls", [FilteredPixelClassifier])
 @pytest.mark.parametrize("slide_path", ["tests/data/test.tif"])
 @pytest.mark.parametrize("model", [GreenModel()])
@@ -51,15 +49,13 @@ def test_classify_with_filter(slide, classifier_cls, level, model):
     ones_row = 10
     ones_col = 10
     filter_array[:ones_row, :ones_col] = 1
-    filter_mask = Mask(
-        filter_array, filter_level, filter_downsample, green_slide.level_dimensions
-    )
+    filter_mask = Mask(filter_array, filter_level, filter_downsample,
+                       green_slide.level_dimensions)
     classifier = classifier_cls(model, "test", filter_mask >= 1)
     mask = classifier.classify(green_slide, level=level)
 
-    ones_row = round(
-        ones_row * filter_downsample // green_slide.level_downsamples[level]
-    )
+    ones_row = round(ones_row * filter_downsample //
+                     green_slide.level_downsamples[level])
     assert mask.array.shape == green_slide.level_dimensions[level][::-1]
     assert (mask.array[:ones_row, :ones_col] == 100).all()
     assert (mask.array[ones_row:, :ones_col] == 0).all()
@@ -67,9 +63,8 @@ def test_classify_with_filter(slide, classifier_cls, level, model):
 
 @pytest.mark.parametrize("level", [0, 1])
 @pytest.mark.parametrize("classifier_cls", [FilteredPixelClassifier])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize("slide_path", ["tests/data/test.tif"])
 @pytest.mark.parametrize("model", [GreenModel()])
 def test_classify_with_zeros_as_filter(slide, classifier_cls, level, model):
@@ -77,9 +72,8 @@ def test_classify_with_zeros_as_filter(slide, classifier_cls, level, model):
     filter_level = 2
     filter_downsample = green_slide.level_downsamples[filter_level]
     filter_array = np.zeros(green_slide.level_dimensions[filter_level][::-1])
-    filter_mask = Mask(
-        filter_array, filter_level, filter_downsample, green_slide.level_dimensions
-    )
+    filter_mask = Mask(filter_array, filter_level, filter_downsample,
+                       green_slide.level_dimensions)
 
     classifier = classifier_cls(model, "test", filter_mask >= 1)
     mask = classifier.classify(green_slide, level=level)
@@ -89,15 +83,13 @@ def test_classify_with_zeros_as_filter(slide, classifier_cls, level, model):
 
 
 @pytest.mark.parametrize("classifier_cls", [FilteredPatchClassifier])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize("slide_path", ["tests/data/test.tif"])
 @pytest.mark.parametrize("level", [0])
 @pytest.mark.parametrize("model", [EddlGreenPatchModel((50, 50))])
 def test_classify_slide_by_patches_with_filter_all_zeros(
-    classifier_cls, slide, model, level
-):
+        classifier_cls, slide, model, level):
     green_slide = slide
     filter_array = np.zeros(
         (
@@ -118,13 +110,13 @@ def test_classify_slide_by_patches_with_filter_all_zeros(
 
 
 @pytest.mark.parametrize("classifier_cls", [FilteredPatchClassifier])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize("slide_path", ["tests/data/test.tif"])
 @pytest.mark.parametrize("level", [0])
 @pytest.mark.parametrize("model", [EddlGreenPatchModel((50, 50))])
-def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level, model):
+def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level,
+                                               model):
     green_slide = slide
     filter_array = np.zeros(
         (
@@ -151,18 +143,19 @@ def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level, mod
 
 @pytest.mark.parametrize("classifier_cls", [FilteredPatchClassifier])
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 @pytest.mark.parametrize(
     "model",
-    [TumorModel("slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin")],
+    [
+        TumorModel(
+            "slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin")
+    ],
 )
 def test_classifies_tumor(slide, classifier_cls, patch_tissue_mask, model):
 
-    classifier = classifier_cls(
-        model, "test", Filter(None, np.ones((1, 1), dtype="bool"))
-    )
+    classifier = classifier_cls(model, "test",
+                                Filter(None, np.ones((1, 1), dtype="bool")))
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
 
     print(mask.array.shape, type(mask.array))
@@ -170,13 +163,11 @@ def test_classifies_tumor(slide, classifier_cls, patch_tissue_mask, model):
 
 
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
-@pytest.mark.parametrize(
-    "slide_cls,args", [(Slide, (EcvlSlide,)), (Slide, (OpenSlide,))]
-)
+@pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 def test_classifies_tissue(slide, patch_tissue_mask):
     model = TissueModel(
-        "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin"
-    )
+        "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin")
     classifier = PixelClassifier(model, "tissue")
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
     assert (mask.array == patch_tissue_mask).all()
@@ -191,9 +182,8 @@ def test_classifies_tissue(slide, patch_tissue_mask):
     )
     filter_array[:2, :2] = 1
 
-    filter_classifier = FilteredPixelClassifier(
-        model, "tissue", Filter(None, filter_array)
-    )
+    filter_classifier = FilteredPixelClassifier(model, "tissue",
+                                                Filter(None, filter_array))
     mask = filter_classifier.classify(
         slide,
         level=0,

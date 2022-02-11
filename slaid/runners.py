@@ -17,6 +17,7 @@ from slaid.commons import ImageInfo
 from slaid.commons.base import do_filter
 from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
+from slaid.writers.zarr import ZarrStorage
 
 DEFAULT_BATCH_SIZE = 10000
 
@@ -77,24 +78,26 @@ class Runner(abc.ABC):
     def run(self):
         classifiled_slides = []
         for slide in _get_slides(self.input_path, self.slide_reader):
+            output_path = os.path.join(
+                self.output_dir,
+                f'{os.path.basename(slide.filename)}.{self.writer}')
+
+            storage = ZarrStorage(self.classifier.label, output_path)
+            self.classifier.array_factory = storage
             mask = self.classifier.classify(slide,
                                             level=self.level,
                                             threshold=self.threshold,
                                             round_to_0_100=not self.no_round,
                                             batch_size=self.batch_size)
             slide.masks[self.label] = mask
-
-            output_path = os.path.join(
-                self.output_dir,
-                f'{os.path.basename(slide.filename)}.{self.writer}')
-            STORAGE[self.writer].dump(
-                slide,
-                output_path,
-                overwrite=self.overwrite_output_if_exists,
-                mask_name=self.label)
-            logging.info('output %s', output_path)
+            storage.write(mask)
+            storage.add_metadata({
+                'filename': slide.filename,
+                'resolution': slide.dimensions
+            })
 
             classifiled_slides.append(slide)
+            print(output_path)
         return self.classifier, classifiled_slides
 
 

@@ -107,7 +107,8 @@ class Mask:
     round_to_0_100: bool = False
     threshold: float = None
     model: str = None
-    tile_size: int = None
+    slide: str = None
+    label: str = None
 
     def __post_init__(self):
         self.dzi_sampling_level = math.ceil(
@@ -154,59 +155,18 @@ class Mask:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
-    def to_zarr(self, group, name: str, overwrite: bool = False):
-        if overwrite and name in group:
-            del group[name]
-        array = group.array(name, self.array)
-        for attr, value in self._get_attributes().items():
-            logger.info('writing attr %s %s', attr, value)
-            array.attrs[attr] = value
-
-    def _get_attributes(self):
+    def get_attributes(self):
         attrs = {}
         attrs['extraction_level'] = self.extraction_level
         attrs['dzi_sampling_level'] = self.dzi_sampling_level
         attrs['level_downsample'] = self.level_downsample
-        attrs['datetime'] = self.datetime.timestamp()
         attrs['round_to_0_100'] = self.round_to_0_100
+        attrs['slide_levels'] = self.slide_levels
         if self.threshold:
             attrs['threshold'] = self.threshold
         if self.model:
             attrs['model'] = self.model
-            attrs['tile_size'] = self.tile_size
         return attrs
-
-    def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
-        logger.info('dumping mask to tiledb on path %s', path)
-        if os.path.isdir(path) and overwrite:
-            tiledb.remove(path, ctx=ctx)
-        tiledb.from_numpy(path, self.array, ctx=ctx)
-        self._write_meta_tiledb(path, ctx=ctx)
-
-    def _write_meta_tiledb(self, path, ctx: tiledb.Ctx = None):
-        with tiledb.open(path, 'w', ctx=ctx) as array:
-            array.meta['extraction_level'] = self.extraction_level
-            array.meta['level_downsample'] = self.level_downsample
-            if self.threshold:
-                array.meta['threshold'] = self.threshold
-            if self.model:
-                array.meta['model'] = self.model
-
-    @classmethod
-    def from_tiledb(cls, path, ctx: tiledb.Ctx = None):
-        array = tiledb.open(path, ctx=ctx)
-        return Mask(array, array.meta['extraction_level'],
-                    array.meta['level_downsample'],
-                    cls._get_meta(array, 'threshold'),
-                    cls._get_meta(array, 'model'))
-
-    @staticmethod
-    def _get_meta(array, attr):
-        try:
-            res = array.meta[attr]
-        except KeyError:
-            res = None
-        return res
 
 
 class Filter:
