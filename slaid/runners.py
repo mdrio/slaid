@@ -247,7 +247,7 @@ def fixed_batch(input_path: str,
                   filter_slide=filter_slide,
                   slide_reader=slide_reader,
                   batch_size=batch_size)
-    _model = ModelFactory(model, gpu=gpu, batch_size=batch_size).get_model()
+    _model = ModelFactory(model, gpu=gpu).get_model()
     if _filter:
         kwargs['_filter'] = _filter
         if _model.patch_size:
