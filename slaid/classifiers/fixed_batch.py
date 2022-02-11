@@ -6,7 +6,8 @@ from typing import Callable
 
 import numpy as np
 
-from slaid.classifiers.base import Classifier as BaseClassifier, append_array
+from slaid.classifiers.base import Classifier as BaseClassifier
+from slaid.classifiers.base import append_array
 from slaid.commons import Filter, Mask
 from slaid.commons.base import ImageInfo, Slide
 from slaid.models import Model
@@ -49,14 +50,17 @@ class BatchIterator:
 
 class Classifier(BaseClassifier):
 
-    def _predict_by_batch(self, batch_iterator: BatchIterator) -> np.ndarray:
+    def _predict_by_batch(self, batch_iterator: BatchIterator,
+                          all_buffer: bool) -> np.ndarray:
 
         predictions = []
         for batch in batch_iterator.iter():
             predictions.append(self._predict(batch))
 
-        predictions.append(self._predict(batch_iterator.buffer))
-        predictions = np.concatenate(predictions)
+        if all_buffer:
+            predictions.append(self._predict(batch_iterator.buffer))
+        predictions = np.concatenate(predictions) if predictions else np.empty(
+            (0, ))
         return predictions
 
 
@@ -102,15 +106,13 @@ class PixelClassifier(Classifier):
             row = slide_array[row_idx:row_idx + row_size, :].convert(
                 self.model.image_info).array
             row = row.reshape(3, -1) if channel_first else row.reshape(-1, 3)
+
             batch_iterator.append(row)
-            predictions = []
-            for batch in batch_iterator.iter():
-                predictions.append(self._predict(batch))
+            predictions = self._predict_by_batch(batch_iterator, False)
+            res = append_array(res, predictions, 0)
 
-            res = append_array(res, np.concatenate(predictions),
-                               0) if predictions else res
-
-        res = append_array(res, self._predict(batch_iterator.buffer), 0)
+        remaining_predictions = self._predict_by_batch(batch_iterator, True)
+        res = append_array(res, remaining_predictions, 0)
 
         res = res.reshape(slide_array.size)
         res = self._threshold(res, threshold)
@@ -220,13 +222,7 @@ class FilteredPixelClassifier(FilteredClassifier):
         batch_iterator = BatchIterator(batch_size, channel_first)
         batch_iterator.append(to_predict)
 
-        predictions = self._predict_by_batch(batch_iterator)
-        #  predictions = []
-        #  for batch in batch_iterator.iter():
-        #      predictions.append(self._predict(batch))
-        #
-        #  predictions.append(self._predict(batch_iterator.buffer))
-        #  predictions = np.concatenate(predictions)
+        predictions = self._predict_by_batch(batch_iterator, True)
 
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
         res = self._array_factory.zeros(slide_array.size, dtype=dtype)
