@@ -9,7 +9,7 @@ import numpy as np
 from slaid.classifiers.base import Classifier as BaseClassifier
 from slaid.classifiers.base import append_array
 from slaid.commons import Filter, Mask
-from slaid.commons.base import ImageInfo, Slide
+from slaid.commons.base import ImageInfo, Slide, ArrayFactory
 from slaid.models import Model
 
 logger = logging.getLogger()
@@ -66,13 +66,11 @@ class Classifier(BaseClassifier):
 
 class FilteredClassifier(Classifier):
 
-    def __init__(
-        self,
-        model: "Model",
-        feature: str,
-        _filter: Filter,
-        array_factory: Callable = np,
-    ):
+    def __init__(self,
+                 model: "Model",
+                 feature: str,
+                 _filter: Filter,
+                 array_factory: ArrayFactory = None):
         super().__init__(model, feature, array_factory)
         self._filter = _filter
 
@@ -82,7 +80,7 @@ class PixelClassifier(Classifier):
     def __init__(self,
                  model: "Model",
                  feature: str,
-                 array_factory: Callable = np,
+                 array_factory: ArrayFactory = None,
                  chunk_size: int = None):
         super().__init__(model, feature, array_factory)
         self.chunk_size = chunk_size

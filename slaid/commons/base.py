@@ -640,3 +640,23 @@ class SlideStore(OpenSlideStore):
         if self._slide.IMAGE_INFO.channel == ImageInfo.CHANNEL.LAST:
             y, x, _ = _, y, x
         return x, y, int(level)
+
+
+class ArrayFactory(abc.ABC):
+
+    @abc.abstractmethod
+    def empty(self, shape: Tuple[int, int], dtype: str):
+        ...
+
+    @abc.abstractmethod
+    def zeros(self, shape: Tuple[int, int], dtype: str):
+        ...
+
+
+class NumpyArrayFactory(ArrayFactory):
+
+    def empty(self, shape: Tuple[int, int], dtype: str):
+        return np.empty(shape, dtype=dtype)
+
+    def zeros(self, shape: Tuple[int, int], dtype: str):
+        return np.zeros(shape, dtype=dtype)

@@ -9,6 +9,7 @@ from progress.bar import Bar
 from slaid.commons import Filter, Mask, NapariSlide
 from slaid.commons.base import ImageInfo
 from slaid.models import Model
+from slaid.commons.base import ArrayFactory, NumpyArrayFactory
 
 logger = logging.getLogger('classify')
 fh = logging.FileHandler('/tmp/base-classifier.log')
@@ -22,15 +23,14 @@ class InvalidChunkSize(Exception):
 class Classifier(abc.ABC):
     MASK_CLASS = Mask
 
-    def __init__(
-        self,
-        model: "Model",
-        feature: str,
-        array_factory: Callable = np,
-    ):
+    def __init__(self,
+                 model: "Model",
+                 feature: str,
+                 array_factory: ArrayFactory = None):
         self.model = model
         self.feature = feature
-        self._array_factory = array_factory
+        self._array_factory = array_factory or NumpyArrayFactory()
+
         try:
             self._patch_size = self.model.patch_size
             self._image_info = model.image_info
@@ -87,7 +87,7 @@ class BasicClassifier(Classifier):
     def __init__(self,
                  model: "Model",
                  feature: str,
-                 array_factory: Callable = np,
+                 array_factory: ArrayFactory = None,
                  _filter: Filter = None,
                  chunk: Tuple[int, int] = None):
         super().__init__(model, feature, array_factory)
