@@ -41,4 +41,4 @@ if __name__ == '__main__':
         basic = set_model(basic, model)
         fixed_batch = set_model(fixed_batch, model)
 
-    clize.run(basic, fixed_batch)
+    clize.run({'basic': basic, 'fixed-batch': fixed_batch})
