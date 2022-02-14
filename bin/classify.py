@@ -38,7 +38,7 @@ if __name__ == '__main__':
     if model:
         model = pkg_resources.resource_filename('slaid',
                                                 f'resources/models/{model}')
-        serial_patch = set_model(serial_patch, model)
-        serial = set_model(serial, model)
+        basic = set_model(basic, model)
+        fixed_batch = set_model(fixed_batch, model)
 
     clize.run(basic, fixed_batch)
