@@ -1,6 +1,7 @@
 import abc
 import logging
 import os
+import re
 from dataclasses import dataclass
 from importlib import import_module
 from typing import List
@@ -14,7 +15,7 @@ from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
                                            FilteredPixelClassifier,
                                            PixelClassifier)
 from slaid.commons import ImageInfo
-from slaid.commons.base import do_filter
+from slaid.commons.base import Filter
 from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
 from slaid.writers.zarr import ZarrStorage
@@ -107,8 +108,32 @@ class FilteredRunner(Runner):
 
     def __post_init__(self):
         super().__post_init__()
-        self._filter = _process_filter(self._filter, self.filter_slide,
-                                       self.slide_reader)
+        self._filter_obj = self._process_filter()
+
+    def _process_filter(self) -> Filter:
+        if self._filter:
+            return self._convert_condition()
+
+    def _convert_condition(self) -> Filter:
+        operator_mapping = {
+            '>': '__gt__',
+            '>=': '__ge__',
+            '<': '__lt__',
+            '<=': '__le__',
+            '==': '__eq__',
+            '!=': '__ne__',
+        }
+
+        condition = self._filter.replace('"', '')
+        parsed = re.match(
+            r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
+            condition).groupdict()
+        label = parsed['mask']
+        value = float(parsed['value'])
+
+        mask = ZarrStorage(label, self.filter_slide).load()
+        operator = operator_mapping[parsed['operator']]
+        return getattr(mask, operator)(value)
 
 
 @dataclass
@@ -145,7 +170,7 @@ class FilteredPatchRunner(FilteredRunner):
     def classifier(self):
         if self._classifier is None:
             self._classifier = FilteredPatchClassifier(self.model, self.label,
-                                                       self._filter)
+                                                       self._filter_obj)
         return self._classifier
 
 
@@ -177,9 +202,8 @@ class FilteredPixelRunner(FilteredRunner):
     @property
     def classifier(self):
         if self._classifier is None:
-            self._classifier = FilteredPixelClassifier(self.model,
-                                                       self.label,
-                                                       _filter=self._filter)
+            self._classifier = FilteredPixelClassifier(
+                self.model, self.label, _filter=self._filter_obj)
 
         return self._classifier
 
@@ -264,17 +288,6 @@ def fixed_batch(input_path: str,
         kwargs['chunk_size'] = chunk_size
 
     cls(**kwargs).run()
-
-
-def _process_filter(filter_, filter_slide, slide_reader):
-    if filter_:
-        filter_slide = SlideFactory(
-            filter_slide,
-            slide_reader,
-            'base',
-        ).get_slide()
-        filter_ = do_filter(filter_slide, filter_)
-    return filter_
 
 
 def _convert_gpu_params(gpu: List[int]) -> List[int]:

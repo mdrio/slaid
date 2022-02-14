@@ -140,35 +140,63 @@ class TestSerialPatchClassifier:
         assert (np.array(output[self.feature]) <= 1).all()
 
 
-@pytest.mark.skip('patch size too large, TBF')
 @pytest.mark.parametrize('classifier', ['fixed-batch'])
-@pytest.mark.parametrize('storage', ['zarr', 'zip'])
-def test_classifies_with_filter(classifier, slide_with_mask, tmp_path,
-                                model_all_ones_path, tmpdir, storage):
-    path = f'{tmp_path}.{storage}'
-    slide = slide_with_mask(np.ones)
-    condition = 'mask>2'
-    REGISTRY[storage].dump(slide, path, 'mask')
+@pytest.mark.parametrize('storage', ['zip'])
+@pytest.mark.parametrize('slide', ['tests/data/patch-8-level.tif'])
+def test_classifies_with_filter(classifier, slide, storage, tmp_path):
 
-    cmd = [
+    tissue_low_res = [
+        'classify.py',
+        classifier,
+        '-l',
+        '8',
+        '-L',
+        'tissue',
+        '-m',
+        'slaid/resources/models/tissue_model-eddl_2.bin',
+        '-o',
+        str(tmp_path),
+        slide,
+    ]
+    tissue_high_res = [
+        'classify.py',
+        classifier,
+        '-l',
+        '3',
+        '-L',
+        'tissue-high-res',
+        '-m',
+        'slaid/resources/models/tissue_model-eddl_2.bin',
+        '--filter',
+        'tissue>0.8',
+        '--filter-slide',
+        os.path.join(str(tmp_path), f'{os.path.basename(slide)}.zarr'),
+        '-o',
+        str(tmp_path),
+        slide,
+    ]
+    tumor = [
         'classify.py',
         classifier,
         '-l',
         '0',
         '-L',
-        'test',
+        'tumor',
         '-m',
-        model_all_ones_path,
-        '-o',
-        str(tmpdir),
-        '-F',
-        f'"{condition}"',
+        'slaid/resources/models/tumor_model-level_1.bin',
+        '--filter',
+        'tissue>0.8',
         '--filter-slide',
-        path,
-        slide.filename,
+        os.path.join(str(tmp_path), f'{os.path.basename(slide)}.zarr'),
+        '-o',
+        str(tmp_path),
+        slide,
     ]
-    print(' '.join(cmd))
-    subprocess.check_call(cmd)
+
+    subprocess.check_call(tissue_low_res)
+    subprocess.check_call(tissue_high_res)
+    print(' '.join(tumor))
+    subprocess.check_call(tumor)
 
 
 @pytest.mark.skip(reason="to be updated")

@@ -205,26 +205,6 @@ class Filter:
         self._array = res
 
 
-def do_filter(slide: "Slide", condition: str) -> "Filter":
-    operator_mapping = {
-        '>': '__gt__',
-        '>=': '__ge__',
-        '<': '__lt__',
-        '<=': '__le__',
-        '==': '__eq__',
-        '!=': '__ne__',
-    }
-
-    condition = condition.replace('"', '')
-    parsed = re.match(
-        r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
-        condition).groupdict()
-    mask = slide.masks[parsed['mask']]
-    operator = operator_mapping[parsed['operator']]
-    value = float(parsed['value'])
-    return getattr(mask, operator)(value)
-
-
 class BasicSlide(abc.ABC):
     IMAGE_INFO = ImageInfo.create('bgr', 'yx', 'first')
 

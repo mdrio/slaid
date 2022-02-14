@@ -176,7 +176,7 @@ class FilteredPatchClassifier(FilteredClassifier):
 
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)
-        res[filter_array] = predictions
+        res.set_mask_selection(filter_array, predictions)
 
         return self._get_mask(slide,
                               res, level, slide.level_downsamples[level],
