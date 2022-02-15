@@ -103,12 +103,12 @@ class Mask:
     extraction_level: int
     level_downsample: int
     slide_levels: List[Tuple[int, int]]
-    datetime: dt = None
     round_to_0_100: bool = False
     threshold: float = None
     model: str = None
     slide: str = None
     label: str = None
+    tile_size: int = 1
 
     def __post_init__(self):
         self.dzi_sampling_level = math.ceil(
@@ -144,7 +144,8 @@ class Mask:
             and self.threshold == other.threshold \
             and self.model == other.model \
             and self.round_to_0_100 == other.round_to_0_100 \
-            and self.datetime == other.datetime \
+            and self.tile_size == other.tile_size \
+            and self.slide == other.slide \
             and check_array
 
     def to_image(self, downsample: int = 1, threshold: float = None):
@@ -162,6 +163,7 @@ class Mask:
         attrs['level_downsample'] = self.level_downsample
         attrs['round_to_0_100'] = self.round_to_0_100
         attrs['slide_levels'] = self.slide_levels
+        attrs['tile_size'] = self.tile_size
         if self.threshold:
             attrs['threshold'] = self.threshold
         if self.model:

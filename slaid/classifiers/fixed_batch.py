@@ -116,9 +116,8 @@ class PixelClassifier(Classifier):
         row_splitter.append(remaining_predictions)
         self._set_rows(res, row_splitter, threshold, round_to_0_100)
 
-        return self._get_mask(slide,
-                              res, level, slide.level_downsamples[level],
-                              dt.now(), round_to_0_100)
+        return self._get_mask(slide, res, level,
+                              slide.level_downsamples[level], round_to_0_100)
 
     def _set_rows(self, array, row_splitter: "RowSplitter", threshold: float,
                   round_to_0_100: bool):
@@ -178,9 +177,8 @@ class FilteredPatchClassifier(FilteredClassifier):
         predictions = self._round_to_0_100(predictions, round_to_0_100)
         res.set_mask_selection(filter_array, predictions)
 
-        return self._get_mask(slide,
-                              res, level, slide.level_downsamples[level],
-                              dt.now(), round_to_0_100)
+        return self._get_mask(slide, res, level,
+                              slide.level_downsamples[level], round_to_0_100)
 
     def _remove_borders(self, slide_array: np.ndarray,
                         coord: np.ndarray) -> bool:
@@ -242,9 +240,8 @@ class FilteredPixelClassifier(FilteredClassifier):
             patch = self._round_to_0_100(patch, round_to_0_100)
             res[x:x + tile_size[0], y:y + tile_size[1]] = patch
 
-        return self._get_mask(slide,
-                              res, level, slide.level_downsamples[level],
-                              dt.now(), round_to_0_100)
+        return self._get_mask(slide, res, level,
+                              slide.level_downsamples[level], round_to_0_100)
 
 
 class RowSplitter:

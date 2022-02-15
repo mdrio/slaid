@@ -51,15 +51,13 @@ class Classifier(abc.ABC):
                  round_to_0_100: bool = True) -> Mask:
         pass
 
-    def _get_mask(self, slide, array, level, downsample, datetime,
-                  round_to_0_100):
+    def _get_mask(self, slide, array, level, downsample, round_to_0_100):
 
         return self.MASK_CLASS(
             array,
             level,
             downsample,
             slide.level_dimensions,
-            datetime,
             round_to_0_100,
             model=str(self.model),
         )
@@ -114,8 +112,7 @@ class BasicClassifier(Classifier):
             predictions = self._classify_pixels(slide_array, chunk, threshold,
                                                 round_to_0_100, dtype)
         return self._get_mask(slide, predictions, level,
-                              slide.level_downsamples[level], dt.now(),
-                              round_to_0_100)
+                              slide.level_downsamples[level], round_to_0_100)
 
     def _classify_pixels(self, slide_array, chunk, threshold, round_to_0_100,
                          dtype):

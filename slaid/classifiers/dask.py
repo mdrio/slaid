@@ -38,8 +38,7 @@ class Classifier(BasicClassifier):
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)
         mask = self._get_mask(slide, predictions, level,
-                              slide.level_downsamples[level], dt.now(),
-                              round_to_0_100)
+                              slide.level_downsamples[level], round_to_0_100)
 
         if self.compute_mask:
             mask.compute()
