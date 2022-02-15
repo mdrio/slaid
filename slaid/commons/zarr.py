@@ -20,13 +20,13 @@ class ArrayFactory(BaseArrayFactory):
 
 class GroupArrayFactory(BaseArrayFactory):
 
-    def __init__(self, name, store: str = None):
+    def __init__(self, name, store: str = None, mode: str = 'a'):
         if store:
             ext = os.path.splitext(store)[1]
             if ext == '.zarr':
                 self._store = zarr.DirectoryStore(store)
             elif ext == '.zip':
-                self._store = zarr.ZipStore(store)
+                self._store = zarr.ZipStore(store, mode=mode)
         else:
             self._store = store
         self.name = name

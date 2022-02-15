@@ -131,7 +131,7 @@ class FilteredRunner(Runner):
         label = parsed['mask']
         value = float(parsed['value'])
 
-        mask = ZarrStorage(label, self.filter_slide).load()
+        mask = ZarrStorage(label, self.filter_slide, mode='r').load()
         operator = operator_mapping[parsed['operator']]
         return getattr(mask, operator)(value)
 
