@@ -58,7 +58,7 @@ class Image(BaseImage):
 
 
 class BasicSlide(BaseSlide):
-    IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'last')
+    IMAGE_INFO = Image.IMAGE_INFO
 
     def __init__(self, filename: str):
         super().__init__(filename)

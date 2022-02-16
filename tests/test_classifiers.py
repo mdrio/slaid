@@ -162,9 +162,8 @@ def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level,
     ],
 )
 @pytest.mark.parametrize("array_factory", [ZarrStorage])
-def test_classifies_tumor(slide, classifier_cls, patch_tissue_mask, model,
-                          array_factory, tmp_path):
-
+def test_classifies_tumor(slide, classifier_cls, model, array_factory,
+                          tmp_path):
     classifier = classifier_cls(model,
                                 "test",
                                 Filter(None, np.ones((1, 1), dtype="bool")),
