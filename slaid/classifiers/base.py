@@ -51,16 +51,21 @@ class Classifier(abc.ABC):
                  round_to_0_100: bool = True) -> Mask:
         pass
 
-    def _get_mask(self, slide, array, level, downsample, round_to_0_100):
+    def _get_mask(self,
+                  slide,
+                  array,
+                  level,
+                  downsample,
+                  round_to_0_100,
+                  tile_size=1):
 
-        return self.MASK_CLASS(
-            array,
-            level,
-            downsample,
-            slide.level_dimensions,
-            round_to_0_100,
-            model=str(self.model),
-        )
+        return self.MASK_CLASS(array,
+                               level,
+                               downsample,
+                               slide.level_dimensions,
+                               round_to_0_100,
+                               model=str(self.model),
+                               tile_size=tile_size)
 
     @staticmethod
     def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:

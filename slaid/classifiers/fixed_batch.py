@@ -177,8 +177,12 @@ class FilteredPatchClassifier(FilteredClassifier):
         predictions = self._round_to_0_100(predictions, round_to_0_100)
         res.set_mask_selection(filter_array, predictions)
 
-        return self._get_mask(slide, res, level,
-                              slide.level_downsamples[level], round_to_0_100)
+        return self._get_mask(slide,
+                              res,
+                              level,
+                              slide.level_downsamples[level],
+                              round_to_0_100,
+                              tile_size=self._patch_size[0])
 
     def _remove_borders(self, slide_array: np.ndarray,
                         coord: np.ndarray) -> bool:
