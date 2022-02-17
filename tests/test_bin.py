@@ -10,7 +10,6 @@ import pytest
 import zarr
 
 from slaid.commons.ecvl import BasicSlide as Slide
-from slaid.writers import REGISTRY
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 OUTPUT_DIR = '/tmp/test-slaid'
@@ -199,11 +198,6 @@ def test_classifies_with_filter(classifier, slide, storage, tmp_path):
     subprocess.check_call(tissue_high_res)
     print(' '.join(tumor))
     subprocess.check_call(tumor)
-
-
-@pytest.mark.skip(reason="to be updated")
-class TestParallelPatchClassifier(TestSerialPatchClassifier):
-    cmd = 'parallel'
 
 
 @pytest.mark.parametrize('classifier', ['fixed-batch'])
