@@ -20,7 +20,7 @@ from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
 from slaid.writers.zarr import ZarrStorage
 
-DEFAULT_BATCH_SIZE = 10000
+DEFAULT_BATCH_SIZE = 8192
 
 
 class SlideFactory:
