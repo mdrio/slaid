@@ -255,5 +255,84 @@ def test_classifies_patches(slide, classifier, tmp_path, model):
     assert output[label].dtype == 'uint8'
 
 
+@pytest.mark.skipif(not os.path.exists('/usr/include/cudnn.h'),
+                    reason='CUDNN not available')
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
+@pytest.mark.parametrize('mirax_slide',
+                         ['tests/data/Mirax2-Fluorescence-2.mrxs'])
+@pytest.mark.parametrize('chunk_size', [None, 100])
+@pytest.mark.parametrize('batch_size', [None])
+def test_real_case_classification(classifier, mirax_slide, chunk_size,
+                                  batch_size, tmp_path):
+    tissue_low_res = [
+        'classify.py',
+        classifier,
+        '-l',
+        '9',
+        '-L',
+        'tissue',
+        '-m',
+        'slaid/resources/models/tissue_model-eddl_2.bin',
+        '--gpu',
+        '0',
+        '-o',
+        str(tmp_path),
+        '--no-round',
+        mirax_slide,
+    ]
+    if chunk_size:
+        tissue_low_res.extend(['--chunk-size', str(chunk_size)])
+
+    if batch_size:
+        tissue_low_res.extend(['--batch-size', str(batch_size)])
+    subprocess.check_call(tissue_low_res)
+
+    group = zarr.open(str(tmp_path / f'{os.path.basename(mirax_slide)}.zarr'))
+    output = np.array(group['tissue'])
+    expected = np.load(open('tests/data/mask_ar.npy', 'rb'))
+
+    round_to_decimal = 4
+    output = np.around(output, round_to_decimal)
+    expected = np.around(expected, round_to_decimal)
+
+    assert (output == expected).all()
+
+    label = 'tumor'
+    path = str(tmp_path)
+    tumor = [
+        'classify.py',
+        classifier,
+        '-L',
+        label,
+        '-m',
+        'slaid/resources/models/tumor_model-level_1.bin',
+        '-l',
+        '1',
+        '--gpu',
+        '0',
+        '-o',
+        path,
+        '--filter',
+        'tissue>0.5',
+        '--filter-slide',
+        os.path.join(str(tmp_path), f'{os.path.basename(mirax_slide)}.zarr'),
+        '--no-round',
+        mirax_slide,
+    ]
+
+    if batch_size:
+        tumor.extend(['--batch-size', str(batch_size)])
+
+    subprocess.check_call(tumor)
+
+    group = zarr.open(str(tmp_path / f'{os.path.basename(mirax_slide)}.zarr'))
+    output = np.array(group[label])
+    expected = np.load(open('tests/data/heat.npy', 'rb'))
+
+    round_to_decimal = 5
+    output = np.around(output, round_to_decimal)
+    expected = np.around(expected, round_to_decimal)
+
+
 if __name__ == '__main__':
     unittest.main()
