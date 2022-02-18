@@ -7,7 +7,7 @@ import clize
 import pkg_resources
 import tiledb
 
-from slaid.runners import basic, fixed_batch
+from slaid.runners import fixed_batch
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
                     '[%(filename)s:%(lineno)d] %(message)s',
@@ -38,7 +38,6 @@ if __name__ == '__main__':
     if model:
         model = pkg_resources.resource_filename('slaid',
                                                 f'resources/models/{model}')
-        basic = set_model(basic, model)
         fixed_batch = set_model(fixed_batch, model)
 
-    clize.run({'basic': basic, 'fixed-batch': fixed_batch})
+    clize.run({'fixed-batch': fixed_batch})
