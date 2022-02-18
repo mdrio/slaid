@@ -6,8 +6,10 @@ on:
   pull_request:
     branches: [ master, develop ]
 
+
 jobs:
   test:
+    permissions: write-all
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag-creation.outputs.new_tag }}

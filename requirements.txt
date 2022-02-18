@@ -1,8 +1,8 @@
 setuptools==45
 numpy==1.19.5
 openslide-python==1.1.2
-pyecvl==0.10.1
-pyeddl==1.0.0
+pyecvl==1.1.0
+pyeddl==1.2.0
 clize==4.2.1
 dask[complete]==2.20.0
 zarr==2.8.3
