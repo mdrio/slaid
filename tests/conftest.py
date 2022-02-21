@@ -14,7 +14,7 @@ from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.factory import MetaSlideFactory
 from slaid.models.dask import ActorModel
 #  from slaid.commons.openslide import Slide as OpenSlide
-from slaid.models.eddl import load_model
+from slaid.models.eddl import Factory
 from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 
 
@@ -84,9 +84,17 @@ def patch_tissue_mask(request):
 
 
 @pytest.fixture
+def tumor_model():
+    return Factory(
+        'slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin',
+        'TumorModel').get_model()
+
+
+@pytest.fixture
 def tissue_model():
-    return load_model(
-        'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+    return Factory(
+        "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin",
+        'TissueModel').get_model()
 
 
 @pytest.fixture

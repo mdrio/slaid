@@ -154,17 +154,10 @@ def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level,
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
                                             (Slide, (OpenSlide, ))])
-@pytest.mark.parametrize(
-    "model",
-    [
-        TumorModel(
-            "slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin")
-    ],
-)
 @pytest.mark.parametrize("array_factory", [ZarrStorage])
-def test_classifies_tumor(slide, classifier_cls, model, array_factory,
+def test_classifies_tumor(slide, classifier_cls, tumor_model, array_factory,
                           tmp_path):
-    classifier = classifier_cls(model,
+    classifier = classifier_cls(tumor_model,
                                 "test",
                                 Filter(None, np.ones((1, 1), dtype="bool")),
                                 array_factory=array_factory(
@@ -178,10 +171,8 @@ def test_classifies_tumor(slide, classifier_cls, model, array_factory,
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
                                             (Slide, (OpenSlide, ))])
-def test_classifies_tissue(slide, patch_tissue_mask):
-    model = TissueModel(
-        "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin")
-    classifier = PixelClassifier(model, "tissue")
+def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
+    classifier = PixelClassifier(tissue_model, "tissue")
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
     assert (mask.array == patch_tissue_mask).all()
 
@@ -195,7 +186,7 @@ def test_classifies_tissue(slide, patch_tissue_mask):
     )
     filter_array[:2, :2] = 1
 
-    filter_classifier = FilteredPixelClassifier(model, "tissue",
+    filter_classifier = FilteredPixelClassifier(tissue_model, "tissue",
                                                 Filter(None, filter_array))
     mask = filter_classifier.classify(
         slide,

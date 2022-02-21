@@ -279,6 +279,8 @@ def test_real_case_classification(classifier, mirax_slide, chunk_size,
 
     if batch_size:
         tissue_low_res.extend(['--batch-size', str(batch_size)])
+
+    print(' '.join(tissue_low_res))
     subprocess.check_call(tissue_low_res)
 
     group = zarr.open(str(tmp_path / f'{os.path.basename(mirax_slide)}.zarr'))

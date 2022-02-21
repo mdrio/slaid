@@ -1,6 +1,7 @@
 import logging
 import os
-from abc import ABC, abstractstaticmethod
+from abc import ABC
+from dataclasses import dataclass
 from typing import List
 
 import numpy as np
@@ -17,17 +18,37 @@ fh = logging.FileHandler('/tmp/eddl.log')
 logger.addHandler(fh)
 
 
+@dataclass
 class Factory(BaseFactory):
+    filename: str
+    cls_name: str = None
+    gpu: List[int] = None
+    learn_rate = 1e-5
+    list_of_losses: List[str] = None
+    list_of_metrics: List[str] = None
 
-    def __init__(self, filename: str, gpu: List[int]):
-        super().__init__(filename)
-        self._gpu = gpu
+    def __post_init__(self):
+        self.list_of_losses = self.list_of_losses or ["soft_cross_entropy"]
+        self.list_of_metrics = self.list_of_metrics or ["categorical_accuracy"]
 
     def get_model(self):
-        basename = os.path.basename(self._filename)
-        cls_name = basename.split('-')[0]
-        cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-        return globals()[cls_name](self._filename, self._gpu)
+        if self.cls_name:
+            cls_name = self.cls_name
+        else:
+            basename = os.path.basename(self.filename)
+            cls_name = basename.split('-')[0]
+            cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+        cls = globals()[cls_name]
+        net = cls.create_net()
+        eddl.build(net,
+                   eddl.rmsprop(self.learn_rate),
+                   self.list_of_losses,
+                   self.list_of_metrics,
+                   eddl.CS_GPU(self.gpu, mem="low_mem")
+                   if self.gpu else eddl.CS_CPU(),
+                   init_weights=False)
+        eddl.load(net, self.filename, "bin")
+        return globals()[cls_name](net)
 
 
 class Model(BaseModel, ABC):
@@ -37,50 +58,28 @@ class Model(BaseModel, ABC):
     normalization_factor = 1
     index_prediction = 1
 
-    def __init__(self, weight_filename, gpu: List = None):
+    def __init__(self,
+                 net: eddl.Model,
+                 weight_filename: str = None,
+                 gpu: List = None):
+        self._net = net
         self._weight_filename = weight_filename
         self._gpu = gpu
-        self._model_ = None
 
     @property
     def weight_filename(self):
         return self._weight_filename
 
-    def _get_model(self):
-        if self._model_ is None:
-            self._create_model()
-        return self._model_
-
-    def _set_model(self, value):
-        self._model_ = value
-
-    _model = property(_get_model, _set_model)
-
     def __str__(self):
-        return self._weight_filename
+        return str(self._weight_filename)
 
-    def _set_gpu(self, value: List):
-        self._gpu = value
-        self._model = None
-
-    def _get_gpu(self) -> List:
+    @property
+    def gpu(self) -> List:
         return self._gpu
 
-    gpu = property(_get_gpu, _set_gpu)
-
-    def _create_model(self):
-        net = self._create_net()
-        eddl.build(
-            net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
-            ["categorical_accuracy"],
-            eddl.CS_GPU(self.gpu, mem="low_mem")
-            if self.gpu else eddl.CS_CPU())
-        eddl.load(net, self._weight_filename, "bin")
-        self._model_ = net
-
-    @abstractstaticmethod
-    def _create_net():
-        pass
+    @property
+    def net(self):
+        return self._net
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         predictions = self._predict(array)
@@ -94,14 +93,8 @@ class Model(BaseModel, ABC):
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
         tensor = Tensor.fromarray(array / self.normalization_factor)
-        prediction = eddl.predict(self._model, [tensor])
+        prediction = eddl.predict(self._net, [tensor])
         return prediction
-
-    def __getstate__(self):
-        return dict(weight_filename=self._weight_filename, gpu=self._gpu)
-
-    def __setstate__(self, state):
-        self.__init__(**state)
 
 
 class TissueModel(Model):
@@ -110,7 +103,7 @@ class TissueModel(Model):
                            ImageInfo.CHANNEL.LAST)
 
     @staticmethod
-    def _create_net():
+    def create_net():
         in_ = eddl.Input([3])
         layer = in_
         layer = eddl.ReLu(eddl.Dense(layer, 50))
@@ -127,7 +120,7 @@ class TumorModel(Model):
     index_prediction = 1
 
     @staticmethod
-    def _create_net():
+    def create_net():
         in_size = [256, 256]
         num_classes = 2
         in_ = eddl.Input([3, in_size[0], in_size[1]])
