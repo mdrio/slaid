@@ -150,6 +150,9 @@ def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level,
     assert (mask.array[2:, :] == 0).all()
 
 
+@pytest.mark.parametrize(
+    "model_filename",
+    ['slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin'])
 @pytest.mark.parametrize("classifier_cls", [FilteredPatchClassifier])
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
@@ -168,6 +171,10 @@ def test_classifies_tumor(slide, classifier_cls, tumor_model, array_factory,
     assert round(float(mask.array[0]), 4) == round(1 - 0.11082522, 4)
 
 
+@pytest.mark.parametrize("model_filename", [
+    "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin",
+    "slaid/resources/models/tissue_model-eddl-1.1.onnx"
+])
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
                                             (Slide, (OpenSlide, ))])

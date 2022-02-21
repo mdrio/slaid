@@ -1,15 +1,18 @@
 import os
 
-from slaid.models import Factory as BaseFactory, Model
+import slaid.models.eddl as eddl
+from slaid.models import Factory as BaseFactory
+from slaid.models import Model
 from slaid.models.commons import Factory as CommonFactory
-from slaid.models.eddl import Factory as EddlFactory
 
 
 class Factory(BaseFactory):
 
-    def __init__(self, filename, **kwargs):
+    def __init__(self, filename, backend: str = 'eddl', **kwargs):
         super().__init__(filename)
+        self.backend = backend
         self._kwargs = kwargs
+        self._backends = {'eddl': eddl}
 
     def get_model(self) -> Model:
         _ext_mapping = {
@@ -25,10 +28,14 @@ class Factory(BaseFactory):
         return CommonFactory(self._filename)
 
     def _get_eddl_factory(self, **kwargs) -> Model:
-        return EddlFactory(self._filename, **kwargs)
+        return eddl.Factory(self._filename, **kwargs)
 
-    def _get_onnx_factory(
-            self,
+    def _get_onnx_factory(self, gpu, cls_name: str = None) -> Model:
+        backend_module = self._backends[self.backend]
+        factory = getattr(backend_module, 'OnnxFactory')
+        return factory(
+            self._filename,
+            cls_name,
             gpu,
-            backend_cls: str = 'slaid.models.eddl.TumorModel') -> Model:
-        ...
+        )
+        return factory

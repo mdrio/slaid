@@ -14,6 +14,7 @@ class Model(abc.ABC):
 
 
 class Factory(abc.ABC):
+
     def __init__(self, filename):
         self._filename = filename
 

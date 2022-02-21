@@ -41,9 +41,10 @@ def _test_output(feature, output, slide, level, tile_size=1):
 
 
 @pytest.mark.parametrize('classifier', ['fixed-batch'])
-@pytest.mark.parametrize(
-    'model',
-    ['slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin'])
+@pytest.mark.parametrize('model', [
+    'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin',
+    'slaid/resources/models/tissue_model-eddl-1.1.onnx'
+])
 @pytest.mark.parametrize('chunk', [None, 10])
 @pytest.mark.parametrize('level', [2])
 def test_classify(classifier, tmp_path, model, chunk, level):
@@ -55,6 +56,7 @@ def test_classify(classifier, tmp_path, model, chunk, level):
     ]
     if chunk:
         cmd += ['--chunk-size', str(chunk)]
+    print(' '.join(cmd))
     subprocess.check_call(cmd)
     logger.info('running cmd %s', ' '.join(cmd))
     output_path = os.path.join(path, f'{input_basename}.zarr')

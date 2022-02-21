@@ -18,39 +18,6 @@ fh = logging.FileHandler('/tmp/eddl.log')
 logger.addHandler(fh)
 
 
-@dataclass
-class Factory(BaseFactory):
-    filename: str
-    cls_name: str = None
-    gpu: List[int] = None
-    learn_rate = 1e-5
-    list_of_losses: List[str] = None
-    list_of_metrics: List[str] = None
-
-    def __post_init__(self):
-        self.list_of_losses = self.list_of_losses or ["soft_cross_entropy"]
-        self.list_of_metrics = self.list_of_metrics or ["categorical_accuracy"]
-
-    def get_model(self):
-        if self.cls_name:
-            cls_name = self.cls_name
-        else:
-            basename = os.path.basename(self.filename)
-            cls_name = basename.split('-')[0]
-            cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-        cls = globals()[cls_name]
-        net = cls.create_net()
-        eddl.build(net,
-                   eddl.rmsprop(self.learn_rate),
-                   self.list_of_losses,
-                   self.list_of_metrics,
-                   eddl.CS_GPU(self.gpu, mem="low_mem")
-                   if self.gpu else eddl.CS_CPU(),
-                   init_weights=False)
-        eddl.load(net, self.filename, "bin")
-        return globals()[cls_name](net)
-
-
 class Model(BaseModel, ABC):
     patch_size = None
     image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
@@ -155,8 +122,57 @@ class TumorModel(Model):
         return x
 
 
-def load_model(weight_filename: str, gpu: List[int] = None) -> Model:
-    basename = os.path.basename(weight_filename)
-    cls_name = basename.split('-')[0]
-    cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-    return globals()[cls_name](weight_filename, gpu)
+def to_onnx(model: Model, filename: str):
+    eddl.save_net_to_onnx_file(model.net, filename)
+
+
+@dataclass
+class Factory(BaseFactory):
+    filename: str
+    cls_name: str = None
+    gpu: List[int] = None
+    learn_rate = 1e-5
+    list_of_losses: List[str] = None
+    list_of_metrics: List[str] = None
+
+    def __post_init__(self):
+        self.list_of_losses = self.list_of_losses or ["soft_cross_entropy"]
+        self.list_of_metrics = self.list_of_metrics or ["categorical_accuracy"]
+
+    def get_model(self):
+        cls_name = self._get_cls_name()
+        cls = globals()[cls_name]
+        net = cls.create_net()
+        self._build_net(net)
+        eddl.load(net, self.filename, "bin")
+        return globals()[cls_name](net)
+
+    def _build_net(self, net):
+        eddl.build(net,
+                   eddl.rmsprop(self.learn_rate),
+                   self.list_of_losses,
+                   self.list_of_metrics,
+                   eddl.CS_GPU(self.gpu, mem="low_mem")
+                   if self.gpu else eddl.CS_CPU(),
+                   init_weights=False)
+
+    def _get_cls_name(self):
+        if self.cls_name:
+            cls_name = self.cls_name
+        else:
+            basename = os.path.basename(self.filename)
+            cls_name = basename.split('-')[0]
+            cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+        return cls_name
+
+
+@dataclass
+class OnnxFactory(Factory):
+
+    def get_model(self):
+        net = eddl.import_net_from_onnx_file(self.filename)
+        self._build_net(net)
+
+        cls_name = self._get_cls_name()
+        cls = globals()[cls_name]
+        return cls(net)
