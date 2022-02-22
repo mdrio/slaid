@@ -177,3 +177,9 @@ def green_slide_and_patch_classifier(backend, slide_cls, image_info):
 @pytest.fixture
 def mask():
     return Mask(np.arange(9).reshape((3, 3)), 0, 1, [(3, 3)])
+
+
+@pytest.fixture
+def patch_array():
+    patch_array = np.load(open('tests/data/patch.npy', 'rb'))
+    return patch_array

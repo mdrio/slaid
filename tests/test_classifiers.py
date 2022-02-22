@@ -204,6 +204,13 @@ def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
     assert (mask.array[:16, :16] == patch_tissue_mask[:16, :16]).all()
 
 
+@pytest.mark.parametrize(
+    "model_filename", ['slaid/resources/models/tumor_model-level_1-v2.onnx'])
+def test_tumor_model(tumor_model, patch_array):
+    prediction = tumor_model.predict(patch_array)
+    assert round(float(prediction[0]), 4) == 0.9998
+
+
 if __name__ == "__main__":
     init_client()
     unittest.main()
