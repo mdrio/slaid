@@ -20,7 +20,7 @@ logger.addHandler(fh)
 
 class Model(BaseModel, ABC):
     patch_size = None
-    image_info = ImageInfo(
+    default_image_info = ImageInfo(
         ImageInfo.ColorType.BGR,
         ImageInfo.Coord.YX,
         ImageInfo.Channel.FIRST,
@@ -30,10 +30,12 @@ class Model(BaseModel, ABC):
     def __init__(self,
                  net: eddl.Model,
                  weight_filename: str = None,
-                 gpu: List = None):
+                 gpu: List = None,
+                 image_info: ImageInfo = None):
         self._net = net
         self._weight_filename = weight_filename
         self._gpu = gpu
+        self.image_info = image_info or self.default_image_info
 
     @property
     def weight_filename(self):
@@ -68,8 +70,9 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
-    image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
-                           ImageInfo.Channel.LAST, ImageInfo.Range._0_255)
+    default_image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
+                                   ImageInfo.Channel.LAST,
+                                   ImageInfo.Range._0_255)
 
     @staticmethod
     def create_net():
@@ -86,8 +89,9 @@ class TissueModel(Model):
 class TumorModel(Model):
     patch_size = (256, 256)
     index_prediction = 1
-    image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
-                           ImageInfo.Channel.FIRST, ImageInfo.Range._0_1)
+    default_image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
+                                   ImageInfo.Channel.FIRST,
+                                   ImageInfo.Range._0_1)
 
     @staticmethod
     def create_net():
