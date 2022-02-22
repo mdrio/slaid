@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List
 
 import numpy as np
+import onnx
 import pyeddl.eddl as eddl
 import stringcase
 from pyeddl.tensor import Tensor
@@ -182,4 +183,22 @@ class OnnxFactory(Factory):
 
         cls_name = self._get_cls_name()
         cls = globals()[cls_name]
-        return cls(net)
+
+        image_info = self._update_image_info(cls.default_image_info)
+        return cls(net, image_info=image_info)
+
+    def _update_image_info(self, image_info: ImageInfo) -> ImageInfo:
+
+        image_info = ImageInfo(color_type=image_info.color_type,
+                               coord=image_info.coord,
+                               channel=image_info.channel,
+                               pixel_range=image_info.pixel_range)
+        onnx_model = onnx.load(self.filename)
+        for prop in onnx_model.metadata_props:
+            if prop.key == "Image.BitmapPixelFormat":
+                color_type = prop.value[:3].lower()
+                image_info.color_type = ImageInfo.ColorType(color_type)
+            if prop.key == "Image.NominalPixelRange":
+                pixel_range = prop.value.split('_', 1)[1]
+                image_info.pixel_range = ImageInfo.Range(pixel_range)
+        return image_info

@@ -205,12 +205,12 @@ def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
 
 
 @pytest.mark.parametrize(
-    "model_filename", ['slaid/resources/models/tumor_model-level_1-v2.onnx'])
+    "model_filename", ['slaid/resources/models/tumor_model-level_1-v2.1.onnx'])
 def test_tumor_model(tumor_model, patch_array):
     image_info = ImageInfo.create('bgr', 'xy', 'first', '0_255')
     patch_array = image_info.convert(patch_array, tumor_model.image_info)
     prediction = tumor_model.predict(patch_array)
-    assert round(float(prediction[0]), 4) == 0.9998
+    assert round(float(prediction[0]), 4) == 1
 
 
 if __name__ == "__main__":
