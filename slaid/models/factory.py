@@ -30,7 +30,7 @@ class Factory(BaseFactory):
     def _get_eddl_factory(self, **kwargs) -> Model:
         return eddl.Factory(self._filename, **kwargs)
 
-    def _get_onnx_factory(self, gpu, cls_name: str = None) -> Model:
+    def _get_onnx_factory(self, gpu=None, cls_name: str = None) -> Model:
         backend_module = self._backends[self.backend]
         factory = getattr(backend_module, 'OnnxFactory')
         return factory(
