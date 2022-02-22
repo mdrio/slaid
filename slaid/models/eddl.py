@@ -20,9 +20,11 @@ logger.addHandler(fh)
 
 class Model(BaseModel, ABC):
     patch_size = None
-    image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
-                           ImageInfo.Channel.FIRST)
-    normalization_factor = 1
+    image_info = ImageInfo(
+        ImageInfo.ColorType.BGR,
+        ImageInfo.Coord.YX,
+        ImageInfo.Channel.FIRST,
+    )
     index_prediction = 1
 
     def __init__(self,
@@ -59,7 +61,7 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        tensor = Tensor.fromarray(array / self.normalization_factor)
+        tensor = Tensor.fromarray(array)
         prediction = eddl.predict(self._net, [tensor])
         return prediction
 
@@ -67,7 +69,7 @@ class Model(BaseModel, ABC):
 class TissueModel(Model):
     index_prediction = 1
     image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
-                           ImageInfo.Channel.LAST)
+                           ImageInfo.Channel.LAST, ImageInfo.Range._0_255)
 
     @staticmethod
     def create_net():
@@ -83,8 +85,9 @@ class TissueModel(Model):
 
 class TumorModel(Model):
     patch_size = (256, 256)
-    normalization_factor = 255
     index_prediction = 1
+    image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
+                           ImageInfo.Channel.FIRST, ImageInfo.Range._0_1)
 
     @staticmethod
     def create_net():
