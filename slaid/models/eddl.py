@@ -20,8 +20,8 @@ logger.addHandler(fh)
 
 class Model(BaseModel, ABC):
     patch_size = None
-    image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
-                           ImageInfo.CHANNEL.FIRST)
+    image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
+                           ImageInfo.Channel.FIRST)
     normalization_factor = 1
     index_prediction = 1
 
@@ -66,8 +66,8 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
-    image_info = ImageInfo(ImageInfo.COLORTYPE.RGB, ImageInfo.COORD.YX,
-                           ImageInfo.CHANNEL.LAST)
+    image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
+                           ImageInfo.Channel.LAST)
 
     @staticmethod
     def create_net():
