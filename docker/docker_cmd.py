@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import glob
 import logging
 import os
 import subprocess
+
+from slaid.models.factory import retrieve_model
 
 logging.basicConfig(level=logging.DEBUG)
 
