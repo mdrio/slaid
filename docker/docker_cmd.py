@@ -130,9 +130,10 @@ def _get_tag(lib_version, model_name, extra_tags=None):
 def get_models():
     with open("filter-models.txt", "r") as f_obj:
         models = f_obj.read().splitlines()
-    for model in models:
-        model_no_ext = os.path.splitext(model)[0]
-        yield model, model_no_ext
+    for model_path in models:
+        model_path = retrieve_model(model_path)
+        model_no_ext = os.path.splitext(model_path)[0]
+        yield os.path.basename(model_path), model_no_ext
 
 
 if __name__ == "__main__":
