@@ -243,7 +243,7 @@ def basic(input_path: str,
 
 def fixed_batch(input_path: str,
                 *,
-                model_name: (str, 'm'),
+                model: (str, 'm'),
                 level: (int, 'l'),
                 output_dir: (str, 'o'),
                 label: (str, 'L'),
@@ -275,7 +275,7 @@ def fixed_batch(input_path: str,
                   batch_size=batch_size)
 
     gpu = _convert_gpu_params(gpu)
-    model = ModelFactory(model_name, gpu=gpu).get_model()
+    model = ModelFactory(model, gpu=gpu).get_model()
     kwargs['model'] = model
     if _filter:
         kwargs['_filter'] = _filter
