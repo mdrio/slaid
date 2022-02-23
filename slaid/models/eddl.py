@@ -32,11 +32,13 @@ class Model(BaseModel, ABC):
                  net: eddl.Model,
                  weight_filename: str = None,
                  gpu: List = None,
-                 image_info: ImageInfo = None):
+                 image_info: ImageInfo = None,
+                 name: str = None):
         self._net = net
         self._weight_filename = weight_filename
         self._gpu = gpu
         self.image_info = image_info or self.default_image_info
+        super().__init__(name)
 
     @property
     def weight_filename(self):
@@ -185,7 +187,9 @@ class OnnxFactory(Factory):
         cls = globals()[cls_name]
 
         image_info = self._update_image_info(cls.default_image_info)
-        return cls(net, image_info=image_info)
+        return cls(net,
+                   image_info=image_info,
+                   name=os.path.basename(self.filename))
 
     def _update_image_info(self, image_info: ImageInfo) -> ImageInfo:
 
