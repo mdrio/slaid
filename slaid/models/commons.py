@@ -1,11 +1,10 @@
+import pickle
 from typing import List, Tuple
 
 import numpy as np
 from pyeddl.tensor import Tensor
-import pickle
 
-from slaid.commons import NapariSlide
-from slaid.commons.base import Image, ImageInfo
+from slaid.commons.base import Image, ImageInfo, Slide
 from slaid.models.base import Factory as BaseFactory
 from slaid.models.base import Model as BaseModel
 from slaid.models.eddl import Model as EddlModel
@@ -87,7 +86,7 @@ class DummyModel(BaseDummyModel):
         return self.func(array.shape[0])
 
 
-class DummySlide(NapariSlide):
+class DummySlide(Slide):
 
     def __init__(self,
                  level_dimensions: List[Tuple[int, int]],

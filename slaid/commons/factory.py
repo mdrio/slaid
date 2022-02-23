@@ -2,7 +2,7 @@ import abc
 import logging
 from dataclasses import dataclass
 
-from slaid.commons import BasicSlide, ImageInfo, Slide
+from slaid.commons.base import BasicSlide, ImageInfo, Slide
 
 logger = logging.getLogger('slaid.commons.factory')
 

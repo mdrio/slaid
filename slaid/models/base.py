@@ -2,7 +2,7 @@ import abc
 
 import numpy as np
 
-from slaid.commons import ImageInfo
+from slaid.commons.base import ImageInfo
 
 
 class Model(abc.ABC):

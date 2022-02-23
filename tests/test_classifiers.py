@@ -6,13 +6,10 @@ import pytest
 from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
                                            FilteredPixelClassifier,
                                            PixelClassifier)
-from slaid.commons import Mask
-from slaid.commons.base import Filter, Slide, ImageInfo
-from slaid.commons.dask import init_client
+from slaid.commons.base import Filter, Mask, Slide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.openslide import BasicSlide as OpenSlide
-from slaid.models.eddl import TissueModel, TumorModel
-from slaid.writers.zarr import ZarrStorage
+from slaid.writers.zarr_adapter import ZarrStorage
 from tests.commons import EddlGreenPatchModel, GreenModel
 
 
@@ -208,11 +205,12 @@ def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
 #      'https://space.crs4.it/s/GcCd8EQx5W84zrK/download/tumor_model-level_1-v2.1.onnx'
 #  ])
 #  def test_tumor_model(tumor_model, patch_array):
+#      from slaid.commons.base import ImageInfo
 #      image_info = ImageInfo.create('bgr', 'xy', 'first', '0_255')
 #      patch_array = image_info.convert(patch_array, tumor_model.image_info)
 #      prediction = tumor_model.predict(patch_array)
 #      assert round(float(prediction[0]), 4) == 0.9998
+#
 
 if __name__ == "__main__":
-    init_client()
     unittest.main()

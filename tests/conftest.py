@@ -1,20 +1,13 @@
 from datetime import datetime as dt
 
-import dask.array as da
 import numpy as np
 import pytest
-import tiledb
 
-from slaid.classifiers.base import BasicClassifier
-from slaid.classifiers.dask import Classifier as DaskClassifier
-from slaid.commons import ImageInfo, Mask
-from slaid.commons.base import Slide, SlideStore
-from slaid.commons.dask import Slide as DaskSlide
+from slaid.commons.base import ImageInfo, Mask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.factory import MetaSlideFactory
-from slaid.models.dask import ActorModel
 from slaid.models.factory import Factory
-from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
+from tests.commons import DummyModel, GreenModel
 
 
 @pytest.fixture
@@ -39,22 +32,6 @@ def slide_with_mask():
 @pytest.fixture
 def array(request):
     return np.ones((10, 10))
-
-
-@pytest.fixture
-def dask_array(request):
-    return da.ones((10, 10))
-
-
-@pytest.fixture
-def tiledb_path(tmp_path):
-    tmp_path = str(tmp_path)
-    tiledb.from_numpy(tmp_path, np.ones((10, 10)))
-    with tiledb.open(tmp_path, 'w') as array:
-        array.meta['extraction_level'] = 1
-        array.meta['level_downsample'] = 1
-        array.meta['threshold'] = 0.8
-    return tmp_path
 
 
 @pytest.fixture
@@ -106,25 +83,10 @@ def slide(slide_cls, slide_path, args):
                                           *args).get_slide()
 
 
-@pytest.fixture
-def green_slide(
-    basic_slide_cls,
-    image_info,
-    tile_size,
-    slide_cls=Slide,
-):
-    slide_path = 'tests/data/test.tif'
-    return slide_cls(
-        SlideStore(basic_slide_cls(slide_path), tilesize=tile_size),
-        image_info)
-
-
 def green_classifier(classifier_cls):
     model = GreenModel()
 
     classifier = classifier_cls(model, 'tissue')
-    if classifier_cls == DaskClassifier:
-        classifier.compute_mask = True
 
     return classifier
 
@@ -138,40 +100,6 @@ def dummy_classifier(classifier_cls):
 @pytest.fixture
 def classifier(classifier_cls, model, feature='test'):
     return classifier_cls(model, feature)
-
-
-@pytest.fixture
-def green_slide_and_classifier(backend, slide_cls, image_info):
-
-    slide_path = 'tests/data/test.tif'
-    if backend == 'basic':
-        return Slide(SlideStore(slide_cls(slide_path)),
-                     image_info), BasicClassifier(GreenModel(), 'tissue')
-    elif backend == 'dask':
-        return DaskSlide(SlideStore(slide_cls(slide_path)),
-                         image_info), DaskClassifier(GreenModel(),
-                                                     'tissue',
-                                                     compute_mask=True)
-    else:
-        return NotImplementedError(backend)
-
-
-@pytest.fixture
-def green_slide_and_patch_classifier(backend, slide_cls, image_info):
-
-    slide_path = 'tests/data/test.tif'
-    if backend == 'basic':
-        return Slide(SlideStore(slide_cls(slide_path)),
-                     image_info), BasicClassifier(
-                         EddlGreenPatchModel(patch_size=(10, 10)), 'tissue')
-    elif backend == 'dask':
-        return DaskSlide(SlideStore(slide_cls(slide_path), tilesize=90),
-                         image_info), DaskClassifier(ActorModel.create(
-                             EddlGreenPatchModel, patch_size=(10, 10)),
-                                                     'tissue',
-                                                     compute_mask=True)
-    else:
-        return NotImplementedError(backend)
 
 
 @pytest.fixture

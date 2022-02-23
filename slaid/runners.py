@@ -10,16 +10,15 @@ import numpy as np
 from clize import parameters
 
 import slaid.commons.ecvl as ecvl
-from slaid.classifiers import BasicClassifier
+from slaid.classifiers.base import BasicClassifier
 from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
                                            FilteredPixelClassifier,
                                            PixelClassifier)
-from slaid.commons import ImageInfo
-from slaid.commons.base import Filter
-from slaid.models.factory import Factory as ModelFactory
+from slaid.commons.base import Filter, ImageInfo
 from slaid.models.base import Model
+from slaid.models.factory import Factory as ModelFactory
 from slaid.writers import REGISTRY as STORAGE
-from slaid.writers.zarr import ZarrStorage
+from slaid.writers.zarr_adapter import ZarrStorage
 
 DEFAULT_BATCH_SIZE = 8192
 

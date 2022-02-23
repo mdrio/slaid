@@ -31,7 +31,6 @@ from typing import Tuple
 
 import numpy as np
 import zarr
-from napari_lazy_openslide import OpenSlideStore
 from openslide import open_slide
 from PIL import Image as PIL_Image
 
@@ -92,16 +91,3 @@ class BasicSlide(BaseSlide):
     @property
     def level_downsamples(self):
         return self._level_downsamples
-
-    def to_array(self, level):
-        store = OpenSlideStore(self.filename)
-        grp = zarr.open(store, mode="r")
-        datasets = grp.attrs["multiscales"][0]["datasets"]
-
-        pyramid = [grp.get(d["path"]) for d in datasets]
-        return pyramid[level]
-
-
-def load(filename: str):
-    slide = Slide(filename)
-    return slide

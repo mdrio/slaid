@@ -11,8 +11,8 @@ import stringcase
 from pyeddl.tensor import Tensor
 
 from slaid.commons.base import ImageInfo
-from slaid.models import Factory as BaseFactory
-from slaid.models import Model as BaseModel
+from slaid.models.base import Factory as BaseFactory
+from slaid.models.base import Model as BaseModel
 
 logger = logging.getLogger('eddl-models')
 fh = logging.FileHandler('/tmp/eddl.log')

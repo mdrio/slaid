@@ -1,7 +1,7 @@
 import logging
 from typing import Dict
 
-from slaid.commons import Mask
+from slaid.commons.base import Mask
 from slaid.commons.zarr import GroupArrayFactory
 from slaid.writers import Storage
 

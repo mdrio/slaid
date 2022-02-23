@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 from urllib.request import urlretrieve
 
 import slaid.models.eddl as eddl
-from slaid.models import Factory as BaseFactory
-from slaid.models import Model
+from slaid.models.base import Factory as BaseFactory
+from slaid.models.base import Model
 from slaid.models.commons import Factory as CommonFactory
 
 logger = logging.getLogger()

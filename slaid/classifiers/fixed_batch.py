@@ -1,16 +1,13 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime as dt
 from functools import partial
-from typing import Tuple, Union
+from typing import Tuple
 
 import numpy as np
 
 from slaid.classifiers.base import Classifier as BaseClassifier
-from slaid.classifiers.base import append_array
-from slaid.commons import Filter, Mask
-from slaid.commons.base import ArrayFactory, ImageInfo, Slide
-from slaid.models import Model
+from slaid.commons.base import ArrayFactory, Filter, ImageInfo, Mask, Slide
+from slaid.models.base import Model
 
 logger = logging.getLogger()
 

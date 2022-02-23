@@ -3,7 +3,7 @@ from typing import List, Tuple
 import numpy as np
 from pyeddl.tensor import Tensor
 
-from slaid.commons import Slide
+from slaid.commons.base import Slide
 from slaid.commons.base import Image, ImageInfo
 from slaid.models.eddl import Model as EddlModel
 
@@ -30,6 +30,7 @@ class GreenModel(BaseModel):
 
 
 class EddlGreenModel(BaseModel, EddlModel):
+
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
 
@@ -45,6 +46,7 @@ class EddlGreenModel(BaseModel, EddlModel):
 
 
 class EddlGreenPatchModel(BaseModel, EddlModel):
+
     def __init__(self, patch_size=(256, 256)):
         self._patch_size = patch_size
 
@@ -62,6 +64,7 @@ class EddlGreenPatchModel(BaseModel, EddlModel):
 
 
 class BaseDummyModel(BaseModel):
+
     def __init__(self, patch_size=None):
         self._patch_size = patch_size
         self.array_predicted = []
@@ -90,6 +93,7 @@ class DummyModel(BaseDummyModel):
 
 
 class DummySlide(Slide):
+
     def __init__(self,
                  level_dimensions: List[Tuple[int, int]],
                  level_downsamples: List[Tuple[int, int]],
@@ -123,6 +127,7 @@ class DummySlide(Slide):
 
 
 class AllOneModel(BaseDummyModel):
+
     def _predict(self, array):
         return np.ones(array.shape[0], dtype=np.uint8)
 
