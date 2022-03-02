@@ -34,6 +34,7 @@ jobs:
 
     - name: Bump version and push tag
       id: tag-creation
+      if: ${{ github.event_name == 'push' }}
       uses: anothrNick/github-tag-action@1.34.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,14 +49,22 @@ jobs:
       matrix:
           tag: [cudnn]
 
+    env:
+      BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.outputs.pyecvl_version }}-${{ matrix.tag }}
+      EXTRA_TAGS: ${{ matrix.tag }}
+
     steps:
     - uses: actions/checkout@v2
       with:
         fetch-depth: '0'
 
     - name: update VERSION file
+      if: ${{ github.event_name == 'push' }}
       run: echo  "${{ needs.test.outputs.tag }}" > VERSION
 
+    - name: mock VERSION file
+      if: ${{ github.event_name != 'push' }}
+      run: echo  "dev" > VERSION
     - name: set docker repo
       shell: bash
       env:
@@ -68,10 +77,11 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-    - name: build and push docker images
-      env:
-        BUILD_ARG: PARENT=dhealth/pylibs-toolkit:${{ needs.test.outputs.pyecvl_version }}-${{ matrix.tag }}
-        EXTRA_TAGS: ${{ matrix.tag }}
+    - name: build  docker images
+      run: make docker skip_test=true
+
+    - name: push  docker images
+      if: ${{ github.event_name == 'push' }}
       run: make docker-push skip_test=true
 
 
