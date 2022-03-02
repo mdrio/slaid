@@ -25,8 +25,12 @@ jobs:
 
     - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
     - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
-    - run: conda install -c anaconda python=3.8
-    - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu==${{ steps.get_pyecvl_version.outputs.pyecvl-version }}
+    - run: conda install mamba -n base -c conda-forge
+    - run: conda config --add channels dhealth
+    - run:  conda config --add channels bioconda
+    - run:  conda config --add channels conda-forge
+    - run:  conda config --set channel_priority strict
+    - run: mamba install -y python=3.8 pyecvl-cpu==${{ steps.get_pyecvl_version.outputs.pyecvl-version }}
     - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
 
     - name: test
