@@ -54,24 +54,5 @@ def test_filter(mask):
     assert (filter_[1:, :] == 1).all()
 
 
-def test_filter_rescale(mask):
-    filter_ = mask >= 5
-    print(filter_._array)
-    filter_.rescale((9, 9))
-    expected = [
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, True, True, True],
-        [False, False, False, False, False, False, True, True, True],
-        [False, False, False, False, False, False, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-    ]
-    print(filter_._array)
-    assert (filter_[:, :] == np.array(expected)).all()
-
-
 if __name__ == '__main__':
     unittest.main()
