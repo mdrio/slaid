@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from typing import Callable, Dict, List
-
+import slaid
 import numpy as np
 from clize import parameters
 
@@ -371,6 +371,9 @@ class DirCache(Cache):
         return file_path
 
     def _get_filepath(self, func: Callable, **kwargs: Dict[str, str]) -> str:
-        key = (func.__name__, ) + tuple(sorted(kwargs.items()))
+        key = (
+            slaid.__version__,
+            func.__name__,
+        ) + tuple(sorted(kwargs.items()))
         filename = hashlib.sha256(str(key).encode()).hexdigest()
         return os.path.join(self.directory, filename)
