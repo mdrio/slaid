@@ -47,5 +47,9 @@ Example:
 docker run  --rm -v $DIR/../data:/data    slaid:0.62.0-tissue_model-extract_tissue_eddl_1.1 -l 0 /data/$IMAGE --overwrite  -f tissue  -o/data
 
 ```
+## Licenses
+ The software in this repository and the associated documentation files are provided under the conditions of the MIT License,
+ while the model coefficients in the directory  ```slaid/resources/models``` and the ones referenced in ```docker/filter-models.txt```
+ are provided under the conditions of the CC-BY-NC-SA 4.0 License.
 
 Tests data from https://openslide.cs.cmu.edu/download/openslide-testdata/Mirax/. Credits to Yves Sucaet.
