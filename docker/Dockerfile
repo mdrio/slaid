@@ -4,6 +4,11 @@ FROM  $PARENT
 
 # RUN useradd -ms  /bin/bash slaid && \
 #     chown slaid /tmp/slaid && \
+# WORKAROUND for apt update issue
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN apt-key del 7fa2af80
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+
 RUN apt update && apt install -y openslide-tools ffmpeg libsm6 libxext6 && \
     pip3 uninstall -y setuptools && \
     pip3 install setuptools==45
