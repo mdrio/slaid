@@ -1,5 +1,4 @@
 tissue_model-eddl_2.bin
 tumor_model-level_1.bin
 https://space.crs4.it/s/cYwrgStikHjyzwk/download/tumor_model-level_1-v2.3.onnx
-https://space.crs4.it/s/Mw7DsmnDCLaHokM/download/tumor_model-level_1-v2.4.onnx
 https://space.crs4.it/s/fBdYs6A93zqgx65/download/tumor_model-level_1-v2.5.onnx
